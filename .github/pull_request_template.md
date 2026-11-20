@@ -17,8 +17,8 @@
 | Summarized + retained JSON/JUnit Go tests (specialized CI) | `make test-report` / GitHub Actions | NOT RUN |
 | oasdiff API compatibility (only with real baseline/current specs) | `make api-compat` | NOT RUN |
 | Third-party skill scanning (if added/updated) | [Preflight](../docs/tooling/third-party-security.md) | NOT RUN |
-| golangci-lint | `make lint` | NOT RUN |
-| Vulnerability scan | `make security` | NOT RUN |
+| golangci-lint v2.15.0 (blocking CI job) | `make lint` | NOT RUN |
+| govulncheck v1.10.0 (blocking CI job) | `make security` | NOT RUN |
 | PostgreSQL integration / contracts / restoration (where relevant) | Targeted test names | NOT RUN |
 
 ## Compatibility / rollout

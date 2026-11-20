@@ -15,7 +15,8 @@
 | oasdiff breaking API check | Script prepared but no approved Go API contract exists | **NOT RUN** on actual released-vs-candidate spec |
 | `gofmt`, `go vet`, tests, architecture, doc links, build, race | Baseline deterministic checks | `make check` and `make race` in PR CI |
 | v6 research and evaluation metadata | Machine-checkable document completeness only | `make research` in `make check` (not literature verification) |
-| golangci-lint/gosec, govulncheck | Configured as optional local commands; **not yet blocking PR CI** | `make lint`, `make security`, missing binaries fail explicitly |
+| golangci-lint v2.15.0 and govulncheck v1.10.0 | [CI](../../.github/workflows/ci.yml) now defines separate blocking lint and vulnerability jobs; latest execution must be inspected | `make lint` / `make security`, **PASS only on successful Actions runs** |
+| [Harness v7 integration map](../research/harness-v7-provenance.md) | V7 ZIP audited against branch; historical test results archived, not rerun as current evidence | `make harness` checks routing and expected jobs, not design safety |
 | PostgreSQL, ledger idempotency, RLS, outbox, restore | **NOT IMPLEMENTED** in Go | Database/financial Gate A is NOT RUN |
 
 **Truthful gate reporting:** a green basic CI does not imply the security, finance, or performance gates passed.
@@ -27,6 +28,6 @@ Use the narrowest relevant skill from [registry](../../.agents/skills/). An agen
 ## Next adoption steps
 
 1. Review v6 research and decide which recommendations become mandatory Go standards; preserve existing Mamony ADR authority.
-2. Add verified linter/vulnerability CI jobs with pinned compatible versions.
+2. Verify and maintain the added pinned lint/vulnerability CI jobs; address failures before approving the PR.
 3. Build PostgreSQL migrations and real integration/recovery tests before claiming Gate A.
 4. Run the [v6 matched-task E01–E12 evaluations](../evals/mamony-agent-benchmark.md) before claiming quality improvements or token savings; compare accepted AC, cost, latency and defects.

@@ -6,4 +6,6 @@ Authoritative product requirements, approved ADRs, technical designs and invaria
 
 See [v6 source-file manifest](v6-integration-manifest.md) for what was imported verbatim, merged, or retained from v5.
 
+See the [v7 integration manifest](harness-v7-provenance.md) for the 39-file source comparison and why historical local verification is separate from real repository CI.
+
 Keep `AGENTS.md` brief. Read only sections relevant to the task; do not paste this full research document into every agent prompt.

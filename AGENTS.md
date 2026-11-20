@@ -14,4 +14,6 @@ Project: synthetic cross-border pay-in/pay-out simulator. No real funds, identit
 
 10. Review the [11-tool adoption matrix](docs/tooling/shortlist.md) before using new agent or CLI tools. Pinned `go-arch-lint` and `gotestsum` run in specialized CI. Other upstream packages/MCP servers are **not automatically installed**. Follow [third-party preflight](docs/tooling/third-party-security.md); do not enable RTK global hooks before matched-task evaluation.
 
+11. Before writing C01 persistence or PostgreSQL migrations, read [ledger contract gaps](docs/contracts/ledger-contract-gaps.md) and [database contract gaps](docs/contracts/database-contract-gaps.md); these blockers are NOT RUN. Use the [six-step AI task workflow](docs/standards/agent-workflow.md). Current CI contains lint/vulnerability jobs; record their observed results, not expected results.
+
 See [architecture](docs/architecture.md), [requirements](docs/contracts/ledger-gate-a.md) and [PR evidence](docs/evidence/template.md).

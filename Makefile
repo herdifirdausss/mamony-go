@@ -1,6 +1,6 @@
-.PHONY: check fmt-check vet unit architecture docs skills research tools-policy archlint test-report api-compat build race lint security run
+.PHONY: check fmt-check vet unit architecture docs skills research tools-policy harness archlint test-report api-compat build race lint security run
 
-check: fmt-check vet unit architecture docs skills research tools-policy build
+check: fmt-check vet unit architecture docs skills research tools-policy harness build
 
 fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
@@ -26,6 +26,9 @@ research:
 
 tools-policy:
 	python3 tools/toolingcheck.py
+
+harness:
+	python3 tools/harnesscheck.py
 
 archlint:
 	@command -v go-arch-lint >/dev/null || { echo 'NOT RUN: install github.com/fe3dback/go-arch-lint@v1.19.2'; exit 2; }

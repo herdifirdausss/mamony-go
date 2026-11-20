@@ -30,11 +30,14 @@ The private listener binds loopback only. Readiness means **HTTP process readine
 - `make research` checks the v6 document routing, 31 reference entries and 12 benchmark case IDs; this is a metadata gate, **not** independent research verification.
 - [11-candidate adoption matrix](docs/tooling/shortlist.md): pinned `go-arch-lint` and `gotestsum` in a specialized CI workflow; others are independent Mamony skill adaptations, opt-in tools, or explicitly unrun experiments.
 - [Third-party skill security preflight](docs/tooling/third-party-security.md) and [RTK token-economics protocol](docs/tooling/token-economics.md).
+- CI foundation and specialized Go checks, plus v7-derived **lint and vulnerability scanning jobs** ([GitHub workflow](.github/workflows/ci.yml)); check their latest Actions run before claiming PASS.
+- [V7 integration map](docs/research/harness-v7-provenance.md) documenting which source files were retained, adapted, superseded and which standalone results are historical; see [database blockers](docs/contracts/database-contract-gaps.md) and [ledger blockers](docs/contracts/ledger-contract-gaps.md).
+- [V7 mechanical benchmark](docs/evals/harness-v7-fixture-cases.md) and [empty results sheet](docs/evals/results.csv), separate from the v6 E01–E12 evaluation.
 - CI baseline and a source-derived [Gate A trace](docs/contracts/ledger-gate-a.md).
 
 ## What is absent
 
-No PostgreSQL migration, RLS, role grants, journal posting, idempotency, reversal, outbox, reconciliation, backup or verified financial behavior. General `golangci-lint` and `govulncheck` have local commands but are **not yet blocking PR CI**. `oasdiff` cannot check the absent payment OpenAPI contract, and `gopls MCP` / RTK / SkillSpector are not connected or installed here. Skills are **not benchmarked**; files existing does not establish that any coding agent discovers or follows them. Historical Rust tests do not count as Go runtime evidence.
+No PostgreSQL migration, RLS, role grants, journal posting, idempotency, reversal, outbox, reconciliation, backup or verified financial behavior. General `golangci-lint v2.15.0` and `govulncheck v1.10.0` are configured as separate **blocking PR CI jobs**; their actual results are tracked in GitHub Actions, not assumed from the configuration. `oasdiff` cannot check the absent payment OpenAPI contract, and `gopls MCP` / RTK / SkillSpector are not connected or installed here. Skills are **not benchmarked**; files existing does not establish that any coding agent discovers or follows them. Historical Rust tests do not count as Go runtime evidence.
 
 Start with [documentation index](docs/index.md) for task-specific references. Do **not** paste full v5/v6 research or handbooks into every AI prompt. Literature conclusions and token benefits remain unverified for this Go repository until tested.
 
