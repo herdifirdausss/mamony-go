@@ -10,7 +10,10 @@
 | Architecture and security standards policy | [Adoption status](standards/adoption-status.md) |
 | AI-agent harness, token efficiency and secure tooling | [v6 production engineering §§18–24](standards/ai-agent-production-engineering.md) — read task-relevant sections only |
 | Full workflow/history | [integrated v6 workflow](research/engineering-workflow-v6.md), [v5 predecessor](research/engineering-workflow-v5.md), [31-source register](research/source-register.md), [reader notes](research/README.md); **not required initial context** |
-| AI skills, context and efficiency | [5 project skills](../.agents/skills/); [v6 E01–E12 benchmark](evals/mamony-agent-benchmark.md); [v5 pilot cases](evidence/skill-evaluation-v5.md) |
+| AI skills, context and efficiency | [8 Mamony skills](../.agents/skills/); [11 external tool adoption statuses](tooling/shortlist.md); [security preflight](tooling/third-party-security.md); [v6 E01–E12 benchmark](evals/mamony-agent-benchmark.md) |
+| Go architecture and test-output tooling | [Tool matrix](tooling/shortlist.md): pinned `go-arch-lint` and `gotestsum` in specialized CI |
+| OpenAPI compatibility / future contract work | [oasdiff integration](tooling/openapi-compat.md); actual API contract not yet implemented |
+| Go symbol navigation / AST search | [gopls MCP](tooling/gopls-mcp.md), [ast-grep](tooling/structural-search.md) — opt-in |
 | Review / completion | [Evidence template](evidence/template.md) |
 | Reference Go project | [Seev](https://github.com/herdifirdausss/seev), engineering patterns only |
 

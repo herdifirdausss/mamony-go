@@ -13,6 +13,10 @@
 |---|---|---|
 | Format, vet, tests, docs, architecture, skills, v6 research registry, build | `make check` | NOT RUN |
 | Race detector (where relevant) | `make race` | NOT RUN |
+| Go architecture linter (specialized CI) | `make archlint` / GitHub Actions | NOT RUN |
+| Summarized + retained JSON/JUnit Go tests (specialized CI) | `make test-report` / GitHub Actions | NOT RUN |
+| oasdiff API compatibility (only with real baseline/current specs) | `make api-compat` | NOT RUN |
+| Third-party skill scanning (if added/updated) | [Preflight](../docs/tooling/third-party-security.md) | NOT RUN |
 | golangci-lint | `make lint` | NOT RUN |
 | Vulnerability scan | `make security` | NOT RUN |
 | PostgreSQL integration / contracts / restoration (where relevant) | Targeted test names | NOT RUN |

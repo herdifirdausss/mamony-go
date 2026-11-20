@@ -8,7 +8,11 @@
 | [31-source research register](../research/source-register.md) | Review-date literature index; links/versions need revalidation when promoted to policy | CI verifies presence/count, NOT live source correctness |
 | [v6 E01–E12 agent benchmark](../evals/mamony-agent-benchmark.md) | **Plan only; NOT RUN**; no measured cost/token improvement | CI checks case registry, not agent quality |
 | Go modular monolith [ADR-0001](../adr/0001-go-modular-monolith.md) | **Proposed** pending owner review | Current import checker tests, does not imply ADR accepted |
-| Agent skill files | **Installed as repo files**; discovery and effectiveness depend on agent host | Structural metadata check by `make skills`; behavioral A/B NOT RUN |
+| Eight Mamony agent skill files | **In-repo native guidance**; upstream Ponytail/Superpowers/Trail of Bits/STE100 are NOT installed | Metadata checks via `make skills`; host discovery and behavioral A/B NOT RUN |
+| [11 external tool shortlist](../tooling/shortlist.md) | Actual integration vs opt-in/not-run tracked per candidate | `make tools-policy` verifies registry and required files only |
+| go-arch-lint v1.19.2 + gotestsum v1.13.0 | Specialist Go CLI pinned in [CI](../../.github/workflows/engineering-tools.yml) | Separate PR job; verify actual workflow outcome, do not extrapolate from basic CI |
+| gopls MCP, ast-grep, RTK, SkillSpector, upstream skills | **OPT-IN / NOT INSTALLED**; activation requires host setup and trust review | Manual per [preflight](../tooling/third-party-security.md) and matched task eval |
+| oasdiff breaking API check | Script prepared but no approved Go API contract exists | **NOT RUN** on actual released-vs-candidate spec |
 | `gofmt`, `go vet`, tests, architecture, doc links, build, race | Baseline deterministic checks | `make check` and `make race` in PR CI |
 | v6 research and evaluation metadata | Machine-checkable document completeness only | `make research` in `make check` (not literature verification) |
 | golangci-lint/gosec, govulncheck | Configured as optional local commands; **not yet blocking PR CI** | `make lint`, `make security`, missing binaries fail explicitly |

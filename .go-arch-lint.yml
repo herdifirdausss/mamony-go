@@ -1,0 +1,21 @@
+# Enforced in specialized tooling CI; custom tools/archcheck remains the
+# canonical rule for cross-capability imports and future dynamic capabilities.
+# Tool version: github.com/fe3dback/go-arch-lint@v1.19.2
+version: 3
+workdir: internal
+allow:
+  depOnAnyVendor: false
+  deepScan: true
+components:
+  app:
+    in: app/**
+  platform:
+    in: platform/**
+  ledger_domain:
+    in: modules/ledger/internal/domain/**
+deps:
+  app:
+    mayDependOn:
+      - platform
+  platform: {}
+  ledger_domain: {}

@@ -13,6 +13,9 @@ EXPECTED = {
     "mamony-ledger-review",
     "mamony-pr-evidence",
     "mamony-engineering-review",
+    "mamony-debugging",
+    "mamony-security-diff",
+    "mamony-technical-writing",
 }
 
 
