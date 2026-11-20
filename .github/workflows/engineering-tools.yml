@@ -26,17 +26,17 @@ jobs:
         run: "$(go env GOPATH)/bin/go-arch-lint check --project-path ."
       - name: Test with machine-readable evidence
         run: |
-          mkdir -p .artifacts
+          mkdir -p test-reports
           "$(go env GOPATH)/bin/gotestsum" \
             --format pkgname \
-            --junitfile .artifacts/unit.xml \
-            --jsonfile .artifacts/unit.json \
+            --junitfile test-reports/unit.xml \
+            --jsonfile test-reports/unit.json \
             -- ./...
       - name: Upload full test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: specialized-go-tool-reports
-          path: .artifacts/
+          path: test-reports/
           if-no-files-found: warn
           retention-days: 7

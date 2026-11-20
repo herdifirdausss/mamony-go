@@ -29,7 +29,7 @@
 ```sh
 make check            # base deterministic checks, plus skill/tooling metadata
 make archlint         # go-arch-lint binary required; no silent skip
-make test-report      # gotestsum binary required, creates .artifacts tests
+make test-report      # gotestsum binary required, creates test-reports tests
 make api-compat       # oasdiff, BASE_SPEC and CURRENT_SPEC required
 ```
 

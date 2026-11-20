@@ -33,8 +33,8 @@ archlint:
 
 test-report:
 	@command -v gotestsum >/dev/null || { echo 'NOT RUN: install gotest.tools/gotestsum@v1.13.0'; exit 2; }
-	@mkdir -p .artifacts
-	gotestsum --format pkgname --junitfile .artifacts/unit.xml --jsonfile .artifacts/unit.json -- ./...
+	@mkdir -p test-reports
+	gotestsum --format pkgname --junitfile test-reports/unit.xml --jsonfile test-reports/unit.json -- ./...
 
 api-compat:
 	bash scripts/check-openapi-compat.sh
