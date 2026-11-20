@@ -9,4 +9,4 @@
 - Compatibility / migrations / rollback:
 - Residual risks and next steps:
 
-Only evidence tied to executed code may be marked PASS. A code-reviewed design, mock, or Rust historical result is not Go runtime evidence.
+Only evidence tied to executed code may be marked PASS. Use Go runtime results for runtime claims.

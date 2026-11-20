@@ -2,8 +2,8 @@
 
 Project: synthetic cross-border pay-in/pay-out simulator. No real funds, identities, or provider credentials.
 
-1. Start with the issue's acceptance criteria, then [docs/index.md](docs/index.md). Fetch only relevant approved Mamony requirements/ADRs/technical designs; treat Seev as an engineering reference, not product authority.
-2. Preserve original Mamony Accepted ADRs: modular monolith (0004/0027), C01 sole writer (0005), synthetic-only (0008), capability schemas (0010), transaction-scoped RLS (0021). Go-specific changes require a Proposed ADR, not silent edits to Rust decisions.
+1. Read the issue's acceptance criteria. Use the [documentation index](docs/index.md) to find the task contract.
+2. Use the [local decisions](docs/adr/README.md) and contracts for implementation. Record changes to a baseline in a proposed ADR.
 3. Load [engineering principles](docs/standards/engineering-principles.md) and [AI-agent production engineering v6](docs/standards/ai-agent-production-engineering.md) **on demand by relevant heading**. Both are draft guidance, not Accepted Mamony ADRs. [Integrated v6 workflow](docs/research/engineering-workflow-v6.md), [literature registry](docs/research/source-register.md) and [adoption status](docs/standards/adoption-status.md) are references, not compulsory context.
 4. Scope modules under `internal/modules/<capability>`; `internal/app` composes facades. Domain is pure; use cases do not import concrete adapters; direct capability-to-capability imports are forbidden. Run architecture checks.
 5. KISS/YAGNI and small consumer-owned interfaces are defaults. Do not simplify away money accuracy, idempotency, access boundaries, or recovery. New patterns/dependencies require explicit problem, alternative, evidence, and revisit trigger.
@@ -14,6 +14,6 @@ Project: synthetic cross-border pay-in/pay-out simulator. No real funds, identit
 
 10. Review the [11-tool adoption matrix](docs/tooling/shortlist.md) before using new agent or CLI tools. Pinned `go-arch-lint` and `gotestsum` run in specialized CI. Other upstream packages/MCP servers are **not automatically installed**. Follow [third-party preflight](docs/tooling/third-party-security.md); do not enable RTK global hooks before matched-task evaluation.
 
-11. Before writing C01 persistence or PostgreSQL migrations, read [ledger contract gaps](docs/contracts/ledger-contract-gaps.md) and [database contract gaps](docs/contracts/database-contract-gaps.md); these blockers are NOT RUN. Use the [six-step AI task workflow](docs/standards/agent-workflow.md). Current CI contains lint/vulnerability jobs; record their observed results, not expected results.
+11. For ledger persistence, read the [C01 requirements](docs/contracts/ledger-gate-a.md). For migrations or access controls, read the [PostgreSQL contract](docs/contracts/postgresql.md). Use the [task workflow](docs/standards/agent-workflow.md).
 
 See [architecture](docs/architecture.md), [requirements](docs/contracts/ledger-gate-a.md) and [PR evidence](docs/evidence/template.md).

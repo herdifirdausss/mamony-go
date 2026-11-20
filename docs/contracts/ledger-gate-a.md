@@ -1,23 +1,38 @@
-# C01 Gate A — requirement trace
+# Ledger requirements and Gate A
 
-**Current:** only pure in-memory journal shape validation, not Post, Reverse, persistence, authorization or a working ledger.
+C01 is the sole writer of balances. See the [ledger and data ownership decision](../adr/0002-ledger-and-data-ownership.md).
 
-**Approved Mamony source:**
-- [ADR-0005](https://github.com/herdifirdausss/mamony/blob/main/docs/adr/0005-ledger-invariants.md): only C01 writes balances; immutable balanced journals; one currency per journal; idempotent Post; reversal and daily verifier.
-- [PRD-01](https://github.com/herdifirdausss/mamony/blob/main/docs/prd/PRD-01-ledger-core.md): approved functional requirements; pay attention to FR-003/004/005/006/007, FR-008/009/013 and FR-011.
-- [TD-01](https://github.com/herdifirdausss/mamony/blob/main/docs/design/TD-01-ledger-core.md): approved technical design; its Rust library layout must be adapted, not copied literally.
-- [Gate A historical evidence](https://github.com/herdifirdausss/mamony/blob/main/docs/09-gate-a-evidence.md): historical Rust test names and gaps, not evidence that Go Gate A passed.
-- [ADR-0010](https://github.com/herdifirdausss/mamony/blob/main/docs/adr/0010-one-database-schema-per-capability.md): database permissions and schema ownership.
-- [ADR-0021](https://github.com/herdifirdausss/mamony/blob/main/docs/adr/0021-row-level-security-for-tenant-isolation.md): transaction-local tenant context and RLS.
+The bootstrap checks journal structure and arithmetic in memory. Durable ledger operations and Gate A evidence are pending.
 
-**Gate A required Go evidence (NOT RUN):** migration bootstrap with roles/grants, atomic DB posting, concurrent replay with same key, different-payload rejection, balance floor under contention, one reversal under concurrent requests, outbox ordering and rollback, RLS tenant A/B with pooled connection reuse, backup/restore/recompute verifier.
+## Posting and replay
 
-## Open decision on wire amounts
+| ID | Requirement | Go acceptance check |
+|---|---|---|
+| LGR-01 | Post at least two entries. Use positive integer minor units. All entries and accounts must use the journal currency. Debit and credit totals must match. | Reject empty, unbalanced, zero, mixed-currency, closed-account, and unknown-account cases. |
+| LGR-02 | Commit the journal, entries, balances, idempotency record, and one outbox row as one transaction. Reject overflow and enforce the floor of each account that requires it. | Race withdrawals against the same balance. Inject a failure after a write. Check for no partial changes and no event after rollback. |
+| LGR-03 | Scope the key to the calling capability. Keep the key for the life of the journal. Equal content returns the original result. Different content with the same key fails without a write. | Start concurrent requests with the same key. Check one journal and one event. Repeat after a lost response following commit. The same key for a different caller is independent. |
+| LGR-04 | Derive balances from entries. A read after an acknowledged posting includes that posting. | Compare the stored balance against the entries after commit, retry, and process restart. |
 
-| Source at Mamony commit `776744a` | Representation |
-|---|---|
-| [ADR-0014 §Decision, item 5](https://github.com/herdifirdausss/mamony/blob/776744aa36882328a9669382c82a241d139ff437/docs/adr/0014-rest-json-openapi-api-style.md#decision) | JSON integer counts of minor units within the interoperable safe-integer range (±(2^53 − 1)). |
-| [TD-01](https://github.com/herdifirdausss/mamony/blob/776744aa36882328a9669382c82a241d139ff437/docs/design/TD-01-ledger-core.md) | Internal ledger amounts are positive minor-unit integers up to `i64::MAX`. PostgreSQL uses `bigint`. |
-| [Original OpenAPI](https://github.com/herdifirdausss/mamony/blob/776744aa36882328a9669382c82a241d139ff437/docs/api/openapi.json) | Payment creation (`CreateRequest.amount`) and balance responses (`BalanceResponse.amount`) use strings of digits in minor units. |
+Use the signed 64-bit range for stored minor units. A posting amount must be positive. Compute intermediate totals without overflow. Keep key lookup and balance checks in the posting transaction. Lock affected accounts in a stable order. Test the chosen isolation level with real PostgreSQL connections and deterministic barriers.
 
-Before publishing a Go API, the owner must reconcile the JSON type and range by route. Test the agreed wire format and its boundaries independently of the internal ledger representation.
+Before implementation, record which fields are part of replay identity. Include the financial content. Decide how correlation metadata affects replay. For public requests, use the [HTTP idempotency contract](../adr/0003-public-http-contract.md#http-idempotency).
+
+## Reversal, events, and verification
+
+| ID | Requirement | Go acceptance check |
+|---|---|---|
+| LGR-05 | Protect journal and entry rows from updates and deletes. A reversal offsets the full original journal, refers to it, and follows all posting rules. Allow one reversal per journal. | Race two reversals with different keys. Check one winner and no changes to the original. Check that the floor can refuse a reversal. Attempt updates and deletes as the runtime and owner roles. |
+| LGR-06 | Deliver the durable event at least once and in order per affected account. Deduplicate consumer work. Record audit entries for account and currency administration. | Exercise a multi-account journal and replay after an interrupted delivery. Check order, deduplication, and audit records. |
+| LGR-07 | Run a daily read-only verifier. Recompute balances and validate journal totals, currency, and entry sequences. Report drift. | Plant controlled drift in an isolated database. Check the report and alert. Check that verification changes no ledger data. |
+| LGR-08 | Restore the ledger, its grants, and its outbox from a backup. | Restore onto a fresh database. Compare the committed records and privileges. Run the ledger verifier on the restored data. |
+
+## Gate A evidence
+
+1. Exercise the posting, replay, and reversal checks against real PostgreSQL.
+2. Run property tests against an independent ledger model.
+3. Exercise event delivery, audit, and recovery in a synthetic test environment.
+4. Record the restore drill and verifier result.
+
+Use the [PostgreSQL contract](postgresql.md) for schema ownership and runtime roles. Apply its tenant-isolation tests to tenant-owned tables. Check C01 through its own database grants and its calling capability's authorization.
+
+Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../evidence/template.md). All database checks above are **NOT RUN** in the bootstrap.

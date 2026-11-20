@@ -1,17 +1,21 @@
-# ADR-0001 — Go-specific modular monolith translation
+# ADR-0001 — One process with capability boundaries
 
-- Status: Proposed — owner decision required
-- Date: 2026-11-21
-- Source: Mamony original [ADR-0004](https://github.com/herdifirdausss/mamony/blob/main/docs/adr/0004-modular-monolith-first.md), [ADR-0027](https://github.com/herdifirdausss/mamony/blob/main/docs/adr/0027-first-runtime-and-http-layer.md)
+**Status:** Proposed
+
+**Date:** 2026-11-21
 
 ## Context
-Mamony's initial implementation is Rust. The Go project must preserve ownership/invariants while avoiding a premature multi-process deployment. Seev is a reference for architecture enforcement, not a specification of Mamony behavior.
 
-## Proposed decision
-One Go module; one binary; separate public/private HTTP listener; explicit app composition. Business capabilities live under `internal/modules/<capability>/` with nested `internal` private implementation packages. Go interfaces live with consumers when helpful. No module imports another; app adapters translate dependencies.
+Mamony Go needs clear data ownership and predictable imports. The first release can run all capabilities in one process.
 
-## Alternatives
-Global `handlers/usecases/repositories` dilute capability ownership. Nine deployables as in Seev introduce unneeded infrastructure for initial scope.
+## Decision
+
+Use one Go module and one binary. Give each capability a public facade and private implementation packages. Put cross-capability adapters in the application composition root. Keep business rules in the capability that owns them.
+
+Use separate public and private HTTP listeners. The capability owns its handler and route metadata. The application registers each route on one listener.
 
 ## Consequences
-Compile-time privacy and import checks provide early feedback. No claim of full architecture/runtime parity until PRD/TD and database contracts are implemented and tested.
+
+The package graph and route tests give early feedback. A separate process adds deployment and failure modes. Propose a new ADR when measured load or a required isolation boundary justifies a split.
+
+See [package and route rules](../architecture.md) and [ledger and data ownership](0002-ledger-and-data-ownership.md).

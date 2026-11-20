@@ -12,7 +12,20 @@ import (
 var link = regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
 
 func main() {
-	for _, path := range []string{"README.md", "AGENTS.md", "docs/index.md", "docs/architecture.md", "docs/evidence/template.md"} {
+	for _, path := range []string{
+		"README.md",
+		"AGENTS.md",
+		"docs/index.md",
+		"docs/product.md",
+		"docs/architecture.md",
+		"docs/adr/README.md",
+		"docs/adr/0001-go-modular-monolith.md",
+		"docs/adr/0002-ledger-and-data-ownership.md",
+		"docs/adr/0003-public-http-contract.md",
+		"docs/contracts/ledger-gate-a.md",
+		"docs/contracts/postgresql.md",
+		"docs/evidence/template.md",
+	} {
 		//nolint:gosec // G304: path comes only from the fixed local documentation allowlist above.
 		b, err := os.ReadFile(path)
 		if err != nil {

@@ -2,7 +2,7 @@
 
 | Area | Authority / status | Enforcement |
 |---|---|---|
-| Original Mamony approved ADRs and PRDs | Source of truth; historical Rust choices translated only with Go ADR | Tracked in `docs/contracts`, relevant tests as implemented |
+| [Local decisions](../adr/README.md) and [task contracts](../index.md) | Mamony Go baseline and proposed choices | Apply the contract checks for changes in scope. |
 | [Engineering principles handbook](engineering-principles.md) | **Draft guidance**; does not supersede approved Mamony decisions | Invoked selectively through skills and review |
 | [v6 agent engineering](ai-agent-production-engineering.md) and [integrated research](../research/engineering-workflow-v6.md) | **Draft**; guidance, not Accepted product ADR | Read task-relevant sections, not all context |
 | [31-source research register](../research/source-register.md) | Review-date literature index; links/versions need revalidation when promoted to policy | CI verifies presence/count, NOT live source correctness |
@@ -27,7 +27,7 @@ Use the narrowest relevant skill from [registry](../../.agents/skills/). An agen
 
 ## Next adoption steps
 
-1. Review v6 research and decide which recommendations become mandatory Go standards; preserve existing Mamony ADR authority.
+1. Review v6 research and decide which recommendations become mandatory Go standards; record any baseline change in a local ADR.
 2. Verify and maintain the added pinned lint/vulnerability CI jobs; address failures before approving the PR.
 3. Build PostgreSQL migrations and real integration/recovery tests before claiming Gate A.
 4. Run the [v6 matched-task E01–E12 evaluations](../evals/mamony-agent-benchmark.md) before claiming quality improvements or token savings; compare accepted AC, cost, latency and defects.

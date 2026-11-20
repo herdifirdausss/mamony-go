@@ -1,10 +1,8 @@
 # Mamony Go
 
-Go modular-monolith implementation of the [Mamony](https://github.com/herdifirdausss/mamony) **synthetic** cross-border payment simulator. **Bootstrap only**: no ledger persistence, payouts, real money or real provider credentials. This is not production-ready.
+Mamony Go is a synthetic simulator for cross-border pay-in and pay-out. The current bootstrap checks journal structure in memory and runs two HTTP listeners.
 
-- Original Mamony is the source of truth for accepted product requirements, ledger invariants and ADRs.
-- [Seev](https://github.com/herdifirdausss/seev) supplies relevant Go engineering patterns, not business semantics.
-- The Go-specific topology is Proposed: see [ADR-0001](docs/adr/0001-go-modular-monolith.md).
+Read the [product scope](docs/product.md), [documentation index](docs/index.md), and [architecture decisions](docs/adr/README.md).
 
 ## Getting started
 
@@ -31,16 +29,16 @@ The private listener binds loopback only. Readiness means **HTTP process readine
 - [11-candidate adoption matrix](docs/tooling/shortlist.md): pinned `go-arch-lint` and `gotestsum` in a specialized CI workflow; others are independent Mamony skill adaptations, opt-in tools, or explicitly unrun experiments.
 - [Third-party skill security preflight](docs/tooling/third-party-security.md) and [RTK token-economics protocol](docs/tooling/token-economics.md).
 - CI foundation and specialized Go checks, plus v7-derived **lint and vulnerability scanning jobs** ([GitHub workflow](.github/workflows/ci.yml)); check their latest Actions run before claiming PASS.
-- [V7 integration map](docs/research/harness-v7-provenance.md) documenting which source files were retained, adapted, superseded and which standalone results are historical; see [database blockers](docs/contracts/database-contract-gaps.md) and [ledger blockers](docs/contracts/ledger-contract-gaps.md).
+- [V7 integration map](docs/research/harness-v7-provenance.md) and [engineering pack verification](docs/evidence/engineering-pack-verification.md).
 - [V7 mechanical benchmark](docs/evals/harness-v7-fixture-cases.md) and [empty results sheet](docs/evals/results.csv), separate from the v6 E01–E12 evaluation.
-- CI baseline and a source-derived [Gate A trace](docs/contracts/ledger-gate-a.md).
+- Local [ledger requirements](docs/contracts/ledger-gate-a.md) and [PostgreSQL contract](docs/contracts/postgresql.md).
 
 ## What is absent
 
-No PostgreSQL migration, RLS, role grants, journal posting, idempotency, reversal, outbox, reconciliation, backup or verified financial behavior. General `golangci-lint v2.15.0` and `govulncheck v1.10.0` are configured as separate **blocking PR CI jobs**; their actual results are tracked in GitHub Actions, not assumed from the configuration. `oasdiff` cannot check the absent payment OpenAPI contract, and `gopls MCP` / RTK / SkillSpector are not connected or installed here. Skills are **not benchmarked**; files existing does not establish that any coding agent discovers or follows them. Historical Rust tests do not count as Go runtime evidence.
+No PostgreSQL migration, RLS, role grants, journal posting, idempotency, reversal, outbox, reconciliation, backup or verified financial behavior. General `golangci-lint v2.15.0` and `govulncheck v1.10.0` are configured as separate **blocking PR CI jobs**; their actual results are tracked in GitHub Actions, not assumed from the configuration. `oasdiff` cannot check the absent payment OpenAPI contract, and `gopls MCP` / RTK / SkillSpector are not connected or installed here. Skills are **not benchmarked**; files existing does not establish that any coding agent discovers or follows them.
 
 Start with [documentation index](docs/index.md) for task-specific references. Do **not** paste full v5/v6 research or handbooks into every AI prompt. Literature conclusions and token benefits remain unverified for this Go repository until tested.
 
 ## Merge policy
 
-Review as a draft PR. Green basic CI does not equal production-readiness or Gate A acceptance. Keep `mamony` and `seev` unchanged.
+Review the draft PR and its CI results. Record Gate A acceptance only after the database and recovery checks pass.

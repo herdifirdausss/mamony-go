@@ -1,6 +1,6 @@
 # Security baseline — Go bootstrap
 
-This is a v7-derived short entry point. See [v6 agent security guidance](ai-agent-production-engineering.md), [adoption register](adoption-status.md) and original approved Mamony security ADRs for details.
+Use the [PostgreSQL contract](../contracts/postgresql.md) for data access and the [public HTTP contract](../adr/0003-public-http-contract.md) for route security.
 
 - Mamony is a simulator: never use real identities, funds, production credentials or live provider accounts.
 - The private HTTP listener binds to loopback by default. Inspect actual deployment topology before changing this rule.

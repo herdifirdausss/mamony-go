@@ -323,7 +323,7 @@ Verify object-level authorization, amount matching, and prevention of double pos
 | Provider simulator | Unknown outcome, forged webhook, unbounded retry | Authenticate/scope callback if endpoint exposed; idempotent updates, inquiry/reconcile | Forged callback, timeout after remote effect, duplicate callback. |
 | Build agent/CI → repository | Malicious skill/plugin, poisoned dependency, secret exfiltration | Pin tools, review third-party scripts, restricted tokens, safe secret handling | Validate permissions and untrusted-input handling. |
 
-ADR-0008 defines this system as a simulator. Do not make a connection to real providers or store real bank/account data to test threat scenarios.
+Use [synthetic simulator data](../product.md) for threat scenarios.
 
 ### 16.3 Minimum quality gates by layer
 

@@ -13,4 +13,4 @@ BASE_SPEC=docs/api/released.yaml CURRENT_SPEC=docs/api/openapi.yaml make api-com
 
 **Important:** a committed baseline is needed; comparing a file to itself never proves backward compatibility. In PR CI, obtain the baseline from trusted `main` or an immutable last release, and do not use user-controlled untrusted remote specs.
 
-Check request/response and security changes against the original Mamony PRD/TD, not just automated OpenAPI differences. oasdiff may have false positives/negatives; require human review for intended major changes.
+Check request, response, and security changes against the [local HTTP contract](../adr/0003-public-http-contract.md). Review intended breaking changes with the owner.

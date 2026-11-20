@@ -4,9 +4,9 @@
 
 This workflow is for Go projects where AI implements most changes. The core standards apply to every change. Scale design, testing, and rollout to the impact. Give the agent a concise ticket, a route to the relevant rules, and a way to produce verifiable evidence.
 
-The owner supplied a `docs.zip` snapshot. The `docs/...` references in this workflow point to files inside that archive. Its SHA-256 is `501ec0d095989181c5a3edea3cb03807a32a140b2adc09b138050fb4c4b0f66b`. The snapshot contains documentation only. Its Rust test notes report historical evidence. The Go implementation requires its own evidence.
+This is an engineering research draft. Use the [Mamony Go documentation index](../index.md) for current requirements and implementation status.
 
-Mamony is a single-developer learning project that simulates cross-border pay-in and pay-out, with an internal ledger, FX, screening, onboarding, and reconciliation. `ADR-0008` requires synthetic or simulated identities, providers, banks, exchange rates, and funds. Production readiness here means operating and recovering the simulator reliably. C21 and C22, including billing, cards, and savings, are deferred. Mamony sources: `docs/00-vision-and-scope.md`, `docs/adr/0008-learning-project-no-real-money.md`, and `docs/04-roadmap.md`.
+See the [local product scope](../product.md) for simulator boundaries and delivery gates.
 
 For layout decisions, read [§9](#9-organization-by-capability-layer-and-feature). For tool selections, configuration examples, and CI jobs, read [§10](#10-static-analysis-security-and-ci). For AI skills and token saving strategies, read [§11](#11-agent-skills-tooling-and-token-efficiency). For the principles of design and SOLID/YAGNI, read [§12](#12-software-engineering-principles-and-how-to-apply-them); refactoring [§13](#13-refactoring-code-smells-and-change-discipline); patterns [§14](#14-design-patterns-for-idiomatic-go); system design [§15](#15-system-design-for-a-financial-modular-monolith); DevSecOps [§16](#16-devsecops-security-engineering-and-operational-fundamentals); and application to AI [§17](#17-using-the-engineering-principles-in-ai-assisted-coding). Update v6: [§18 evidence review](#18-2026-evidence-review-and-implications-for-policy), [§19 harness](#19-minimum-workflow-for-an-ai-engineering-harness), [§20 Go production](#20-go-production-engineering-beyond-lint-and-solid), [§21 reliability](#21-reliable-money-workflows-based-on-aws-postgresql-and-sre-guidance), [§22 DevSecOps](#22-devsecops-2026-for-code-builds-and-agents), [§23 evaluations](#23-ai-agent-evaluation-for-quality-and-cost), and [§24 rollout](#24-incremental-rollout-from-v5-to-v6).
 
@@ -14,26 +14,26 @@ For layout decisions, read [§9](#9-organization-by-capability-layer-and-feature
 
 | Topic | Proposed baseline | What would change the choice |
 |---|---|---|
-| Architecture | Use one Go module and one process with two listeners. Preserve capability boundaries. `cmd/mamony` runs the composition root, which wires adapters and jobs explicitly. | Extracting a worker or service requires operational evidence and an ADR for ownership, deployment, and the cross-process protocol. Follow ADR-0004/0027 for the deployment topology. |
+| Architecture | Use one Go module and one process with two listeners. Preserve capability boundaries. `cmd/mamony` runs the composition root, which wires adapters and jobs explicitly. | Extracting a worker or service requires operational evidence and an ADR for ownership, deployment, and the cross-process protocol. Follow the [local runtime decision](../adr/0001-go-modular-monolith.md). |
 | Go and tooling | Candidate Go 1.27.4 based on release history at research date. Pin the patch in CI/build, test the compatibility of the analyzer, and schedule the patch upgrade. | Use the latest patch of a line that's still supported when the toolchain deployment or analyzer isn't ready. Write down the reason and date of review. |
-| HTTP | Candidate: `net/http`. Keep the REST/JSON contract, problem details, and public/private listener. Use `docs/api/openapi.json` 3.1.0 as a reference to compatibility per slice moved. | The spike router/validator/generator must prove that the metadata of permissions and routes listed is consistent, listener limits tested, and the tooling accepts the spec as well as features used. |
+| HTTP | Candidate: `net/http`. Keep the REST/JSON contract, problem details, and public/private listener. Use the local OpenAPI document when it exists. | The spike router/validator/generator must prove that the metadata of permissions and routes listed is consistent, listener limits tested, and the tooling accepts the spec as well as features used. |
 | Storage | PostgreSQL 18 follows the quickstart source, one DB with schema and role per capability. Candidate `pgx/v5` for driver/pool, SQL explicit, and `sqlc` for query type after proven by role and transaction. | Runtime role testing after reuse pool, tenant transactions, rollback, and SQLSTATE. Document the global pool budget before adding a capacity pool. |
 | Migrations | One tool and SQL version, candidate Goose. The runner must be able to execute DDL, trigger, and PostgreSQL Mamony functions in the correct sequence of bootstraps, roles, and grants. | Compare Goose and an alternative runner to the migration fixture C01. Lock tests, transactions, histories, file controls that have been released, and updates to supported schemes. |
 | Quality gate | Use one runner `golangci-lint` v2 for gofmt, govet, Staticcheck, gosec, and selected linters. Run test, build, and govulncheck as separate gates. See §10 for profiles, exclusions and candidate versions. | Extend the analyzer after a proven case, measure noise and duration, as well as check toolchain compatibility with each upgrade. |
 | Deploy | One OCI image for the simulator. PostgreSQL outbox from the beginning when there's a lasting event. Use dev and isolated staging with synthetic fixtures. | Consider brokerage through ADR when there are measurable outbox needs that are not addressed, including ordering, throughput, retention, or consumer isolation. |
 | Product | Simulated pay-in and pay-out, a USD → IDR pilot, and double-entry ledger from the foundation phase. The proposed Go delivery starts with a foundation slice and then proceeds to Gate B. | Full port, compatibility of all APIs, reuse of historical schema, and post-Gate B feature coverage require a separate project decision. |
 
-The baseline column contains an existing Mamony decision and an implementation candidate Go. The candidate binds the implementation after ADR Go is approved by the owner. The proposed repo name is `herdifirdausss/mamony-go` with private visibility.
+The baseline column records research candidates. The [local decision index](../adr/README.md) gives their current status.
 
-| Decisions from sources | Application to Go |
+| Local reference | Application to Go |
 |---|---|
-| ADR-0004/0027 · Modular monolith, one binary, public and private listeners, capability ports, composition root, jobs, and relays | Maintain the runtime pattern. Use a wiring constructor, an adapter to translate the type, and test routes as well as jobs that are actually listed. |
-| ADR-0005/0009/0010 · C01 as sole balance writer, immutable journals, transactional outbox, and one schema per capability | Maintain invariant, atomicity, and grants. Avoid cross-schema queries from the runtime role. C01 doesn't import any other capabilities. |
-| ADR-0016/0017/0018 · Versioned event schemas, ordering per aggregate, and retention | Maintain order per account for the ledger, delivery at least once, and consumer deduplication. Distinguish ledger idempotency keys retained for the life of the journal, HTTP idempotency keys with a replay window, and outbox retention. The 72-hour and 7-day figures in ADR are listed as proposals. |
-| ADR-0019/0021/0029 · HTTP edge, RLS, and approvals bound to the approved content | Copy the behavior and acceptance criteria. Role/grants tests, tenant scope per transaction, authorization per resource, and apply once to approved content. |
-| ADR-0022 · FX with integer mantissa and rounding rule named | Use an independent numerical oracle. Determine the intermediate representation Go and proof of limit. Big test, different currency exponents, and rounding ties. |
-| ADR-0006/0011 · Documentation becomes the foundation of PRD and design | Maintain ID and traceability. Use the resource registry to limit the context of each task and validate chain requirement → design → test. |
-| ADR-0007/0012/0013/0015 and parts of 0019/0023/0027 · Rust implementation | Make ADR Go to match. Transaction testing, API tooling, lifecycle and parity check. Keep the Rust ADRs as historical references. |
+| [Runtime and package boundaries](../adr/0001-go-modular-monolith.md) | Use explicit constructors and small composition adapters. Test the routes and jobs that the application starts. |
+| [Ledger and data ownership](../adr/0002-ledger-and-data-ownership.md) | Use the C01 invariants, schema grants, and atomic outbox. |
+| [Event delivery](../adr/0002-ledger-and-data-ownership.md#event-delivery) | Keep per-account ordering and consumer deduplication. Set published event retention in the relay contract. |
+| [Public HTTP](../adr/0003-public-http-contract.md) and [PostgreSQL isolation](../contracts/postgresql.md#tenant-isolation) | Test resource authorization, runtime grants, and tenant scope. Bind operator approval to the approved payload for configuration changes. |
+| [FX and ledger precision](../adr/0002-ledger-and-data-ownership.md#ledger-ownership) | Use an independent numerical oracle. Test large values, currency exponents, and rounding ties. |
+| [Local decision records](../adr/README.md) | Link a requirement to its design and acceptance checks. Give each durable decision a local ID. |
+| Go implementation choices | Test support for the driver, migration runner, API tools, and application lifecycle before adopting a dependency. |
 Sources: [Go module layout](https://go.dev/doc/modules/layout) · [Go release history and support](https://go.dev/doc/devel/release) · [net/http](https://pkg.go.dev/net/http) · [Using Go and pgx with sqlc](https://docs.sqlc.dev/en/latest/guides/using-go-and-pgx.html) · [Goose](https://pressly.github.io/goose/) · [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.1.html) · [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html).
 
 ## 2. Workflow from intake to operations
@@ -52,7 +52,7 @@ flowchart TD
 
 | Stage | Input and work | Exit evidence |
 |---|---|---|
-| 1. Intake | User identification, problems, desired results, scope limits, and sources. Match each Mamony claim to its source file and the source snapshot or commit, when available. | Project summary or PRD, list of requirements and open questions. |
+| 1. Intake | User identification, problems, desired results, scope limits, and sources. Link each requirement to a decision or contract in this repository. | Project summary or PRD, list of requirements and open questions. |
 | 2. Triage | Determine the S/M/L class of blast radius, data type, compatibility, and recovery. Tickets refer to contracts, ADR, modules, and related standards. | Acceptance criteria that can be tested, working class, decision owners, and a list of influential assumptions. |
 | 3. Design | Choose one vertical slice. For the new boundary, specify contract, data, failure, verification, and rollout. Make ADR when you have a long-term decision. | A design that can be reviewed. Product decisions such as the meaning of balances and access permissions require source or owner approval. |
 | 4. Build | Starting with the admissions case. Make the smallest complete change from entry point to data when relevant. Run a guided check on the iteration. | Diff that can be reviewed, risk-related tests, and contract updates or referenced documents. |
@@ -94,7 +94,7 @@ Take the highest class triggered. Changes to one line on dismissal or authorizat
 | API-01 | Use OpenAPI for the API consumed by the client. Document the auth, field, error code, pagination, status, compatibility and version strategy. Use `application/problem+json` for public error with safe detail. | Lint and compatibility diff for changing specs. Handler/contract test for status, schema, and authorized caller. |
 | DB-01 | SQL parametrik. Define the PK/FK/unique/check and nullability of an invariant. The use case transaction includes all local write that must be atomic. Determine the isolation/lock order according to invariant, document retry for permissible transient error. | Integration testing with PostgreSQL and migration repo. For a change in concurrency, use some deterministic connections and barriers. |
 | DB-02 | Migration ever released is immutable. Use expand → backfill → switch → contract if two versions of the app are running simultaneously. Measure the lock and backfill duration with representative data. | CI testing fresh setup and upgrades of relevant schemes. Deployment prepares rollback applications or a realistic roll-forward scheme. |
-| FIN-01 | An amount ledger is an integer minor units and a currency explicit with checked arithmetic. Posting doesn't do rounding. FX uses the ADR-0022 rule. Set the wire amount mapping by contract decision in §8. | Boundary test for overflow, exponent, currency mismatch, sign, rounding ties, and full round-trip from HTTP to DB. |
+| FIN-01 | An amount ledger is an integer minor units and a currency explicit with checked arithmetic. Posting doesn't do rounding. FX follows the [ledger and data ownership decision](../adr/0002-ledger-and-data-ownership.md). Set the wire amount mapping by contract decision in §8. | Boundary test for overflow, exponent, currency mismatch, sign, rounding ties, and full round-trip from HTTP to DB. |
 | FIN-02 | To write that can be re-transmitted and has a material effect, set the idempotency scope, fingerprint payload, replay results, and in-flight request behavior. Keep proof of uniqueness and local results atomically. For external effects, specify ambiguous status, verification and reconciliation before retry. | DB tests for simultaneous requests, replay after commits, different payloads, rollbacks, as well as timeout from external boundaries if applicable. |
 | FIN-03 | C01 has an immutable double-entry journal, one currency per journal, balance floor, atomic posting, tied reversals, derivative balances from entries, and a daily verifier. C05 gives results to the orchestrator. The reconciliation correction is through approval and contract C01. | Integration model test, one reversal, replay, transaction rollback, recompute, and reconciliation with simulation provider reports. |
 | SEC-01 | C08 disconnects access by default. Apply tenant context derived from identity, transaction-local RLS, separate roles, and log allowlist. Operator control follows the maker-checker as well as approval binding content. | A/B tenant testing uses runtime role, empty context, leakage during reuse pool, inventory route/permission, public/private listener, and apply to approved payloads. |
@@ -106,9 +106,9 @@ Sources: [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments) · [G
 
 ### Example of a testable decision
 
-Use two contracts of idempotency Mamony as an example. The mutant API uses ADR-0014 and ADR-0018. Posting ledgers use PRD-01-FR-006 and keep keys as long as journals exist.
+Use two contracts for idempotency. The [public HTTP contract](../adr/0003-public-http-contract.md#http-idempotency) scopes keys to the caller and defines a replay window. The [ledger contract](../contracts/ledger-gate-a.md#posting-and-replay) keeps keys for the life of the journal.
 
-1. Take the scope key from contract capability and ADR. The API searches for the key along with the caller's identity and has different results for missing keys, changing payloads, and requests running. The ledger sets replay according to the caller and key of PRD-01-FR-006. Authorization is done before returning the replay results.
+1. Take the scope key from contract capability and ADR. The API searches for the key along with the caller's identity and has different results for missing keys, changing payloads, and requests running. The ledger sets replay according to the calling capability and journal key. Authorization is done before returning the replay results.
 2. Keep records of idempotency and data changes in the same PostgreSQL transaction to write locally. Unique constraints become the safeguard for simultaneous execution. Document the response if payload is different or if an implementation scheme allows in-flight status.
 3. If the connection breaks after commit, the client can repeat with the same key. The test must prove a stable result and only one local effect is recorded.
 4. Simulation providers can produce unknown outcomes. C03 and C04 investigate status using the C05 contract and reconciliation. Use transactional outboxes, consumer deductions, and proof that events don't appear if rollbacks are posted.
@@ -248,7 +248,7 @@ This template came into use after `docs/index.md`, gate lists, and repo commands
 
 ### ADR
 
-Use the `docs/adr/_template.md` source file when creating ADR Go. The AI writes the Proposed status and the owner sets the decision status. This example shows a minimal structure that matches the source format.
+Use the ADR outline below. Give the decision a local ID. Record its status in the [decision index](../adr/README.md).
 
 ```markdown
 # ADR-NNNN: Title of decision
@@ -271,7 +271,7 @@ Use the `docs/adr/_template.md` source file when creating ADR Go. The AI writes 
 
 ### PRD
 
-Use `docs/prd/_template.md` for official PRD. The form below is appropriate as a summary of the linked intake PRD. Changing requirements remain recorded on PRD sources.
+Use this outline for a product requirement. Put the agreed behavior and its acceptance checks in a local contract.
 
 ```markdown
 # Summary of intake
@@ -311,33 +311,33 @@ Rollout/recovery if applicable | The risk is still open
 
 | Stage | The job | Exit evidence |
 |---|---|---|
-| 0 · Contracts and instruments | Set up a private repo when access is available. Set up the snapshot index, template, draft ADR Go, and registry requirement. `net/http`, `pgx`, runner migration, OpenAPI and analyzer in a small spike. Finish the different wire formats before the nominal HTTP port. | Build/check clean clones, a decision trail, and one task brief that only reads the resources needed. |
+| 0 · Contracts and tools | Record decisions in this repository. Test the Go runtime, database driver, migration runner, API tools, and analyzers. Resolve the wire-amount question before publishing a route that uses amounts. | Verify a clean checkout and record the decisions and tests. |
 | 1 · Foundation | One process Go, two listeners, config, graceful lifecycle, error catalog, migration runner, tenant-specific transaction helper, and test DB with role runtime. Add an outbox, audit, and backup/restore to the slice that wears it. | Health/route inventory, runtime role, rollback, schema fresh/upgrade and restore check. |
 | 2 · Gate A ledger | Bring a minimum of C01 through the synthetic fixture. Starting with the `Post` internal, database invariants, replay, reversal, verifier, and outbox. | Go units, PostgreSQL integration, property/model, race, concurrency, fault and restore tests that are connected to PRD. |
 | 3 · Gate B pilot | Build a pay-in and pay-out pipeline on the source corridor, including C08, policies, screening, FX, simulator providers and reconciliation. Add one endpoint slice at a time, then exercise operators and failure paths. | End-to-end line with provider unknown outcome, recovery, daily reconciliation, DR, and runbook. The owner evaluates Gate B using evidence from the Go implementation. |
 | 4 · Continue after Gate B | PRD and wiring matrix for business/risk as well as expansion. Consider separating deployment by data latency, backlog, ownership, or blast radius. | Metric-based decisions, documented scope, and tests that cover new risks. |
 
-The 58 OpenAPI paths describe the source snapshot. What is declared by the API Go must conform to the route that lives on the slice that has been tested. Use inventory with reference source route, implementation status Go, and test wiring to plan parity.
+Register each Go API route in the local OpenAPI document when the route exists. Check that the route and its declared contract agree.
 
 ### Initial evidence for Gate A
 
 | Source requirement | The preliminary tests must be | Proof of graduation |
 |---|---|---|
-| PRD-01-FR-003/004/007 | The unit for the number of entries, debit/credit, currency and overflow. Integration forces input failures on the DB according to design. | Journals, entries, balances, and outboxes stay consistent or they're all rollback. |
-| PRD-01-FR-005/006 | Two posts competing for floor, duplicate key simultaneously, target different payloads, cancel before commit, and replay after commit when the response is lost. | One result for duplicate key, conflict differentiated, floor awake, and no partial write. |
-| PRD-01-FR-008/009/013 | A random test model with a calculated balance of entries, two simultaneous reversals, daily verifier with drift intentionally implanted on an isolated fixture. | The model balance is the same as DB, reversed once, and drift detected. |
-| PRD-01-FR-011 and ADR-0017 | Run two transactions simultaneously and relay so that the order of commits and transaction IDs are different. The consumer replay test. | One event per journal, zero rollback time, ordering per account maintained, consumer effects idempotent. |
-| ADR-0010/0021 | Run request scoping with runtime roles on transactions A, B, and no tenants. Use the reused connections. | Other tenants are unavailable, the empty context fails to be closed, roles and grants are matched with catalogs. |
+| LGR-01 and LGR-02 | Check journal size, totals, currency, and overflow. Run a PostgreSQL rollback test. | The journal, entries, balances, and outbox commit or roll back together. |
+| LGR-02 and LGR-03 | Test the balance floor under contention, concurrent replay, conflicting payloads, and replay after a lost response. | At most one posting applies for the same caller and key. A refused posting makes no change. |
+| LGR-04, LGR-05, and LGR-07 | Compare balances with a model. Race two reversals. Test the verifier with controlled drift. | The model and database balances agree. One reversal wins. The verifier reports drift. |
+| LGR-06 | Test event ordering and interrupted delivery. | Events arrive in order per account. A repeated event has one consumer effect. |
+| Tenant data access | Use runtime roles to test two tenants, missing tenant context, and pooled connections. | Tenant data stays isolated. The database catalog matches the approved grants. |
 | Gate A restore | Make a backup of the logs that were actually posted, restore them to an isolated PostgreSQL, compare states and run verifiers. | Pass with good data and detect defects. Measure the time on a dataset referred to in evidence. |
 
-Mamony sources: `docs/prd/PRD-01-ledger-core.md` §4, `docs/design/TD-01-ledger-core.md` §§6, 9–10, `docs/09-gate-a-evidence.md`, and `docs/runbooks/backup-and-restore.md`. Engineering sources: [PostgreSQL row security](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) · [Transaction-local settings](https://www.postgresql.org/docs/18/sql-set.html) · [PostgreSQL locking](https://www.postgresql.org/docs/18/explicit-locking.html) · [pgxpool](https://pkg.go.dev/github.com/jackc/pgx/v5/pgxpool) · [Goose SQL annotations](https://pressly.github.io/goose/documentation/annotations/).
+Local contracts: [ledger requirements](../contracts/ledger-gate-a.md) and [PostgreSQL](../contracts/postgresql.md). Engineering references: [PostgreSQL row security](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) · [Transaction-local settings](https://www.postgresql.org/docs/18/sql-set.html) · [PostgreSQL locking](https://www.postgresql.org/docs/18/explicit-locking.html) · [pgxpool](https://pkg.go.dev/github.com/jackc/pgx/v5/pgxpool) · [Goose SQL annotations](https://pressly.github.io/goose/documentation/annotations/).
 
 ### Example of a concise handoff for one Go task
 
 ```text
-Task: Port verification replay from TD-01 task 12 to Go, after Post and migration are available.
-Requirements: PRD-01-FR-005/006/018. Focus replay; floor tested on separate tests.
-Read: TD-01 §§6 and 9, PRD-01 §4 on the above IDs, ADR-0005, Gate A §1.
+Task: Verify replay after the C01 posting path and PostgreSQL migrations exist.
+Requirements: LGR-03. Test the balance floor separately under LGR-02.
+Read: docs/contracts/ledger-gate-a.md, Posting and replay.
 Scope: C01 test in the Go and fixture PostgreSQL test used.
 Done: parallel same key → one journal and one outbox row, result of replay according to contract.
       same key + different payload → rejected, balance and journal unchanged.
@@ -348,17 +348,14 @@ Task brief takes a subset of task design. The parent issue keeps track of floor,
 
 ## 8. Source conflicts and open decisions
 
-| Finding | Evidence in the snapshot | The decision or evidence required |
-|---|---|---|
-| The amount on the wire is different. | ADR-0014 grain 5 sets the JSON integer within the interoperability limit. TD-01 §4 describes a string of digits. OpenAPI included using a string for request amount on `POST /v1/payments`, `/v1/payouts`, and `/v1/fx/quotes`. Quickstart also uses strings. | **Rekomendasi:** hold a string of digits for an endpoint that already uses that contract, with the typed integer in the domain. Set the scope and renew ADR/contract once the owner agrees. Tests form, boundary, and compatibility per endpoint. |
-| Gate C07 on C01 is not yet installed in the runtime record. | PRD-05-FR-019, H24, and wiring matrix. Some settlement journals, FX, fee share, and funding use references that do not pass through `Allow`. | Decide gate coverage and default for callers who don't have reservations. Create a caller matrix × journal type × reservation conditions, and prove the policy for each line. |
-| The status of the documentation changed throughout Rust's implementation. | `06-engineering-standards.md` still refers to ADR-0027 as proposed, while ADR is Accepted. The wiring matrix marks ADR-0029 Accepted on the title but refers to Proposed in the narrative. Gate A §4 records restorations with journals, while the gap table still mentions no journals. | Get decision status from ADR, contract from spec, and runnable status from a test bound to commit. Mark old evidence, current evidence, and explicit conflicts in the registry Go. |
-| Certain security policies are still being proposed. | ADR-0025 about factor secret storage, ADR-0026 about `pg_trgm`, ADR-0028 about the cross-tenant reading role. ADR-0021 to isolate tenants with Accepted status. | Suspend the implementation that relies on this proposal until the owner decides. Boundary testing RLS, permits, and synthetic fixtures can start with ADR already Accepted. |
-| Simulation coverage and state legacy still need to be established. | Vision and PRD recorded the pilot USD → IDR. Quickstart runs an example with the `ID-US:IDR-USD` corridor. The snapshot also has 58 OpenAPI paths and wiring at different readiness levels. | Maintain USD → IDR as a documented target. Verify the seed/pilot before parity claims. Determine whether Go takes one compatible slice, all routes, or historical schema/data. Re-prioritize if the target is a full replacement. |
+The [decision index](../adr/README.md) records the current architecture choices. Review these questions before implementing their features.
 
-Standard source of wire: [RFC 8259 §6](https://www.rfc-editor.org/rfc/rfc8259.html#section-6) · [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0.html) · [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html).
-
-Product and invariant decisions are taken from snapshots. Go and CI options are the blueprints for a new repository. Rust's evidence has not been re-examined. Scaffold and Gate A/B Go still need proof of runtime from clean clones.
+| Question | Local contract or decision |
+|---|---|
+| Which JSON type carries an amount? | Choose the route type and range under the [public HTTP contract](../adr/0003-public-http-contract.md#open-decision-on-wire-amounts). |
+| Which tables use tenant RLS? | Classify them under the [PostgreSQL contract](../contracts/postgresql.md#tenant-isolation). Include the actual runtime roles in the tests. |
+| Which checks qualify for Gate A? | Record the tests and recovery evidence under [ledger requirements](../contracts/ledger-gate-a.md#gate-a-evidence). |
+| What belongs to the first pilot? | Use the [delivery gates](../product.md#delivery-gates). Confirm the corridor and observation window before the pilot. |
 
 ## 9. Organization by capability, layer, and feature
 
@@ -370,7 +367,7 @@ Product and invariant decisions are taken from snapshots. Go and CI options are 
 | Capability first, the layer inside | Modules have different models, operations, contracts and data. | **Mamony proposal.** The locations of C01 and C03 are clear at a glance. The layers are formed from the dependence and real test needs. |
 | Capability then the workflow/subfiture that has the entire layer | One capability already has several workflows with a lifecycle and quite independent models. | It can be used when it's mature, for example when payment processing and configuration operators have different needs. Check the ownership schema and import directions first so that write models and joint transactions remain intact. |
 
-Go rules on package visibility and naming conventions. The layer below is an architectural choice Mamony, with boundaries and composition already set ADR-0027. Sources: [Go module layout](https://go.dev/doc/modules/layout) · [Go internal packages](https://go.dev/doc/go1.4#internalpackages) · [Go package names](https://go.dev/blog/package-names) · [Go interface guidance](https://go.dev/wiki/CodeReviewComments#interfaces) · [Example Go service with an application layer and adapters](https://threedots.tech/post/introducing-clean-architecture/).
+Go rules on package visibility and naming conventions. The layer below is an architectural choice Mamony, with boundaries set in the [local architecture](../architecture.md). Sources: [Go module layout](https://go.dev/doc/modules/layout) · [Go internal packages](https://go.dev/doc/go1.4#internalpackages) · [Go package names](https://go.dev/blog/package-names) · [Go interface guidance](https://go.dev/wiki/CodeReviewComments#interfaces) · [Example Go service with an application layer and adapters](https://threedots.tech/post/introducing-clean-architecture/).
 
 ### Target layout after the ledger and payment slices exist
 
@@ -462,7 +459,7 @@ docs/
   runbooks/
 ```
 
-The above example shows the shape of the target, including C03 that emerged after the foundation. The registry in `docs/index.md` maps the ID, package name, source, schema owner, and entry point. Use the approved contracts to identify C01 endpoints. Balance readings and merchant statements follow C02, operators follow contracts C11, and verifiers C01 can run as jobs. Mamony sources: `docs/03-service-boundaries.md`, `docs/12-mvp-wiring-matrix.md`, and `docs/adr/0027-first-runtime-and-http-layer.md`.
+This example shows a possible package layout after the payment capability starts. See [package boundaries](../architecture.md#packages) and [capability ownership](../product.md#capability-ownership).
 
 | Layer | Content and boundaries | Example |
 |---|---|---|
@@ -505,12 +502,12 @@ The `repository → usecase` arrow means that the repo can import a type of cont
 
 1. Boundary compile-time. Go restricts import under `internal/` to code in the tree rooted in that parent folder. The nested `internal/modules/ledger/internal/` protects C01 domain, repository, and handler packages from C03 **and** app. Therefore, the app creates C01 through `ledger.New` and the registration method provided by the root module. Apply a similar structure to C03.
 2. A port repository can be defined in `usecase/ports.go`. When an app needs to implement a port C03 with a request/result type, put the part that needs access in `payment/contract`. Use case and app import contract packages owned by C03. The contract contains only type and interface. This avoids a `payment → usecase → payment` import cycle. Avoid additional contract packages when existing facades and ports already meet the requirements.
-3. `payment` doesn't import `ledger` directly. `app/adapters/payment_ledger.go` imports both facades according to ADR-0027. `platform` does not import package capabilities. Check the import graph reading direct imports through `go list -json ./...`. Add a test check and build an integration tag when that entry point is available. Test the checker with both allowed and forbidden imports. `depguard` can enforce a small set of explicit prohibitions. A checker graph is suitable when the rules depend on a pair of modules and layers.
+3. `payment` doesn't import `ledger` directly. `app/adapters/payment_ledger.go` imports both facades at the composition root. `platform` does not import package capabilities. Check the import graph reading direct imports through `go list -json ./...`. Add a test check and build an integration tag when that entry point is available. Test the checker with both allowed and forbidden imports. `depguard` can enforce a small set of explicit prohibitions. A checker graph is suitable when the rules depend on a pair of modules and layers.
 4. Inter-layer directions. Handlers may import use cases or contracts, repositories may use the type of domain or small contract that needs to be implemented, and free domains HTTP/SQL/pgx. Use case-free concrete adapter. The root module holds the local wiring. The handler uses its own DTO transport and mapping so that the generated type SQL or pgx does not leak into OpenAPI.
 5. **Data access.** The C03 runtime role reads and writes the C03 schema. Cross-capability access through an approved port/event, plus a clear extension point. C01 offers `TxParticipant` for the consumption of quotes C06 which must indeed accompany a postal transaction. That design needs a Go design with explicit grants and tests. Treat it as a named extension point, with scope that can be audited.
 6. Use a transaction per unit of work that has to be atomic. For use cases that touch multiple repo one capability, inject a unit-of-work contract that gives the store the scope of the transaction. The pgx adapter holds start/commit/rollback and mapping SQLSTATE. On the tenant table, set tenants transactionally-local before tenant-scoped access. At C01, DB's design keeps the invariant at post boundaries. Provider calls, local transaction retry, and relay outboxes have their own lifecycle. Concurrent retry test and known/unknown outcome in real connection test.
 
-Sources: [Go internal packages](https://go.dev/doc/go1.4#internalpackages) · [Go interfaces](https://go.dev/wiki/CodeReviewComments#interfaces) · [pgxpool](https://pkg.go.dev/github.com/jackc/pgx/v5/pgxpool) · [PostgreSQL transaction-local settings](https://www.postgresql.org/docs/18/sql-set.html). Mamony sources: ADR-0004, ADR-0010, ADR-0021, ADR-0027, and `docs/03-service-boundaries.md`.
+Sources: [Go internal packages](https://go.dev/doc/go1.4#internalpackages) · [Go interfaces](https://go.dev/wiki/CodeReviewComments#interfaces) · [pgxpool](https://pkg.go.dev/github.com/jackc/pgx/v5/pgxpool) · [PostgreSQL transaction-local settings](https://www.postgresql.org/docs/18/sql-set.html). See [architecture](../architecture.md) and the [PostgreSQL contract](../contracts/postgresql.md).
 
 ### Example changes as a test of the structure
 
@@ -633,7 +630,7 @@ Baseline status §1–§10 (origin v3): the above structures and profiles have b
 | [Superpowers: systematic-debugging](https://github.com/obra/superpowers) | Skill workflow | Failed test, bug race, rollback, duplicate callback, mismatch DB | The root-cause process → hypothesis → reproduction → regression test | High priority. Take selected skills, not all long-term automated methodologies. |
 | [Superpowers: test-driven-development / verification-before-completion](https://github.com/obra/superpowers) | Skills workflow | Changes to use cases, bug fixes, PR handover | Test before/during repair; prohibiting successful claims without actual proof of check | High priority. Adjust the depth of testing with S/M/L; PostgreSQL integration remains mandatory for invariant databases. |
 | [Trail of Bits: differential-review](https://github.com/trailofbits/skills) | Skill security review | Changes to authorization, ledger, SQL, retries, or external side effects | Review diffs and historical context with a security focus | **On demand M/L**. Continue to run gosec, govulncheck, and database tests as applicable. |
-| [Trail of Bits: spec-to-code-compliance](https://github.com/trailofbits/skills) | Skill traceability | Before declaring the air conditioner is complete | Check if the code/test meets the specification document | **On demand M/L**. Use the correct Mamony ID and source status; Rust sources do not prove the implementation of Go. |
+| [Trail of Bits: spec-to-code-compliance](https://github.com/trailofbits/skills) | Skill traceability | Before claiming that acceptance criteria pass | Check if the code/test meets the specification document | **On demand M/L**. Use a local requirement ID and attach the executed Go evidence. |
 | [Trail of Bits: sharp-edges / supply-chain-risk-auditor](https://github.com/trailofbits/skills) | Skill security design/dependencies | API dangerous defaults; dependency baru | Finding footguns and supply chain issues worth investigating | On demand; false positive triage; do not duplicate existing job scans without benefit. |
 | [Anthropic skill-creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator) | Skills to create and evaluate skills | Creating or changing skills Mamony | Encourage real evaluation, work examples, and progressive disclosure | Use once for authoring/eval, instead of loading to all coding tasks. |
 | [ast-grep agent-skill](https://github.com/ast-grep/agent-skill) | Skill + AST search | Looking for calling patterns, cross-package changes, importing hard with `rg` | Structural search without attaching the entire file to AI | **Pilot**. Start `rg`/`gopls` first; `ast-grep` when the query is structural. Verify Go version support and rule coverage. |
@@ -704,7 +701,7 @@ RTK can be specifically tested on long CLI output. Before you activate it as a g
 ### 11.7 Security review before installing a skill
 
 - Check the original publisher repo, commit SHA, license, `SKILL.md`, all scripts/hooks, permissions, and tool invocations. Don't run `curl | sh` just because it's in README.
-- Don't give skill write access to secret, cloud production, or real accounts/providers. Mamony uses the simulation data according to ADR-0008.
+- Don't give skill write access to secret, cloud production, or real accounts/providers. Use only the [project synthetic data](../product.md).
 - External skills are untrusted instructions. In the context of Mamony, skill cannot change product rules, remove audits/validations, or make test claims without evidence.
 - Use a scanner like SkillSpector as an additional signal. Human review, sandbox and least privilege permission remain required; negative scanner results do not prove safe.
 - Document `approved`, `trial`, `rejected`, `revisit` per skill in the repo version registry, including reasons and metrics. Pin the version; review it before you update.
@@ -1038,7 +1035,7 @@ Verify object-level authorization, amount matching, and prevention of double pos
 | Provider simulator | Unknown outcome, forged webhook, unbounded retry | Authenticate/scope callback if endpoint exposed; idempotent updates, inquiry/reconcile | Forged callback, timeout after remote effect, duplicate callback. |
 | Build agent/CI → repository | Malicious skill/plugin, poisoned dependency, secret exfiltration | Pin tools, review third-party scripts, restricted tokens, safe secret handling | Validate permissions and untrusted-input handling. |
 
-ADR-0008 defines this system as a simulator. Do not make a connection to real providers or store real bank/account data to test threat scenarios.
+Use [synthetic simulator data](../product.md) for threat scenarios.
 
 ### 16.3 Minimum quality gates by layer
 

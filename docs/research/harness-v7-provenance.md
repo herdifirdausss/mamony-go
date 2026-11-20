@@ -13,13 +13,13 @@
 | `tools/archcheck/*`, `tools/doccheck/*` | Existing checker and negative-test policy retained |
 | `docs/architecture.md`, `docs/index.md`, `docs/evidence/template.md` | Existing more mature repo documentation retained and updated for new routers |
 | `docs/standards/engineering-principles.md` | v5 complete handbook retained instead of overwriting with the short v7 summary |
-| `docs/contracts/database-contract-gaps.md`, `docs/contracts/ledger-contract-gaps.md` | V7 implementation blockers integrated as separate gap docs |
+| `docs/contracts/database-contract-gaps.md`, `docs/contracts/ledger-contract-gaps.md` | Integrated into the local [PostgreSQL contract](../contracts/postgresql.md) and [ledger requirements](../contracts/ledger-gate-a.md). |
 | `docs/standards/agent-workflow.md`, `docs/standards/security.md` | V7 compact task/security policy integrated as separate entry points |
 | `docs/evals/benchmark.md`, `docs/evals/results.csv` | V7 mechanical fixtures moved to `docs/evals/harness-v7-fixture-cases.md` (IDs explicitly namespaced), CSV template retained |
 | `docs/evidence/local-run.md`, `VERIFICATION.txt` | Condensed historical record at `docs/evidence/archived-harness-v7-local-run.md`; **do not relabel as current PASS** |
 | `docs/research/provenance.md`, `INTEGRATION_PLAN.md`, `SHA256SUMS.txt` | Superseded by this source archive digest/merge map; original stale 404/NOT-RUN GitHub access claims not copied as current state |
 
-The source ZIP is available in this conversation; this GitHub repository does not silently accept old executable code, test results or assumptions. Existing v5/v6 specs and original Mamony Accepted ADRs keep their authority.
+Use the [local decisions and contracts](../index.md) for implementation. The ZIP records the engineering harness at the time of packaging.
 
 ## Verification status
 

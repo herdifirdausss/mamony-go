@@ -6,8 +6,8 @@ import re
 import sys
 
 REQUIRED_FILES = (
-    "docs/contracts/database-contract-gaps.md",
-    "docs/contracts/ledger-contract-gaps.md",
+    "docs/contracts/postgresql.md",
+    "docs/contracts/ledger-gate-a.md",
     "docs/standards/agent-workflow.md",
     "docs/standards/security.md",
     "docs/evals/harness-v7-fixture-cases.md",
@@ -61,7 +61,7 @@ def check(root: Path) -> list[str]:
 
     index = (root / "docs/index.md").read_text(encoding="utf-8")
     for path in (
-        "contracts/database-contract-gaps.md", "contracts/ledger-contract-gaps.md",
+        "contracts/postgresql.md", "contracts/ledger-gate-a.md",
         "standards/agent-workflow.md", "standards/security.md",
         "research/harness-v7-provenance.md",
     ):

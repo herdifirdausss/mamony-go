@@ -17,4 +17,4 @@ Source: user-attached `Mamony_Engineering_Research_Pack_v6(2).zip`, SHA-256 `ba6
 
 The full v6 materials are **reference guidance, not accepted Go ADRs**. Adding or linking them is not equivalent to having production hardening, security scans, database integration, agent evaluation or measured token savings. `make research` checks headings, source and eval registries, and routing only; the actual E01–E12 benchmark is **NOT RUN**.
 
-The source Mamony Rust repository and Seev remain read-only references. Review the [adoption register](../standards/adoption-status.md) before treating a recommendation as a binding policy.
+Use the [local decisions and contracts](../index.md) for implementation. The table records the initial integration. Later edits refer to the local baseline.

@@ -14,7 +14,7 @@ The three attached archives were checked against the draft PR #1 tree at [`08580
 - **v6.** The main [workflow](../research/engineering-workflow-v6.md) and [addendum](../standards/ai-agent-production-engineering.md) matched their ZIP members byte for byte before translation. The [benchmark plan](../evals/mamony-agent-benchmark.md) remains an exact match. The [source register](../research/source-register.md) retains all 31 URLs and their evidence classes. The [v6 manifest](../research/v6-integration-manifest.md) maps the proposed instructions, shared v5 files, and ZIP README to their repository destinations.
 - **v7.** The [39-file integration map](../research/harness-v7-provenance.md) accounts for the scaffold, executable checks, adopted CI jobs, original documentation, and historical evidence. The repository carries the standalone findings in an [archived report](archived-harness-v7-local-run.md). Local verification below used the current PR code and its pinned Go release.
 
-The two English workflows, the handbook, and the addendum are translations of the original drafts. The original bytes remain available in the verified source archives and the audited Git commit. The [adoption register](../standards/adoption-status.md) records which guidance is enforceable today.
+At the translation commit, the two English workflows, the handbook, and the addendum were translations of the original drafts. The original bytes remain available in the verified source archives and the audited Git commit. Current implementation requirements are in the [local decisions and contracts](../index.md).
 
 ## Executed checks
 
