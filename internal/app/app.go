@@ -43,12 +43,20 @@ func Run(ctx context.Context, logger *slog.Logger, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("bind public: %w", err)
 	}
-	defer publicLn.Close()
+	defer func() {
+		if err := publicLn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			logger.Warn("close public listener", "error", err)
+		}
+	}()
 	privateLn, err := net.Listen("tcp", cfg.PrivateAddr)
 	if err != nil {
 		return fmt.Errorf("bind private: %w", err)
 	}
-	defer privateLn.Close()
+	defer func() {
+		if err := privateLn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			logger.Warn("close private listener", "error", err)
+		}
+	}()
 
 	public := newServer(httpedge.PublicHandler())
 	private := newServer(httpedge.PrivateHandler())

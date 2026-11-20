@@ -13,6 +13,7 @@ var link = regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
 
 func main() {
 	for _, path := range []string{"README.md", "AGENTS.md", "docs/index.md", "docs/architecture.md", "docs/evidence/template.md"} {
+		//nolint:gosec // G304: path comes only from the fixed local documentation allowlist above.
 		b, err := os.ReadFile(path)
 		if err != nil {
 			fatal(fmt.Errorf("read %s: %w", path, err))
@@ -41,7 +42,26 @@ func check(path, contents string) error {
 		if dest == ".." || strings.HasPrefix(dest, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("%s: link escapes repo: %s", path, target)
 		}
-		if _, err := os.Stat(dest); err != nil {
+		// A path may be lexically in the repo but escape through a symlink.
+		// Resolve it and recheck against the physical current directory.
+		resolved, err := filepath.EvalSymlinks(dest)
+		if err != nil {
+			return fmt.Errorf("%s: broken local link %s: %w", path, target, err)
+		}
+		resolved, err = filepath.Abs(resolved)
+		if err != nil {
+			return fmt.Errorf("%s: resolve local link %s: %w", path, target, err)
+		}
+		root, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("%s: determine repo root: %w", path, err)
+		}
+		rel, err := filepath.Rel(root, resolved)
+		if err != nil || !filepath.IsLocal(rel) {
+			return fmt.Errorf("%s: local link escapes repo via symlink: %s", path, target)
+		}
+		//nolint:gosec // G703: the resolved path is checked against the physical repo root using filepath.Rel and IsLocal.
+		if _, err := os.Stat(resolved); err != nil {
 			return fmt.Errorf("%s: broken local link %s: %w", path, target, err)
 		}
 	}

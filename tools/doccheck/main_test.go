@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestLocalLinkRules(t *testing.T) {
 	t.Parallel()
@@ -15,5 +19,29 @@ func TestLocalLinkRules(t *testing.T) {
 	}
 	if err := check("README.md", "[official](https://go.dev/doc/)"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSymlinkOutsideRepositoryRejected(t *testing.T) {
+	t.Parallel()
+	target := filepath.Join(t.TempDir(), "external.md")
+	if err := os.WriteFile(target, []byte("not part of repo"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(".", "doccheck-symlink-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Error(err)
+		}
+	})
+	link := filepath.Join(dir, "escape.md")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := check("main_test.go", "[outside]("+filepath.ToSlash(link)+")"); err == nil {
+		t.Fatal("expected symlink escape rejection")
 	}
 }
