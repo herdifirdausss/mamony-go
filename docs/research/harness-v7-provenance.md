@@ -1,6 +1,6 @@
 # Mamony Engineering Harness v7 — provenance and integration decision
 
-**User-attached ZIP:** `Mamony_Engineering_Harness_v7(1).zip` (39 files); SHA-256 `538990b9fe7c8321f6fa2d2e5c8890a0d54bcfe75b9a9df77f6d9090fe563c88`. ZIP integrity check: passed. The user-provided source is an **older standalone Go scaffold**, written before GitHub access was available, so it must not blindly overwrite the now-working `mamony-go` repository.
+**User-attached ZIP:** `Mamony_Engineering_Harness_v7(2).zip` (39 files); SHA-256 `538990b9fe7c8321f6fa2d2e5c8890a0d54bcfe75b9a9df77f6d9090fe563c88`. ZIP integrity and all 38 listed member checksums passed. The user-provided source is an **older standalone Go scaffold**, written before GitHub access was available, so it must not blindly overwrite the now-working `mamony-go` repository.
 
 ## Merge decision by source category
 
@@ -21,9 +21,8 @@
 
 The source ZIP is available in this conversation; this GitHub repository does not silently accept old executable code, test results or assumptions. Existing v5/v6 specs and original Mamony Accepted ADRs keep their authority.
 
-## Reality check
+## Verification status
 
-- Go repository foundation and the v5/v6 guidance **have been integrated** into draft PR #1.
-- New `golangci-lint` and `govulncheck` CI jobs are **only verified if their latest actual GitHub Actions runs pass**.
+- Draft PR #1 includes the Go foundation, v5/v6 guidance, and v7 engineering checks. The [pack verification report](../evidence/engineering-pack-verification.md) records exact-commit CI and independently executed local checks.
 - PostgreSQL roles/RLS, migrations, C01 Post/Reverse/idempotency/outbox/recovery and controlled token benchmarks remain **NOT IMPLEMENTED / NOT RUN**.
 - A green docs/checker CI is not financial, security or deployment readiness.

@@ -15,6 +15,7 @@
 | Go architecture and test-output tooling | [Tool matrix](tooling/shortlist.md): pinned `go-arch-lint` and `gotestsum` in specialized CI |
 | OpenAPI compatibility / future contract work | [oasdiff integration](tooling/openapi-compat.md); actual API contract not yet implemented |
 | Go symbol navigation / AST search | [gopls MCP](tooling/gopls-mcp.md), [ast-grep](tooling/structural-search.md) — opt-in |
+| Engineering pack verification | [v5, v6, and v7 verification report](evidence/engineering-pack-verification.md) |
 | Harness v7 provenance and historical test evidence | [Integration map](research/harness-v7-provenance.md), [historical standalone test](evidence/archived-harness-v7-local-run.md) |
 | Harness v7 mechanical evaluation | [Eight scoped fixtures](evals/harness-v7-fixture-cases.md) and [empty metrics sheet](evals/results.csv) — not the same IDs as v6 E01–E12 |
 | Review / completion | [Evidence template](evidence/template.md) |

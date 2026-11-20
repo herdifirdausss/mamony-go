@@ -4,7 +4,7 @@
 
 Authoritative product requirements, approved ADRs, technical designs and invariants remain in the original Mamony repository. A Go-specific departure requires a proposed ADR and owner acceptance. See [adoption status](../standards/adoption-status.md).
 
-See [v6 source-file manifest](v6-integration-manifest.md) for what was imported verbatim, merged, or retained from v5.
+The [pack verification report](../evidence/engineering-pack-verification.md) records archive integrity, original matches, and executed checks. The [v6 source-file manifest](v6-integration-manifest.md) records how each source file was integrated.
 
 See the [v7 integration manifest](harness-v7-provenance.md) for the 39-file source comparison and why historical local verification is separate from real repository CI.
 

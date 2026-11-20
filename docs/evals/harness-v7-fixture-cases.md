@@ -4,11 +4,11 @@ Source: uploaded Mamony Engineering Harness v7 `docs/evals/benchmark.md`. This i
 
 | v7 harness case | Required local behavior | Current verification status |
 |---|---|---|
-| H07-E01 | Forbidden module import is rejected | Architecture policy unit test covers the rule; deliberate source mutation is NOT RUN on this PR |
-| H07-E02 | Valid app adapter and local usecase imports are accepted | Architecture policy unit test, not a complete adapter integration |
+| H07-E01 | Forbidden module import is rejected | PASS in [local fixture verification](../evidence/engineering-pack-verification.md). Deliberately added direct payment-to-ledger import rejected. |
+| H07-E02 | Valid app adapter and local usecase imports are accepted | PASS in [local fixture verification](../evidence/engineering-pack-verification.md). App-to-facade and local handler-to-use-case imports accepted. |
 | H07-E03 | Unbalanced debit/credit rejected | Existing pure ledger unit test |
 | H07-E04 | Minor-unit total overflow rejected | Existing pure ledger unit test |
-| H07-E05 | Public listener does not expose private readiness | Existing HTTP route isolation test |
+| H07-E05 | Public listener does not expose private readiness | PASS in route-isolation test and [local HTTP smoke test](../evidence/engineering-pack-verification.md). |
 | H07-E06 | Concurrent duplicate ledger Post yields one durable posting | BLOCKED: PostgreSQL C01 Post not implemented |
 | H07-E07 | Unknown provider outcome cannot cause blind resend | BLOCKED: provider simulator not implemented |
 | H07-E08 | Tenant A cannot access B after pooled connection reuse | BLOCKED: runtime role/RLS not implemented |

@@ -9,7 +9,7 @@ Before implementing financial posting, resolve and verify:
 - PRD-01 FR-008/009/013: single reversal, verifier and immutable journals.
 - PRD-01 FR-011 and related event/outbox ADRs: atomic outbox, ordering, replay and consumer deduplication.
 - ADR-0010 and ADR-0021: per-capability schema ownership, actual runtime role, and transaction-local tenant RLS.
-- ADR-0014 versus TD-01/OpenAPI: wire amount shape inconsistency; **do not resolve silently**.
+- [Open wire-amount decision](ledger-gate-a.md#open-decision-on-wire-amounts): agree the JSON type and range per route before publishing a Go contract.
 - FX precision/rounding policy: no `float64` monetary arithmetic.
 
 Acceptance evidence requires real PostgreSQL posting, concurrent barriers, replay after committed response loss, rollback, cross-tenant pool reuse negative tests, upgrade migration and verifier after backup restoration. **None of those scenarios are implemented in this starter.**

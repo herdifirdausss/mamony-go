@@ -12,4 +12,12 @@
 
 **Gate A required Go evidence (NOT RUN):** migration bootstrap with roles/grants, atomic DB posting, concurrent replay with same key, different-payload rejection, balance floor under contention, one reversal under concurrent requests, outbox ordering and rollback, RLS tenant A/B with pooled connection reuse, backup/restore/recompute verifier.
 
-**Open decision:** amount representation differs between original ADR-0014, TD-01 and OpenAPI for some endpoints. Preserve approved endpoint contracts per route; do not silently change them.
+## Open decision on wire amounts
+
+| Source at Mamony commit `776744a` | Representation |
+|---|---|
+| [ADR-0014 §Decision, item 5](https://github.com/herdifirdausss/mamony/blob/776744aa36882328a9669382c82a241d139ff437/docs/adr/0014-rest-json-openapi-api-style.md#decision) | JSON integer counts of minor units within the interoperable safe-integer range (±(2^53 − 1)). |
+| [TD-01](https://github.com/herdifirdausss/mamony/blob/776744aa36882328a9669382c82a241d139ff437/docs/design/TD-01-ledger-core.md) | Internal ledger amounts are positive minor-unit integers up to `i64::MAX`. PostgreSQL uses `bigint`. |
+| [Original OpenAPI](https://github.com/herdifirdausss/mamony/blob/776744aa36882328a9669382c82a241d139ff437/docs/api/openapi.json) | Payment creation (`CreateRequest.amount`) and balance responses (`BalanceResponse.amount`) use strings of digits in minor units. |
+
+Before publishing a Go API, the owner must reconcile the JSON type and range by route. Test the agreed wire format and its boundaries independently of the internal ledger representation.
