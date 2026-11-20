@@ -2,7 +2,7 @@
 
 Project: synthetic cross-border pay-in/pay-out simulator. No real funds, identities, or provider credentials.
 
-1. Read the issue's acceptance criteria. Use the [documentation index](docs/index.md) to find the task contract.
+1. Read the issue's acceptance criteria. Use the [implementation sequence](docs/delivery/README.md) to find the task contract and its requirement IDs.
 2. Use the [local decisions](docs/adr/README.md) and contracts for implementation. Record changes to a baseline in a proposed ADR.
 3. Load [engineering principles](docs/standards/engineering-principles.md) and [AI-agent production engineering v6](docs/standards/ai-agent-production-engineering.md) **on demand by relevant heading**. Both are draft guidance, not Accepted Mamony ADRs. [Integrated v6 workflow](docs/research/engineering-workflow-v6.md), [literature registry](docs/research/source-register.md) and [adoption status](docs/standards/adoption-status.md) are references, not compulsory context.
 4. Scope modules under `internal/modules/<capability>`; `internal/app` composes facades. Domain is pure; use cases do not import concrete adapters; direct capability-to-capability imports are forbidden. Run architecture checks.

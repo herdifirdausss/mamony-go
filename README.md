@@ -2,7 +2,7 @@
 
 Mamony Go is a synthetic simulator for cross-border pay-in and pay-out. The current bootstrap checks journal structure in memory and runs two HTTP listeners.
 
-Read the [product scope](docs/product.md), [documentation index](docs/index.md), and [architecture decisions](docs/adr/README.md).
+Read the [implementation sequence](docs/delivery/README.md) to find the contract for the next step. The [documentation index](docs/index.md) links the product scope, architecture decisions, and engineering checks.
 
 ## Getting started
 

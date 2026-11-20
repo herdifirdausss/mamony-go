@@ -18,7 +18,12 @@ Mamony Go is a simulator for cross-border pay-in and pay-out. Use synthetic iden
 | C08 Identity and C09 Onboarding | Authentication, access decisions, and synthetic identity checks. |
 | C10 Reconciliation and C11 Back office | Reconciliation findings and operator workflows. Corrections go through C01. |
 | C12 Events | Event contracts and delivery. The capability that changes data owns the event. |
-| C14 FX and C19 Compliance | Rates, FX positions, and sanctions decisions for the pilot. |
+| C14 FX and C19 Compliance | Rates, FX positions, screening, and later activity monitoring. |
+| C13 Fraud | Rules, scores, review, and risk evidence. |
+| C15 Settlement and C16 Accounting | Merchant settlement batches, reserves, ledger projections, and period close. |
+| C17 Disputes and C18 Developer tools | Dispute evidence, refund policy, API docs, and sandbox operations. |
+| C20 Platform | Sub-merchant allocation rules and split payments. |
+| C21 Billing and C22 Cards and savings | Deferred scope. |
 
 ## Pilot behavior
 
@@ -32,4 +37,4 @@ Mamony Go is a simulator for cross-border pay-in and pay-out. Use synthetic iden
 2. **Gate A.** Demonstrate durable ledger posting, recovery, and audit with PostgreSQL. See the [C01 requirements and checks](contracts/ledger-gate-a.md).
 3. **Gate B.** Run a simulated pilot on one corridor. Cover pay-in and pay-out, sanctions checks, provider failures and unknown outcomes, and daily reconciliation. Match FX positions to the ledger. Exercise recovery and record incident procedures.
 
-The pilot corridor, observation window, and performance targets require a decision before Gate B.
+The pilot corridor, observation window, and performance targets require a decision before Gate B. See the [implementation sequence](delivery/README.md) for the prerequisites and acceptance checks for each capability.

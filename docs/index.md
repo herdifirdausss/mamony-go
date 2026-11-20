@@ -2,6 +2,9 @@
 
 | Task | Start here |
 |---|---|
+| What to build next | [Implementation sequence](delivery/README.md) |
+| Review findings and coverage | [Product and design review](delivery/validation.md) |
+| Choices for the current stage | [Decision register](delivery/decisions.md) |
 | Product, capabilities, and delivery gates | [Product scope](product.md) |
 | System decisions | [Architecture decision index](adr/README.md) |
 | Go packages and listeners | [Architecture](architecture.md) |
