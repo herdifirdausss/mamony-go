@@ -1,7 +1,19 @@
 package main
+
 import "testing"
-func TestLinks(t *testing.T){
-	if e:=check("main_test.go","[source](main.go)");e!=nil {t.Fatal(e)}
-	if e:=check("docs/index.md","[escape](../../etc/passwd)");e==nil {t.Fatal("path escape allowed")}
-	if e:=check("README.md","[missing](no-such-file.md)");e==nil {t.Fatal("broken link allowed")}
+
+func TestLocalLinkRules(t *testing.T) {
+	t.Parallel()
+	if err := check("main_test.go", "[source](main.go)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := check("docs/index.md", "[evil](../../etc/passwd)"); err == nil {
+		t.Fatal("expected path escape rejection")
+	}
+	if err := check("README.md", "[bad](not-exists.md)"); err == nil {
+		t.Fatal("expected broken link")
+	}
+	if err := check("README.md", "[official](https://go.dev/doc/)"); err != nil {
+		t.Fatal(err)
+	}
 }
