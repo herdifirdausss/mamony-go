@@ -8,8 +8,9 @@
 | Go package changes | [Architecture](architecture.md), [Go ADR](adr/0001-go-modular-monolith.md) |
 | Design principles / refactoring / patterns | [Engineering principles handbook](standards/engineering-principles.md), read only relevant heading |
 | Architecture and security standards policy | [Adoption status](standards/adoption-status.md) |
-| Full workflow/history | [v5 research reference](research/engineering-workflow-v5.md), [reader notes](research/README.md); **not required initial context** |
-| AI skills, context and efficiency | [5 project skills](../.agents/skills/); [evaluation plan](evidence/skill-evaluation-v5.md) |
+| AI-agent harness, token efficiency and secure tooling | [v6 production engineering §§18–24](standards/ai-agent-production-engineering.md) — read task-relevant sections only |
+| Full workflow/history | [integrated v6 workflow](research/engineering-workflow-v6.md), [v5 predecessor](research/engineering-workflow-v5.md), [31-source register](research/source-register.md), [reader notes](research/README.md); **not required initial context** |
+| AI skills, context and efficiency | [5 project skills](../.agents/skills/); [v6 E01–E12 benchmark](evals/mamony-agent-benchmark.md); [v5 pilot cases](evidence/skill-evaluation-v5.md) |
 | Review / completion | [Evidence template](evidence/template.md) |
 | Reference Go project | [Seev](https://github.com/herdifirdausss/seev), engineering patterns only |
 

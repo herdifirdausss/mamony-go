@@ -25,15 +25,16 @@ The private listener binds loopback only. Readiness means **HTTP process readine
 - One Go binary and separate public/private HTTP listeners with route-isolation tests.
 - C01 pure journal-shape validation (positive integer minor units, one currency, debits equal credits, overflow rejection); **not real posting**.
 - Architecture checker, documentation-link checker, unit tests, vet, race and build targets.
-- Engineering [handbook v5](docs/standards/engineering-principles.md), [research workflow v5](docs/research/engineering-workflow-v5.md), [adoption status](docs/standards/adoption-status.md) and five draft [agent skills](.agents/skills/) with structural metadata tests.
-- [Skill A/B evaluation](docs/evidence/skill-evaluation-v5.md) with acceptance criteria, cost and token metrics (not run).
+- Engineering [handbook v5](docs/standards/engineering-principles.md), [v6 AI-agent production engineering](docs/standards/ai-agent-production-engineering.md), [integrated workflow v6](docs/research/engineering-workflow-v6.md), [31-source register](docs/research/source-register.md), [adoption status](docs/standards/adoption-status.md), and five draft [agent skills](.agents/skills/) with structural metadata tests.
+- [Skill A/B evaluation v5](docs/evidence/skill-evaluation-v5.md) and [v6 E01–E12 matched-task benchmark](docs/evals/mamony-agent-benchmark.md) with acceptance criteria, hard gates, cost and token metrics (**NOT RUN**).
+- `make research` checks the v6 document routing, 31 reference entries and 12 benchmark case IDs; this is a metadata gate, **not** independent research verification.
 - CI baseline and a source-derived [Gate A trace](docs/contracts/ledger-gate-a.md).
 
 ## What is absent
 
 No PostgreSQL migration, RLS, role grants, journal posting, idempotency, reversal, outbox, reconciliation, backup or verified financial behavior. Go lint/security scanners have local commands but are **not yet blocking PR CI**. Skills are **not benchmarked**; files existing does not establish that any coding agent discovers or follows them. Historical Rust tests do not count as Go runtime evidence.
 
-Start with [documentation index](docs/index.md) for task-specific references. Do **not** paste the full research or handbook into every AI prompt.
+Start with [documentation index](docs/index.md) for task-specific references. Do **not** paste full v5/v6 research or handbooks into every AI prompt. Literature conclusions and token benefits remain unverified for this Go repository until tested.
 
 ## Merge policy
 

@@ -1,6 +1,6 @@
-.PHONY: check fmt-check vet unit architecture docs skills build race lint security run
+.PHONY: check fmt-check vet unit architecture docs skills research build race lint security run
 
-check: fmt-check vet unit architecture docs skills build
+check: fmt-check vet unit architecture docs skills research build
 
 fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
@@ -20,6 +20,9 @@ docs:
 skills:
 	python3 tools/skillcheck.py
 	python3 -m unittest discover -s tools -p 'test_*.py'
+
+research:
+	python3 tools/researchcheck.py
 
 build:
 	go build ./...

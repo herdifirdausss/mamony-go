@@ -11,7 +11,7 @@
 ## Evidence
 | Check | Command + evidence | Status (PASS/FAIL/NOT RUN) |
 |---|---|---|
-| Format, vet, tests, docs, architecture, skill metadata, build | `make check` | NOT RUN |
+| Format, vet, tests, docs, architecture, skills, v6 research registry, build | `make check` | NOT RUN |
 | Race detector (where relevant) | `make race` | NOT RUN |
 | golangci-lint | `make lint` | NOT RUN |
 | Vulnerability scan | `make security` | NOT RUN |
@@ -22,4 +22,9 @@
 - Deployment/rollback/roll-forward:
 - Open blockers, owner decision or risk acceptance:
 
-Do not claim Gate A or deployment readiness without database and failure-mode evidence.
+## AI-workflow changes (if applicable)
+- [v6 E01–E12 plan](../docs/evals/mamony-agent-benchmark.md): matched tasks, model and baseline:
+- Accepted AC / hard-gate results:
+- Measured input/output/cached tokens, cost, retries, review effort (or NOT RUN):
+
+Do not claim Gate A, benchmark success, token savings or deployment readiness without reproducible evidence.
