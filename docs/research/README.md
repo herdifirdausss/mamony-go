@@ -4,4 +4,6 @@
 
 Authoritative product requirements, approved ADRs, technical designs and invariants remain in the original Mamony repository. A Go-specific departure requires a proposed ADR and owner acceptance. See [adoption status](../standards/adoption-status.md).
 
+See [v6 source-file manifest](v6-integration-manifest.md) for what was imported verbatim, merged, or retained from v5.
+
 Keep `AGENTS.md` brief. Read only sections relevant to the task; do not paste this full research document into every agent prompt.

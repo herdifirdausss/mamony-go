@@ -13,7 +13,9 @@ class SkillCheckTest(unittest.TestCase):
             path.parent.mkdir()
             path.write_text(
                 "---\nname: mamony-test\ndescription: Use for example checks\n---\n"
-                "# Example\nFollow the scope, verify acceptance criteria and record evidence.\n",
+                "# Example\nFollow the scope, verify acceptance criteria, record reproducible evidence, "\
+                "review error paths and security boundaries, and explicitly mark work as NOT RUN "\
+                "when no test was executed. Avoid ungrounded claims.\n",
                 encoding="utf-8",
             )
             self.assertEqual(validate_skill(path), [])
