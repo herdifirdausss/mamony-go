@@ -17,5 +17,11 @@ deps:
   app:
     mayDependOn:
       - platform
-  platform: {}
-  ledger_domain: {}
+  # The current config schema requires at least one explicit reference;
+  # self-component references do not grant cross-layer imports.
+  platform:
+    mayDependOn:
+      - platform
+  ledger_domain:
+    mayDependOn:
+      - ledger_domain
