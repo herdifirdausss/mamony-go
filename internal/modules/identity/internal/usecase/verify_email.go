@@ -22,12 +22,12 @@ const proofPrefix = "mamony:email-proof:v1:"
 // EmailProofRequest is a trusted, single-transaction repository command.
 // The token digest must never be used as a bearer or logged.
 type EmailProofRequest struct {
-	SubjectID   string
-	ChallengeID string
-	EventID     string
-	TokenDigest []byte
+	SubjectID     string
+	ChallengeID   string
+	EventID       string
+	TokenDigest   []byte
 	EnvelopeKeyID string
-	SealedToken []byte
+	SealedToken   []byte
 }
 
 type EmailProofDestination struct {

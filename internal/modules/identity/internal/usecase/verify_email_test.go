@@ -36,7 +36,7 @@ func (f *fakeEmailProofPort) Consume(_ context.Context, digest []byte, event str
 	return f.consumeErr
 }
 
-type fakeEnvelopeSealer struct { fail bool }
+type fakeEnvelopeSealer struct{ fail bool }
 
 func (s fakeEnvelopeSealer) Seal(_, _, _ string) (string, []byte, error) {
 	if s.fail {
