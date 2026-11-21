@@ -25,8 +25,8 @@ import (
 var errUnsafeReconcileConfig = errors.New("identity reconciliation command blocked")
 
 const (
-	inspectFlag = "--inspect"
-	repairFlag  = "--repair-once"
+	inspectFlag    = "--inspect"
+	repairFlag     = "--repair-once"
 	repairApproval = "I_APPROVE_BOUNDED_IDENTITY_FIRST_PROOF_REPAIR"
 )
 
@@ -44,7 +44,7 @@ type executionReport struct {
 
 type commandDeps struct {
 	inspect func(context.Context, string) (identity.EnrollmentBacklog, error)
-	repair func(context.Context, identity.EnrollmentReconciliationConfig) (identity.EnrollmentReconciliationResult, error)
+	repair  func(context.Context, identity.EnrollmentReconciliationConfig) (identity.EnrollmentReconciliationResult, error)
 }
 
 func main() {
