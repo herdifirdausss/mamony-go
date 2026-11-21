@@ -204,14 +204,16 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 				return nil, fmt.Errorf("write integration output: %w", err)
 			}
 		}
-		if ev.Action == "pass" && !strings.Contains(ev.Test, "/") &&
-			((ev.Package == requiredPackage && strings.HasPrefix(ev.Test, "TestPostgres")) ||
+		if ev.Action == "pass" && !strings.Contains(ev.Test, "/") {
+			if (ev.Package == requiredPackage && strings.HasPrefix(ev.Test, "TestPostgres")) ||
 				(ev.Package == identityPackage && strings.HasPrefix(ev.Test, "TestIdentity")) ||
 				(ev.Package == identityIntegrationPackage &&
 					(strings.HasPrefix(ev.Test, "TestIdentityMailgunMock") ||
 						strings.HasPrefix(ev.Test, "TestIdentityHTTPEnrollmentDB") ||
-						strings.HasPrefix(ev.Test, "TestIdentityZEnrollmentReconciliationDB"))))) {
-			passed[ev.Test] = true
+						strings.HasPrefix(ev.Test, "TestIdentityZEnrollmentReconciliationDB"))) {
+				passed[ev.Test] = true
+			}
+
 		}
 	}
 	return passed, nil
