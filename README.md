@@ -1,13 +1,23 @@
 # Mamony Go
 
-Go modular-monolith implementation of the [Mamony](https://github.com/herdifirdausss/mamony) **synthetic** cross-border pay-in/pay-out learning project.
+Mamony Go is a project for simulating cross-border payments and payouts with synthetic data. The current Go binary serves health endpoints on two HTTP listeners. The [roadmap](docs/roadmap.md) describes planned ledger and payment capabilities.
 
-Status: bootstrap only. No real money, credentials, providers, or identities. The repository is not production-ready.
+Start with the [documentation index](docs/index.md) or the [roadmap](docs/roadmap.md).
 
-Authoritative references:
-- Product requirements and Accepted ADRs: `herdifirdausss/mamony` (read only).
-- Go engineering reference: `herdifirdausss/seev` (read only).
+## Run locally
 
-Source-derived constraints: C01 alone writes balances; immutable, balanced journals; idempotent posting; one runtime first; isolated PostgreSQL capability schemas; fail-closed tenant isolation. These constraints are not yet implemented by this foundation.
+Use Go 1.23 or later. CI uses the version in [`.go-version`](.go-version). Install Python 3.9 or later for the repository's metadata checks.
 
-The initial engineering harness will be proposed on a separate branch for review.
+```sh
+make check
+make run
+```
+
+From a second terminal, use the default listener addresses to check the process.
+
+```sh
+curl -i http://127.0.0.1:8080/livez
+curl -i http://127.0.0.1:8081/readyz
+```
+
+The private listener binds to loopback. Use `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to set listener addresses. The private readiness endpoint checks the HTTP process. See [engineering practices](docs/engineering.md#verification) for the test and CI commands.
