@@ -8,14 +8,14 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 |---|---|---|---|
 | Unit | Pure domain rules, usecase orchestration, invalid inputs and error classification with fakes for external ports | `make unit`; files named `*_test.go` | **Implemented** for existing bootstrap/checker packages; financial rules absent |
 | HTTP/component | Handler routing, method/resource exposure, request/response mapping, deadlines and private/public listener separation using `httptest` or bound ephemeral listeners | `make unit`; focused Go tests | **Implemented** only for health endpoints |
-| Integration — database | Actual SQL, migrations, constraints, runtime roles, tenant RLS, transaction/retry, outbox, balance-floor and race semantics | `make integration` with real PostgreSQL fixture and `TEST_DATABASE_URL`; `//go:build integration` and `*_integration_test.go` | **NOT RUN**: database code, fixtures and integration cases not yet available |
+| Integration — database | Actual SQL, migrations, constraints, runtime roles, tenant RLS, transaction/retry, outbox, balance-floor and race semantics | `make integration` is a fail-closed placeholder; enable only with a disposable PostgreSQL fixture, tagged `*_integration_test.go` and a required CI integration job | **NOT RUN**: database code, fixtures and integration cases not yet available |
 | Contract | Public OpenAPI/schema compatibility, event versions, external provider signature fixtures and stub behavior | Focused tests when published contracts/adapters exist | **NOT RUN** for payment/provider APIs |
 | Scenario / E2E | Customer/operator flows crossing capability boundaries with synthetic providers, including recovery, denial, retry, duplicate/out-of-order messages | Dedicated scenario tests after target flows exist | **NOT RUN** for financial flows |
 | Concurrency / fault | Race, lost response, concurrent idempotency key, rollback, outbox replay, restart/restore | `make race` for shared memory; real DB multi-connection fault tests for durable state | Race detector runs; **financial fault tests NOT RUN** |
 | Property / fuzz | Arithmetic conservation, allowed state transitions, parsers/decoders on hostile inputs | `go test -fuzz=Fuzz... -fuzztime=... <package>` when targets exist; committed corpus runs during unit tests | **NOT RUN** for absent financial/parser targets |
 | Performance / recovery | Bounded latency, resource budget, load, backups and safe restoration | Dedicated reproducible benchmarks and restore drills with declared fixtures | **NOT RUN** |
 
-**Never claim `make race` proves a SQL concurrency invariant.** Never report `make unit` as a database integration PASS. The `integration` Make target intentionally fails with `NOT RUN` (exit 2) until a real suite and `TEST_DATABASE_URL` exist. Do not add an empty dummy integration test merely to make it green.
+**Never claim `make race` proves a SQL concurrency invariant.** Never report `make unit` as a database integration PASS. The `integration` Make target deliberately returns `NOT RUN` (exit 2) on every invocation until a real PostgreSQL test harness and required CI integration job exist. An integration filename and `TEST_DATABASE_URL` are insufficient: `go test` can return success with **no tests executed**. Do not relax this gate merely to make it green.
 
 ## Go test conventions
 
@@ -36,7 +36,7 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 | `make test-repeat` | `go test -shuffle=on -count=3 ./...` catches some order dependence but not all flakiness. |
 | `make race` | Shared-memory race detector; only exercised code paths are checked. |
 | `make coverage` | Generates `test-reports/coverage.out` and per-function coverage; diagnostic only, no arbitrary percentage gate. |
-| `make integration` | Requires actual tagged integration files **and** explicit `TEST_DATABASE_URL`; never a pretend PASS. |
+| `make integration` | Currently returns `NOT RUN`; replace the placeholder only after a real disposable PostgreSQL fixture, executed tagged tests and a required CI job are present. |
 | `make lint`, `make security`, `make archlint` | Static/vulnerability/dependency gates; not a substitute for behavioral proof. |
 | `make test-report` | Test evidence for base Go suite via gotestsum; does not cover absent database tests. |
 
@@ -50,7 +50,7 @@ When the first database schema/migration lands:
 2. Add `*_integration_test.go` with `//go:build integration` and explicit setup/cleanup. Use `TEST_DATABASE_URL` only for isolated disposable test infrastructure. Fail closed if absent.
 3. Run migrations from empty database and a prior supported version. Verify ownership, `FORCE ROW LEVEL SECURITY`, runtime grants and unauthorized tenant access using **actual roles**.
 4. Add deterministic concurrent transactions, duplicate keys, forced abort, lost response and process restart tests for the first ledger slice.
-5. Then and **only then** enable a required CI integration job. Confirm it fails if PostgreSQL is unavailable, migrations fail, no tests run, or an invariant is violated; do not mark it optional via `continue-on-error`.
+5. Then and **only then** replace the fail-closed `make integration` placeholder and enable a required CI integration job. Confirm it fails if PostgreSQL is unavailable, migrations fail, **no tests execute**, or an invariant is violated; do not mark it optional via `continue-on-error`. A test-file presence check is not sufficient.
 
 Dependency selection and pinning belong to DEC-01 in the [decision register](open-decisions.md). An off-the-shelf test container library is an option, not a prerequisite for Go unit tests.
 
