@@ -164,7 +164,7 @@ func TestIdentityLoginAdmission(t *testing.T) {
 		// loaded CI runner; enforce the cap PER bin and exact total
 		// admitted, without assuming one wall-clock minute.
 		mac := hmac.New(sha256.New, bytes.Repeat([]byte{0xe7}, 32))
-		_, _ = mac.Write([]byte("mamony:identity:login-admission:v1\\x00GLOBAL\\x00all"))
+		_, _ = mac.Write([]byte("mamony:identity:login-admission:v1\x00GLOBAL\x00all"))
 		globalDigest := mac.Sum(nil)
 		var windows, totalHits, maxHits, minBytes, invalid int
 		err = admin.QueryRow(ctx, `SELECT count(*)::int,
