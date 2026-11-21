@@ -77,7 +77,7 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 
 	t.Run("transaction commits encrypted queue with digest and audit", func(t *testing.T) {
 		p := newPending(t)
-		issue := newIssue(t, p.SubjectID, 0x71)
+		issue := newIssue(t, p.SubjectID, 0xd1)
 		var count int
 		err := admin.QueryRow(ctx, `SELECT count(*) FROM
 			mamony_identity.email_verification_challenges c
@@ -95,8 +95,8 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 		// must not survive the same failed issuance transaction.
 		conflict := usecase.EmailProofRequest{
 			SubjectID: p.SubjectID, ChallengeID: randomID(t, "vch_"),
-			EventID: issue.EventID, TokenDigest: bytes.Repeat([]byte{0x72}, 32),
-			EnvelopeKeyID: "test-key", SealedToken: bytes.Repeat([]byte{0x72}, 71),
+			EventID: issue.EventID, TokenDigest: bytes.Repeat([]byte{0xd2}, 32),
+			EnvelopeKeyID: "test-key", SealedToken: bytes.Repeat([]byte{0xd2}, 71),
 		}
 		if _, err := issuer.Issue(ctx, conflict); err == nil {
 			t.Fatal("outbox collision accepted")
@@ -116,7 +116,7 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 
 	t.Run("lease fences concurrent workers and retries", func(t *testing.T) {
 		p := newPending(t)
-		issue := newIssue(t, p.SubjectID, 0x81)
+		issue := newIssue(t, p.SubjectID, 0xd3)
 		first, ok, err := delivery.Claim(ctx, randomID(t, "lse_"))
 		if err != nil || !ok || first.ChallengeID != issue.ChallengeID ||
 			first.SubjectID != p.SubjectID || first.Recipient != p.CanonicalEmail ||
@@ -163,7 +163,7 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 
 	t.Run("fifth retry ends terminally without unbounded sends", func(t *testing.T) {
 		p := newPending(t)
-		issue := newIssue(t, p.SubjectID, 0x91)
+		issue := newIssue(t, p.SubjectID, 0xd4)
 		for i := 0; i < 5; i++ {
 			if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_proof_deliveries
 			    SET next_attempt_at=clock_timestamp()-interval '1 second'
@@ -192,11 +192,11 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 
 	t.Run("revoked or consumed proof never enters claim", func(t *testing.T) {
 		p := newPending(t)
-		old := newIssue(t, p.SubjectID, 0xa1)
+		old := newIssue(t, p.SubjectID, 0xd5)
 		_, err := issuer.Issue(ctx, usecase.EmailProofRequest{
 			SubjectID: p.SubjectID, ChallengeID: randomID(t, "vch_"),
-			EventID: randomID(t, "evt_"), TokenDigest: bytes.Repeat([]byte{0xa2}, 32),
-			EnvelopeKeyID: "test-key", SealedToken: bytes.Repeat([]byte{0xa2}, 71),
+			EventID: randomID(t, "evt_"), TokenDigest: bytes.Repeat([]byte{0xd6}, 32),
+			EnvelopeKeyID: "test-key", SealedToken: bytes.Repeat([]byte{0xd6}, 71),
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -212,7 +212,7 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 
 	t.Run("parallel claims are exclusive", func(t *testing.T) {
 		p := newPending(t)
-		issue := newIssue(t, p.SubjectID, 0xb1)
+		issue := newIssue(t, p.SubjectID, 0xd7)
 		const n = 8
 		var wg sync.WaitGroup
 		jobs := make(chan usecase.ProofDeliveryJob, n)
