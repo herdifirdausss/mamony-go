@@ -7,8 +7,8 @@
 | `cmd/mamony` | Read listener addresses and handle process signals. |
 | `internal/app` | Start and stop the two HTTP listeners. |
 | `internal/platform/httpedge` | Serve liveness and readiness. |
-| `internal/platform/migration` | Standalone versioned platform migration verification; never invoked by HTTP startup. |
-| `internal/platform/postgres` | Bounded runtime-only pgxpool and tenant transaction primitives; not wired to an HTTP capability. |
+| `internal/platform/migration` | Standalone versioned platform and Identity migration verification, with separate schema roles and migration histories; never invoked by HTTP startup. |
+| `internal/platform/postgres` | Bounded runtime-only pgxpool plus transaction primitives; Identity uses a dedicated least-privileged pool, not wired to HTTP. |
 
 | Listener | Default | Routes |
 |---|---|---|
@@ -16,6 +16,8 @@
 | Private | `127.0.0.1:8081` | `GET /livez`, `GET /readyz` |
 
 Set `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to override the addresses. The private listener accepts `127.0.0.1` and `::1`. It maps `localhost` to `127.0.0.1`. Readiness reports only HTTP process readiness.
+
+| `internal/modules/identity` | Internal pending-registration policy, Argon2id credential adapter, and Identity PostgreSQL enrollment repository; public login/verification still absent. |
 
 ## Capability packages
 
@@ -30,7 +32,7 @@ See the [data ownership decision](adr/0002-ledger-and-data-ownership.md), [publi
 
 ## Security authority and trust boundaries
 
-**Current implementation:** only the HTTP health listeners run. All identity, tenant database, money, provider, approval, and audit enforcement below is a **design contract**, not a deployed control. Mamony uses synthetic identities, balances, and providers; these requirements do not imply regulatory compliance or production readiness.
+**Current HTTP implementation:** only the health listeners run. Identity now has draft internal enrollment primitives and SQL storage with an identifier-only outbox, but no public routes, email proof, sessions, tenant membership, resource authorization or money/approval enforcement. The wider security boundaries below remain design contracts, not deployed controls. Mamony uses synthetic identities, balances, and providers; these requirements do not imply regulatory compliance or production readiness.
 
 The initial modular-monolith security model assumes the application runtime and its authoritative database remain trusted (**Profile A**). It does **not** claim to resist an arbitrary writer to that authority database or complete application compromise. Before claiming stronger protection (**Profile B**), choose and verify independently controlled identity, approval, and execution authority, including their persistence, deployment administration, key-operation permissions, and recovery roots. Signed rows, checksums, and KMS alone cannot establish fresh, authorized current state when the signing caller or current-state authority is compromised. Multi-region fencing (**Profile G**) is deferred.
 

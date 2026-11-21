@@ -2,7 +2,7 @@
 
 The identity module owns tenants, users, sessions, API credentials, roles, and change approvals. Capabilities own their resources. They supply the resource and tenant context for authorization.
 
-**Implementation status:** Pending. The HTTP bootstrap has no login, sessions, credentials, recovery, or authorization enforcement. Choose the enabled client channel before treating any option below as a deployed control.
+**Implementation status:** Draft internal registration primitives and dedicated PostgreSQL pending-enrollment storage are proposed in PRs #22 and its stacked storage PR. All public identity HTTP routes, email verification/delivery, login, sessions, recovery, tenant ownership and authorization enforcement remain **NOT IMPLEMENTED**. A credential table alone does not constitute a deployed authentication control.
 
 ## Authentication and lifecycle
 
