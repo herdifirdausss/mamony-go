@@ -22,10 +22,10 @@ func (f *loginGateFake) Admit(_ context.Context, email string, peer netip.Addr) 
 }
 
 type loginPasswordFake struct {
-	calls   int
-	subject string
-	err     error
-	email   string
+	calls    int
+	subject  string
+	err      error
+	email    string
 	password string
 }
 
@@ -38,13 +38,13 @@ func (f *loginPasswordFake) Authenticate(_ context.Context, email, password stri
 func TestPasswordLoginFlowMustAdmitBeforeAnyPasswordWork(t *testing.T) {
 	ip := netip.MustParseAddr("203.0.113.2")
 	cases := []struct {
-		name       string
-		gateOK     bool
-		gateErr    error
-		authErr    error
-		subject    string
-		wantErr    error
-		wantCalls  int
+		name      string
+		gateOK    bool
+		gateErr   error
+		authErr   error
+		subject   string
+		wantErr   error
+		wantCalls int
 	}{
 		{"allowed and matched", true, nil, nil, "sub_0123456789012345678901", nil, 1},
 		{"unknown email or wrong password", true, nil, ErrPasswordAuthenticationDenied, "", ErrPasswordAuthenticationDenied, 1},
