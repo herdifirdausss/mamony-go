@@ -10,11 +10,11 @@ import (
 )
 
 type fakeEmailProofPort struct {
-	issued  EmailProofRequest
-	seen    []byte
-	issues  int
-	consumed int
-	issueErr error
+	issued     EmailProofRequest
+	seen       []byte
+	issues     int
+	consumed   int
+	issueErr   error
 	consumeErr error
 }
 

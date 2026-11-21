@@ -3,10 +3,7 @@
 check: fmt-check vet unit architecture docs skills migrations-check build
 
 
-fmt-check: fmt-inspect
-
-fmt-inspect:
-	@gofmt -d internal/modules/identity/internal/repository/postgres/verification_integration_test.go internal/modules/identity/internal/usecase/verify_email_test.go
+fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:

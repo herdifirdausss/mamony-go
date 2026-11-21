@@ -200,9 +200,9 @@ func TestIdentityEmailVerification(t *testing.T) {
 	t.Run("outbox failure rolls back consume and activation", func(t *testing.T) {
 		pending := newPending(t)
 		req := usecase.EmailProofRequest{
-			SubjectID: pending.SubjectID,
+			SubjectID:   pending.SubjectID,
 			ChallengeID: randomID(t, "vch_"),
-			EventID: randomID(t, "evt_"),
+			EventID:     randomID(t, "evt_"),
 			TokenDigest: bytes.Repeat([]byte{0x63}, 32),
 		}
 		if _, err := proofs.Issue(ctx, req); err != nil {
