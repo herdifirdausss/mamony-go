@@ -2,7 +2,7 @@
 
 **Status:** DRAFT / code under review; no public HTTP registration, no Identity schema, no email verification, no login. Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
-This slice implements internal password policy + Argon2id credential primitives and an atomic enrollment **port**. It intentionally does not claim a working registration feature: the port is not connected to an actual PostgreSQL repository and the application still exposes health routes only.
+This slice implements a pure Identity domain policy + a separate credential adapter using Argon2id and an atomic enrollment **port**. It intentionally does not claim a working registration feature: the port is not connected to an actual PostgreSQL repository and the application still exposes health routes only.
 
 ## Accepted direction vs remaining decisions
 

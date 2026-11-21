@@ -1,4 +1,4 @@
-package domain
+package credential
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"io"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
 )
 
 var (
@@ -25,17 +27,6 @@ const (
 	passwordSaltBytes          = 16
 	passwordHashBytes          = 32
 )
-
-// PasswordVerifier holds no plaintext password or reversible secret. Its
-// exported fields are persistence data, NOT a trusted request contract.
-type PasswordVerifier struct {
-	Version     uint16
-	MemoryKiB   uint32
-	Iterations  uint32
-	Parallelism uint8
-	Salt        []byte
-	Digest      []byte
-}
 
 // PasswordHasher bounds concurrent memory-hard operations. The admission
 // budget must be measured at the actual deployment size before any public use.
@@ -68,30 +59,30 @@ func (h *PasswordHasher) acquire(ctx context.Context) error {
 }
 
 // Hash expects a policy-validated, NFC-normalized password.
-func (h *PasswordHasher) Hash(ctx context.Context, normalized string) (PasswordVerifier, error) {
-	checked, err := NormalizeForVerification(normalized)
+func (h *PasswordHasher) Hash(ctx context.Context, normalized string) (domain.PasswordVerifier, error) {
+	checked, err := domain.NormalizeForVerification(normalized)
 	if err != nil {
-		return PasswordVerifier{}, err
+		return domain.PasswordVerifier{}, err
 	}
 	if err := h.acquire(ctx); err != nil {
-		return PasswordVerifier{}, err
+		return domain.PasswordVerifier{}, err
 	}
 	defer func() { <-h.slots }()
 	salt := make([]byte, passwordSaltBytes)
 	if _, err := io.ReadFull(h.random, salt); err != nil {
-		return PasswordVerifier{}, ErrKDFUnavailable
+		return domain.PasswordVerifier{}, ErrKDFUnavailable
 	}
 	digest := argon2.IDKey([]byte(checked), salt, passwordIterations, passwordMemoryKiB, passwordParallelism, passwordHashBytes)
-	return PasswordVerifier{Version: passwordVersion, MemoryKiB: passwordMemoryKiB, Iterations: passwordIterations, Parallelism: passwordParallelism, Salt: salt, Digest: digest}, nil
+	return domain.PasswordVerifier{Version: passwordVersion, MemoryKiB: passwordMemoryKiB, Iterations: passwordIterations, Parallelism: passwordParallelism, Salt: salt, Digest: digest}, nil
 }
 
 // Verify rejects corrupted/oversized DB parameters BEFORE any expensive KDF.
-func (h *PasswordHasher) Verify(ctx context.Context, password string, stored PasswordVerifier) (bool, error) {
+func (h *PasswordHasher) Verify(ctx context.Context, password string, stored domain.PasswordVerifier) (bool, error) {
 	if stored.Version != passwordVersion || stored.MemoryKiB != passwordMemoryKiB || stored.Iterations != passwordIterations ||
 		stored.Parallelism != passwordParallelism || len(stored.Salt) != passwordSaltBytes || len(stored.Digest) != passwordHashBytes {
 		return false, ErrVerifierInvalid
 	}
-	normalized, err := NormalizeForVerification(password)
+	normalized, err := domain.NormalizeForVerification(password)
 	if err != nil {
 		return false, err
 	}

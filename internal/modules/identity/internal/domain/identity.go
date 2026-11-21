@@ -87,3 +87,14 @@ func NormalizeForVerification(input string) (string, error) {
 	}
 	return normalized, nil
 }
+
+// PasswordVerifier is persistence data; it does not authorize login or
+// external access on its own. Stored KDF parameters must be allowlisted before use.
+type PasswordVerifier struct {
+	Version     uint16
+	MemoryKiB   uint32
+	Iterations  uint32
+	Parallelism uint8
+	Salt        []byte
+	Digest      []byte
+}

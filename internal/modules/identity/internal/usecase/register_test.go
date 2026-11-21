@@ -9,6 +9,12 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
 )
 
+type fakeHasher struct{}
+
+func (fakeHasher) Hash(_ context.Context, normalized string) (domain.PasswordVerifier, error) {
+	return domain.PasswordVerifier{Version: 1, Digest: make([]byte, 32)}, nil
+}
+
 type fakeStore struct {
 	calls int
 	got   PendingRegistration
@@ -23,10 +29,7 @@ func (f *fakeStore) CreatePendingWithObligation(_ context.Context, r PendingRegi
 
 func TestRegisterPendingUsesUnverifiedAtomicPort(t *testing.T) {
 	store := &fakeStore{}
-	h, err := domain.NewPasswordHasher(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	h := fakeHasher{}
 	s, err := NewRegistration(store, h, domain.PasswordPolicy{IsBlocked: func(string, string) bool { return false }})
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +47,7 @@ func TestRegisterPendingUsesUnverifiedAtomicPort(t *testing.T) {
 
 func TestRegistrationRejectsInvalidBeforeStoreAndMasksDuplicate(t *testing.T) {
 	store := &fakeStore{}
-	h, _ := domain.NewPasswordHasher(1)
+	h := fakeHasher{}
 	s, _ := NewRegistration(store, h, domain.PasswordPolicy{IsBlocked: func(string, string) bool { return false }})
 	if err := s.RegisterPending(context.Background(), "not-email", strings.Repeat("x", 20)); err == nil || store.calls != 0 {
 		t.Fatal("invalid email reached store")

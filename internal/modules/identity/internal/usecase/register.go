@@ -33,15 +33,21 @@ type RegistrationStore interface {
 	CreatePendingWithObligation(context.Context, PendingRegistration) error
 }
 
+// PasswordHasher is a usecase-owned port. Credential KDF code lives in the
+// identity repository/credential adapter rather than in the pure domain.
+type PasswordHasher interface {
+	Hash(context.Context, string) (domain.PasswordVerifier, error)
+}
+
 type Registration struct {
 	store  RegistrationStore
-	hasher *domain.PasswordHasher
+	hasher PasswordHasher
 	policy domain.PasswordPolicy
 	random io.Reader
 	clock  func() time.Time
 }
 
-func NewRegistration(store RegistrationStore, hasher *domain.PasswordHasher, policy domain.PasswordPolicy) (*Registration, error) {
+func NewRegistration(store RegistrationStore, hasher PasswordHasher, policy domain.PasswordPolicy) (*Registration, error) {
 	if store == nil || hasher == nil || policy.IsBlocked == nil {
 		return nil, ErrRegistrationUnavailable
 	}
