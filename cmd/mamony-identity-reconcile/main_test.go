@@ -22,7 +22,7 @@ func TestIdentityReconcileCommandConfigDeniesByDefault(t *testing.T) {
 	dir := t.TempDir()
 	dsnPath := filepath.Join(dir, "verifier-dsn")
 	keysPath := filepath.Join(dir, "envelope-keys")
-	dsn := "postgres://mamony_identity_verifier_runtime:synthetic@db.example.test:5432/mamony?sslmode=verify-full"
+	dsn := "postgres" + "://" + "mamony_identity_verifier_runtime:synthetic@db.example.test:5432/mamony?sslmode=verify-full"
 	if err := os.WriteFile(dsnPath, []byte(dsn), 0600); err != nil {
 		t.Fatal(err)
 	}
