@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,9 +18,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// TestIdentityEnrollmentReconciliationDB exercises the actual verifier role,
+// TestIdentityZEnrollmentReconciliationDB exercises the actual verifier role,
 // encrypted proof obligation and real PostgreSQL. No real provider is used.
-func TestIdentityEnrollmentReconciliationDB(t *testing.T) {
+func TestIdentityZEnrollmentReconciliationDB(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	adminDSN := guardedDB(t, "TEST_DATABASE_ADMIN_URL", "mamony_test_admin")
@@ -66,7 +67,7 @@ func TestIdentityEnrollmentReconciliationDB(t *testing.T) {
 	newPending := func(created time.Time) string {
 		t.Helper()
 		subject := randomSyntheticID(t, "sub_")
-		email := randomSyntheticID(t, "repair_") + "@example.test"
+		email := strings.ToLower(randomSyntheticID(t, "repair_")) + "@example.test"
 		err := reg.CreatePendingWithObligation(ctx, usecase.PendingRegistration{
 			SubjectID: subject, EventID: randomSyntheticID(t, "evt_"),
 			CanonicalEmail: email, Status: "UNVERIFIED", CreatedAt: created,
