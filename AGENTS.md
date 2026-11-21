@@ -2,6 +2,8 @@
 
 Mamony Go is a synthetic simulator. Use test identities, funds, providers, and credentials.
 
+Before making a feature, behavior, API, database or trust-boundary change, use the [change lifecycle](docs/development-workflow.md). Classify the change as Routine, Feature or Critical, validate research and acceptance criteria, and obtain explicit owner/technical acceptance of Critical PRD and technical design before coding. Do not invent missing requirements or treat the agent's own review as independent approval.
+
 1. Read the issue and the relevant [contract](docs/index.md). Use the [roadmap](docs/roadmap.md) for prerequisites and [open decisions](docs/open-decisions.md) for unresolved choices.
 2. Keep each capability under `internal/modules/<name>`. Put composition in `internal/app`. See the [architecture](docs/architecture.md).
 3. Use the [engineering practices](docs/engineering.md). Load the matching [repository skill](.agents/skills/) when needed.

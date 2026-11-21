@@ -2,6 +2,7 @@
 
 | What you need | Where to start |
 |---|---|
+| Start a new feature from research through requirements, PRD, design and verification | [Change lifecycle](development-workflow.md) and [proposal template](templates/feature-proposal.md) |
 | Understand the product and capability ownership | [Product scope](product.md) |
 | Pick work or find its requirements and acceptance checks | [Roadmap and contracts](roadmap.md) |
 | Change Go packages, listeners, or cross-module interfaces | [Architecture](architecture.md) and [architecture decisions](adr/README.md) |

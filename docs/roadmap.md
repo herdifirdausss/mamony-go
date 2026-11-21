@@ -2,6 +2,8 @@
 
 The Go binary runs two health listeners. The contracts below describe planned behavior, prerequisites, and acceptance checks. See the [architecture](architecture.md) for the packages and routes available today.
 
+Before beginning any new feature or architecture change, use the [change lifecycle](development-workflow.md) to validate research, requirements, design, risks and acceptance checks. The roadmap determines build order; it does not replace product acceptance, technical review or PR evidence.
+
 ## Security prerequisites by stage
 
 Security is integrated into the owning capability's contract rather than a separate feature milestone. Before implementing a non-health endpoint, resolve the applicable [edge](adr/0003-public-http-contract.md#input-admission-and-browser-boundary) and [security decisions](open-decisions.md#security-architecture-decisions). The current health-only process has no user authentication or payment API.

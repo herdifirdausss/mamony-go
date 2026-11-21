@@ -2,7 +2,7 @@
 
 Mamony Go is a project for simulating cross-border payments and payouts with synthetic data. The current Go binary serves health endpoints on two HTTP listeners. The [roadmap](docs/roadmap.md) describes planned ledger and payment capabilities.
 
-Start with the [documentation index](docs/index.md) or the [roadmap](docs/roadmap.md).
+Start with the [documentation index](docs/index.md) or the [roadmap](docs/roadmap.md). For new capabilities, follow the [research-to-implementation workflow](docs/development-workflow.md) before coding.
 
 ## Run locally
 
