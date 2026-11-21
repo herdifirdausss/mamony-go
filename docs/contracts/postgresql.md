@@ -21,6 +21,13 @@ Authorize the caller's tenant before setting it in the database. Set the tenant 
 
 Use a separate named role for a job that must cross tenants. Grant only the operations the job needs. Review and document any RLS bypass before creating the role. Request handlers must never receive its credentials or connection pool.
 
+## Privileged paths and tampering boundary
+
+- The application runtime must not connect as schema owner, superuser, a role with `BYPASSRLS`, or the migration role. Table owners and privileged roles can bypass ordinary RLS unless restrictions are applied; `FORCE ROW LEVEL SECURITY` is required for tenant-owned tables but is not a replacement for privilege review.
+- Define grants, default privileges, view ownership, `SECURITY DEFINER` functions, allowed schemas and `search_path` for every executable DB entry point. No tenant-facing path may obtain an unrestricted cross-tenant connection through an admin helper, view, or pooled job client.
+- Apply transaction-local tenant context only from an already authenticated and authorized caller. Rollback, pool reuse, missing context, and conflicting client-supplied tenant IDs must not reveal or mutate another tenant's rows.
+- RLS and scoped queries enforce tenant boundaries only while the selected database and role trust assumptions hold. An attacker with arbitrary writes to the same **authoritative identity database** can alter credential and ownership state. Hashes, checksums, or signed rows without a separately trusted current head cannot provide a stronger anti-rollback claim. See the [authority model](../architecture.md#security-authority-and-trust-boundaries).
+
 ## Implementation checks
 
 - Choose the PostgreSQL version, driver, and migration runner before adding production migrations. Document the supported upgrade path.

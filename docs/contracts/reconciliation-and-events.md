@@ -23,6 +23,12 @@ A suspense account holds recorded differences under an explicit posting contract
 
 **OPS-01.** Test view-only access, a refused action, independent approval, duplicate apply, and audit search. Verify that the console does not receive unrestricted access to a capability's data.
 
+## Security evidence and mandatory notices
+
+**OPS-02.** Security-sensitive account, role, recovery, approval, freeze and financial-administration changes must create a durable audit and, where applicable, a mandatory notification obligation in the same owning transaction as the accepted change. A marketing opt-out or change to a business read model cannot remove an already required obligation. Notification dispatch uses a restricted destination/policy history, retries without duplicating the logical notice, and separates `enqueued`, `provider accepted`, `delivered` and `user read` where observable.
+
+**Acceptance:** Force the state write to succeed while the outbox write fails and assert the entire transaction rolls back. Tamper with marketing preference, suppress a worker, replay an event, alter a notice destination, attempt audit deletion as the runtime role and restore older backup state. Record gaps explicitly rather than claiming append-only storage prevents a fully privileged administrator from altering it. See [platform evidence](platform.md#security-operations-and-evidence), [identity lifecycle](identity.md#security-state-and-recovery-threat-controls) and [recovery procedures](../runbooks/recovery.md).
+
 ## Event delivery
 
 | ID | Requirement | Acceptance check |

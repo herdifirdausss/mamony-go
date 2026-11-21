@@ -2,6 +2,17 @@
 
 The Go binary runs two health listeners. The contracts below describe planned behavior, prerequisites, and acceptance checks. See the [architecture](architecture.md) for the packages and routes available today.
 
+## Security prerequisites by stage
+
+Security is integrated into the owning capability's contract rather than a separate feature milestone. Before implementing a non-health endpoint, resolve the applicable [edge](adr/0003-public-http-contract.md#input-admission-and-browser-boundary) and [security decisions](open-decisions.md#security-architecture-decisions). The current health-only process has no user authentication or payment API.
+
+- **Foundation gate:** enforce bounded input and trusted routing on introduced endpoints; keep build/runtime/migration permissions narrow; state the attacker model. Existing static checks do not prove future identity or ledger safety.
+- **Identity gate:** establish subject/session authority, recovery and revocation policy, resource-level authorization and negative tenant tests. Prove [PostgreSQL runtime isolation](contracts/postgresql.md) when database tables exist.
+- **Money gate:** verify an authorized exact financial intent when required; test atomic ledger replay, balance-floor races, approval reuse, uncertain results, and restore with actual database fixtures.
+- **Provider/operations gate:** verify provider-specific callback signatures and replay protection, destination/egress restrictions, durable audit/notice obligations, and reconciliation after failure.
+
+Use the [security verification matrix](engineering.md#security-verification) and report unimplemented controls as `NOT RUN`. Defer the independent-authority and multi-region profiles until their risk and operating assumptions justify them.
+
 ## Foundation and ledger
 
 | Order | Contract | Prerequisites and outcome |
