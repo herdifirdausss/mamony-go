@@ -4,10 +4,23 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func fixtureRoot(t *testing.T, dir string) *os.Root {
+	t.Helper()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := root.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	return root
+}
 
 func writeTestMigration(t *testing.T, dir string, version int, body string) string {
 	t.Helper()
@@ -15,7 +28,7 @@ func writeTestMigration(t *testing.T, dir string, version int, body string) stri
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(body)))
 	sql := body + marker + fmt.Sprintf(
 		"INSERT INTO mamony_platform.migration_fingerprints (version, sha256) VALUES (%d, '%s');\n", version, digest)
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(sql), 0600); err != nil {
+	if err := fixtureRoot(t, dir).WriteFile(name, []byte(sql), 0600); err != nil {
 		t.Fatal(err)
 	}
 	return name
@@ -34,13 +47,13 @@ func TestMigrationFileIntegrity(t *testing.T) {
 	t.Run("mutated content", func(t *testing.T) {
 		dir := t.TempDir()
 		name := writeTestMigration(t, dir, 1, "CREATE TABLE example(id integer);\n")
-		path := filepath.Join(dir, name)
-		data, err := os.ReadFile(path)
+		root := fixtureRoot(t, dir)
+		data, err := root.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
 		}
 		data = []byte(strings.Replace(string(data), "example(id", "attacker(id", 1))
-		if err := os.WriteFile(path, data, 0600); err != nil {
+		if err := root.WriteFile(name, data, 0600); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := Load(dir); err == nil {
@@ -49,7 +62,7 @@ func TestMigrationFileIntegrity(t *testing.T) {
 	})
 	t.Run("missing trailer", func(t *testing.T) {
 		dir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(dir, "000001_init.up.sql"), []byte("SELECT 1;\n"), 0600); err != nil {
+		if err := fixtureRoot(t, dir).WriteFile("000001_init.up.sql", []byte("SELECT 1;\n"), 0600); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := Load(dir); err == nil {
@@ -59,11 +72,11 @@ func TestMigrationFileIntegrity(t *testing.T) {
 	t.Run("duplicate version", func(t *testing.T) {
 		dir := t.TempDir()
 		writeTestMigration(t, dir, 1, "SELECT 1;\n")
-		a, err := os.ReadFile(filepath.Join(dir, "000001_testing.up.sql"))
+		a, err := fixtureRoot(t, dir).ReadFile("000001_testing.up.sql")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "000001_second.up.sql"), a, 0600); err != nil {
+		if err := fixtureRoot(t, dir).WriteFile("000001_second.up.sql", a, 0600); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := Load(dir); err == nil {
@@ -80,7 +93,7 @@ func TestMigrationFileIntegrity(t *testing.T) {
 	t.Run("unrecognized files", func(t *testing.T) {
 		dir := t.TempDir()
 		writeTestMigration(t, dir, 1, "SELECT 1;\n")
-		if err := os.WriteFile(filepath.Join(dir, "000001_testing.down.sql"), []byte("DROP TABLE"), 0600); err != nil {
+		if err := fixtureRoot(t, dir).WriteFile("000001_testing.down.sql", []byte("DROP TABLE"), 0600); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := Load(dir); err == nil {
