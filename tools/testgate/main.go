@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+const requiredPackage = "github.com/herdifirdausss/mamony-go/tools/postgrestest"
+
 var requiredTests = []string{
 	"TestPostgresRoleSeparation",
 	"TestPostgresTenantIsolation",
@@ -22,9 +24,10 @@ var requiredTests = []string{
 }
 
 type testEvent struct {
-	Action string
-	Test   string
-	Output string
+	Action  string
+	Package string
+	Test    string
+	Output  string
 }
 
 func main() {
@@ -129,7 +132,8 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 		if ev.Output != "" {
 			fmt.Fprint(output, ev.Output)
 		}
-		if ev.Action == "pass" && !strings.Contains(ev.Test, "/") && strings.HasPrefix(ev.Test, "TestPostgres") {
+		if ev.Action == "pass" && ev.Package == requiredPackage &&
+			!strings.Contains(ev.Test, "/") && strings.HasPrefix(ev.Test, "TestPostgres") {
 			passed[ev.Test] = true
 		}
 	}
