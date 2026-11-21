@@ -135,6 +135,13 @@ func TestIdentityEmailVerification(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Existing reissue semantics are tested outside the new 60-second
+		// budget window, without sleeping or bypassing the production guard.
+		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_verification_challenges
+			SET requested_at=clock_timestamp()-interval '65 seconds'
+			WHERE subject_id=$1`, pending.SubjectID); err != nil {
+			t.Fatal(err)
+		}
 		second, err := service.Prepare(ctx, pending.SubjectID)
 		if err != nil {
 			t.Fatal(err)
@@ -236,6 +243,13 @@ func TestIdentityEmailVerification(t *testing.T) {
 			EnvelopeKeyID: "testkey", SealedToken: bytes.Repeat([]byte{0xA5}, 71),
 		}
 		if _, err := proofs.Issue(ctx, first); err != nil {
+			t.Fatal(err)
+		}
+		// Existing reissue semantics are tested outside the new 60-second
+		// budget window, without sleeping or bypassing the production guard.
+		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_verification_challenges
+			SET requested_at=clock_timestamp()-interval '65 seconds'
+			WHERE subject_id=$1`, pending.SubjectID); err != nil {
 			t.Fatal(err)
 		}
 		conflict := usecase.EmailProofRequest{
