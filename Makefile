@@ -5,7 +5,6 @@ check: fmt-check vet unit architecture docs skills migrations-check build
 
 fmt-check:
 	@gofmt -l .
-	@gofmt -d ./internal/modules/identity/enrollment_http_integration_test.go ./internal/modules/identity/internal/usecase/enrollment_flow.go ./internal/modules/identity/internal/usecase/enrollment_flow_test.go
 	@test -z "`gofmt -l .`" || { echo "gofmt required"; exit 1; }
 
 vet:

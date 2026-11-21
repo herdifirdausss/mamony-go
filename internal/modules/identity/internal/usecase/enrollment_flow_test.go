@@ -10,8 +10,8 @@ import (
 
 type enrollmentFakeReg struct {
 	subject string
-	err error
-	calls int
+	err     error
+	calls   int
 }
 
 func (r *enrollmentFakeReg) RegisterPendingWithSubject(context.Context, string, string) (string, error) {
@@ -21,9 +21,9 @@ func (r *enrollmentFakeReg) RegisterPendingWithSubject(context.Context, string, 
 
 type enrollmentFakeLookup struct {
 	subject string
-	err error
-	calls int
-	email string
+	err     error
+	calls   int
+	email   string
 }
 
 func (l *enrollmentFakeLookup) FindUnverifiedSubject(_ context.Context, email string) (string, error) {
@@ -33,9 +33,9 @@ func (l *enrollmentFakeLookup) FindUnverifiedSubject(_ context.Context, email st
 }
 
 type enrollmentFakeProof struct {
-	calls int
+	calls   int
 	subject string
-	err error
+	err     error
 }
 
 func (p *enrollmentFakeProof) Resend(_ context.Context, subject string) error {

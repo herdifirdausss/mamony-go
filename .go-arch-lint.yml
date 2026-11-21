@@ -38,8 +38,6 @@ components:
     in: modules/identity/internal/handler/**
   identity_domain:
     in: modules/identity/internal/domain/**
-  identity_handler:
-    in: modules/identity/internal/handler/**
   identity_usecase:
     in: modules/identity/internal/usecase/**
   identity_credential:
@@ -83,9 +81,6 @@ deps:
       - identity_domain
     canUse:
       - identity_unicode
-  identity_handler:
-    mayDependOn:
-      - identity_usecase
   identity_usecase:
     mayDependOn:
       - identity_domain

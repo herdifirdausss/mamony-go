@@ -28,8 +28,8 @@ type EnrollmentProofIssuer interface {
 // login flow, or proof of ownership of the submitted email address.
 type EnrollmentFlow struct {
 	registration EnrollmentRegistrar
-	lookup EnrollmentSubjectLookup
-	proof EnrollmentProofIssuer
+	lookup       EnrollmentSubjectLookup
+	proof        EnrollmentProofIssuer
 }
 
 func NewEnrollmentFlow(reg EnrollmentRegistrar, lookup EnrollmentSubjectLookup, proof EnrollmentProofIssuer) (*EnrollmentFlow, error) {
