@@ -130,7 +130,9 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 			return nil, fmt.Errorf("cannot parse go test JSON evidence: %w", err)
 		}
 		if ev.Output != "" {
-			fmt.Fprint(output, ev.Output)
+			if _, err := fmt.Fprint(output, ev.Output); err != nil {
+				return nil, fmt.Errorf("write integration output: %w", err)
+			}
 		}
 		if ev.Action == "pass" && ev.Package == requiredPackage &&
 			!strings.Contains(ev.Test, "/") && strings.HasPrefix(ev.Test, "TestPostgres") {
