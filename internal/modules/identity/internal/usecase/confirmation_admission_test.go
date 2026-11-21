@@ -73,9 +73,14 @@ func TestConfirmationAdmissionDeniesInvalidInputAndRedactsStorageFailures(t *tes
 	}
 	store := &fakeAnonymousAdmissionStore{allowed: true}
 	gate, _ := NewConfirmationAdmission(store, bytes.Repeat([]byte{0x89}, 32))
-	for _, bad := range []netip.Addr{netip.Addr{}, netip.MustParseAddr("0.0.0.0"),
-		netip.MustParseAddr("::"), netip.MustParseAddr("ff02::1"),
-		netip.MustParseAddr("fe80::1%eth0")} {
+	badPeers := []netip.Addr{
+		netip.Addr{},
+		netip.MustParseAddr("0.0.0.0"),
+		netip.MustParseAddr("::"),
+		netip.MustParseAddr("ff02::1"),
+		netip.MustParseAddr("fe80::1%eth0"),
+	}
+	for _, bad := range badPeers {
 		if ok, err := gate.Admit(context.Background(), bad); ok ||
 			!errors.Is(err, ErrAnonymousAdmissionUnavailable) {
 			t.Fatal("untrusted network peer admitted")
