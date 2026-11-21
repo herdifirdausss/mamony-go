@@ -26,7 +26,7 @@ type PasswordLoginAuthenticator interface {
 // This is not a session issuer and does not grant resource permissions.
 type PasswordLoginFlow struct {
 	admission PasswordLoginAdmission
-	password PasswordLoginAuthenticator
+	password  PasswordLoginAuthenticator
 }
 
 func NewPasswordLoginFlow(admission PasswordLoginAdmission, password PasswordLoginAuthenticator) (*PasswordLoginFlow, error) {
