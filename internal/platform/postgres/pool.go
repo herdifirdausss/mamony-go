@@ -147,6 +147,31 @@ func validateTenantID(tenant string) error {
 	return nil
 }
 
+// WithTx runs a bounded transaction against platform-owned data. It does not
+// accept a caller-provided tenant, authorize an HTTP subject, or broaden SQL
+// grants. The identity registration repository uses its dedicated DB role.
+func (p *Pool) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
+	if p == nil || p.raw == nil || fn == nil {
+		return errors.New("runtime pool and operation are required")
+	}
+	tx, err := p.raw.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = tx.Rollback(cleanupCtx)
+	}()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit transaction (outcome may be unknown): %w", err)
+	}
+	return nil
+}
+
 // WithTenantTx runs one transaction with transaction-local tenant context.
 // The caller MUST authenticate and authorize the subject/action/resource/tenant
 // before supplying authorizedTenantID. This primitive does not do that work,
