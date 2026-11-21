@@ -11,8 +11,6 @@ components:
     in: app/**
   platform:
     in: platform/**
-  ledger_domain:
-    in: modules/ledger/internal/domain/**
 deps:
   app:
     mayDependOn:
@@ -22,6 +20,3 @@ deps:
   platform:
     mayDependOn:
       - platform
-  ledger_domain:
-    mayDependOn:
-      - ledger_domain

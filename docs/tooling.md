@@ -11,20 +11,14 @@ Use the [engineering checks](engineering.md#verification) for day-to-day work. T
 | [ASD-STE100](https://github.com/danyuchn/asd-ste100-skill) | The repository writing skill uses short instructions and consistent terms. |
 | [ast-grep agent skill](https://github.com/ast-grep/agent-skill) | Optional syntax-aware search. Use `rg` for text and `gopls` for Go symbols first. |
 | [go-arch-lint](https://github.com/fe3dback/go-arch-lint) | CI runs `make archlint` with [the module rules](../.go-arch-lint.yml). |
-| [oasdiff](https://github.com/oasdiff/oasdiff) | The API comparison command is ready for two real OpenAPI specs. |
+| [oasdiff](https://github.com/oasdiff/oasdiff) | Candidate for comparing released and candidate specs after the first public API release. |
 | [gotestsum](https://github.com/gotestyourself/gotestsum) | CI runs `make test-report` and stores JSON and JUnit reports. |
 | [RTK](https://github.com/byx-darwin/rtk) | Evaluate locally with matched tasks before enabling output compression. |
 | [NVIDIA SkillSpector](https://github.com/NVIDIA/skillspector) | Optional static scan in a third-party tool review. Scanner execution is `NOT RUN` here. |
 
 ## OpenAPI compatibility
 
-Use a trusted released spec for the baseline. Use the actual candidate spec for the change.
-
-```sh
-BASE_SPEC=docs/api/released.yaml CURRENT_SPEC=docs/api/openapi.yaml make api-compat
-```
-
-The Go bootstrap has no released payment or payout OpenAPI spec. The [script](../scripts/check-openapi-compat.sh) fails if oasdiff or either spec is missing. Check route behavior against the [HTTP decision](adr/0003-public-http-contract.md) before publishing.
+Add compatibility checks when there is a released OpenAPI baseline and a candidate spec. Use the [HTTP decision](adr/0003-public-http-contract.md) for the public behavior.
 
 ## Third-party tool review
 
@@ -34,4 +28,4 @@ The Go bootstrap has no released payment or payout OpenAPI spec. The [script](..
 4. Review findings and test in a sandbox with synthetic data and the minimum privileges.
 5. Record the approved scope and the condition for another review. Do not send private prompts, source, or credentials to a remote scanner without approval.
 
-Use the [agent evaluation plan](agent-evaluation.md) to compare workflow changes. Keep full failure logs when trying output compression.
+Keep full failure logs when testing output compression.

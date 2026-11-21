@@ -10,4 +10,4 @@
 
 Use the [PostgreSQL contract](contracts/postgresql.md) for schema grants and tenant isolation. Use the [public HTTP decision](adr/0003-public-http-contract.md) for routes and amount formats. The [recovery runbook](runbooks/recovery.md) covers restore and stalled workflows.
 
-For tool changes, see [Tooling](tooling.md). The [agent evaluation plan](agent-evaluation.md) is for workflow experiments. [Development history](history.md) records the earlier research and verification.
+For tool changes, see [Tooling](tooling.md). [Development history](history.md) records the earlier research and verification.

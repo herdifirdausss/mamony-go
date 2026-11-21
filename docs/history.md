@@ -15,7 +15,7 @@ The trace count measures the reviewed input. Each local check can cover several 
 
 | Finding | Local treatment |
 |---|---|
-| Journal checks in the bootstrap run in memory. The ledger design also requires durable replay, account locks, reversals, outbox, and recovery. | [Ledger contract](contracts/ledger.md) defines the transaction path, acceptance checks, and recovery evidence. |
+| The initial journal prototype ran only in its tests. The ledger design also requires durable replay, account locks, reversals, outbox, and recovery. | [Ledger contract](contracts/ledger.md) defines the transaction path, acceptance checks, and recovery evidence. |
 | Some tenant isolation wording describes all resources generically. The core ledger and other platform-owned records have distinct access rules. | [PostgreSQL table classes](contracts/postgresql.md#tenant-isolation) state where to apply RLS, grants, and capability authorization. |
 | The JSON integer option and the digit-string option differ in accepted range and client compatibility. | [Public HTTP decision](adr/0003-public-http-contract.md#open-decision-on-wire-amounts) keeps the choice open before releasing an amount route. |
 | The outbox sequence must preserve each account's order, even when a journal affects several accounts. Replay can redeliver an event. | [Ledger data and event ownership](adr/0002-ledger-and-data-ownership.md#event-delivery) and [consumer tests](contracts/reconciliation-and-events.md#event-delivery) preserve both properties. |
@@ -25,9 +25,8 @@ The trace count measures the reviewed input. Each local check can cover several 
 | Disputes, recipient verification, and monitoring need fields and operations that the small provider and event contracts do not all guarantee. | [Decision register](open-decisions.md#money-and-recovery) requires the producer contracts before these consumers start. |
 | Historic performance numbers, retention values, and library choices depend on their environment and workload. | [Decision register](open-decisions.md) retains the decisions and required evidence. Use Go measurements for release targets. |
 
-
 ## Research packs and bootstrap evidence
 
 `v5`, `v6`, and `v7` were the standards, research, and scaffold pack labels. The [pack audit](https://github.com/herdifirdausss/mamony-go/blob/16f1d484ca50c0e8b90754df52246d7e8d96d768/docs/evidence/engineering-pack-verification.md) records checksums and integration. The [documentation snapshot](https://github.com/herdifirdausss/mamony-go/tree/16f1d484ca50c0e8b90754df52246d7e8d96d768/docs) retains the full drafts, bibliography, and original reports.
 
-The [bootstrap CI run](https://github.com/herdifirdausss/mamony-go/actions/runs/44839152957) at `16f1d48` passed. Its [specialized test report](https://github.com/herdifirdausss/mamony-go/actions/runs/44839152898/artifacts/14680007485) recorded 30 passing Go tests. Use the current commit's CI for new verification. Use the [ledger contract](contracts/ledger.md#ledger-gate-evidence) for database acceptance.
+The [bootstrap CI run](https://github.com/herdifirdausss/mamony-go/actions/runs/44839152957) at `16f1d48` passed. Its [specialized test report](https://github.com/herdifirdausss/mamony-go/actions/runs/44839152898/artifacts/14680007485) recorded 30 passing Go tests. The [agent evaluation draft](https://github.com/herdifirdausss/mamony-go/blob/e669735553cde9de1048d9912a2f94598eb7e4ea/docs/agent-evaluation.md) remains available in the earlier documentation. Use the current commit's CI for new verification. Use the [ledger contract](contracts/ledger.md#ledger-gate-evidence) for database acceptance.

@@ -55,4 +55,4 @@ jobs:
         run: |
           PATH="$(go env GOPATH)/bin:$PATH" make security
 
-# PostgreSQL Gate A is not yet implemented; do not infer its result from these jobs.
+# Ledger gate evidence requires PostgreSQL integration tests.

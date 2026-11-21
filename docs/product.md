@@ -1,6 +1,6 @@
 # Product scope
 
-Mamony Go simulates cross-border payments and payouts. Use synthetic identities, funds, providers, banks, and FX rates. Use test credentials for all integrations.
+Mamony Go is designed to simulate cross-border payments and payouts. Use synthetic identities, funds, providers, banks, and FX rates. Use test credentials for all integrations.
 
 A merchant accepts money from a payer with a payment. A merchant sends money to a recipient with a payout. The first pilot uses one corridor. Consumer wallets, billing, cards, savings, and split payments are outside the first pilot.
 

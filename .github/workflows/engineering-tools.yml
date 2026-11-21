@@ -23,15 +23,9 @@ jobs:
           go install github.com/fe3dback/go-arch-lint@v1.19.2
           go install gotest.tools/gotestsum@v1.13.0
       - name: Enforce package dependency architecture
-        run: "$(go env GOPATH)/bin/go-arch-lint check --project-path ."
+        run: PATH="$(go env GOPATH)/bin:$PATH" make archlint
       - name: Test with machine-readable evidence
-        run: |
-          mkdir -p test-reports
-          "$(go env GOPATH)/bin/gotestsum" \
-            --format pkgname \
-            --junitfile test-reports/unit.xml \
-            --jsonfile test-reports/unit.json \
-            -- ./...
+        run: PATH="$(go env GOPATH)/bin:$PATH" make test-report
       - name: Upload full test evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

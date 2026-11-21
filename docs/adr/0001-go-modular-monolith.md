@@ -12,7 +12,7 @@ Mamony Go needs clear data ownership and predictable imports. The first release 
 
 Use one Go module and one binary. Give each capability a public facade and private implementation packages. Put cross-capability adapters in the application composition root. Keep business rules in the capability that owns them.
 
-Use separate public and private HTTP listeners. The capability owns its handler and route metadata. The application registers each route on one listener.
+Use separate public and private HTTP listeners. The capability owns its handler and route metadata. The application registers each capability route on its assigned listener. Both listeners can expose liveness.
 
 ## Consequences
 

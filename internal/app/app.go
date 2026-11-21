@@ -13,7 +13,7 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/platform/httpedge"
 )
 
-// Config describes listener addresses. The private listener must not bind publicly without an explicit deployment review.
+// Config describes the public and private listener addresses.
 type Config struct {
 	PublicAddr  string
 	PrivateAddr string
@@ -28,11 +28,16 @@ func Run(ctx context.Context, logger *slog.Logger, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("invalid public address: %w", err)
 	}
-	privateHost, _, err := net.SplitHostPort(cfg.PrivateAddr)
+	privateHost, privatePort, err := net.SplitHostPort(cfg.PrivateAddr)
 	if err != nil {
 		return fmt.Errorf("invalid private address: %w", err)
 	}
-	if privateHost != "127.0.0.1" && privateHost != "::1" && privateHost != "localhost" {
+	// Treat localhost as a loopback alias without using host resolution.
+	if privateHost == "localhost" {
+		privateHost = "127.0.0.1"
+		cfg.PrivateAddr = net.JoinHostPort(privateHost, privatePort)
+	}
+	if privateHost != "127.0.0.1" && privateHost != "::1" {
 		return errors.New("private listener must bind to loopback in this scaffold")
 	}
 	if publicHost == "" {

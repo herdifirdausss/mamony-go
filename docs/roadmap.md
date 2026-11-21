@@ -1,6 +1,6 @@
 # Implementation roadmap
 
-The bootstrap checks journal shape and runs two health listeners. Each contract below defines the intended behavior, its prerequisites, and its acceptance checks.
+The Go binary runs two health listeners. The contracts below describe planned behavior, prerequisites, and acceptance checks. See the [architecture](architecture.md) for the packages and routes available today.
 
 ## Foundation and ledger
 

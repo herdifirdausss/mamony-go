@@ -16,4 +16,4 @@ Use `PASS`, `FAIL`, or `NOT RUN` for each check. See [engineering practices](../
 
 ## Compatibility and rollout
 
-State API, event, or schema compatibility. Describe migration, recovery, and remaining risks where relevant. For agent workflow changes, record results from the [evaluation plan](../docs/agent-evaluation.md).
+State API, event, or schema compatibility. Describe migration, recovery, and remaining risks where relevant.

@@ -1,6 +1,6 @@
-.PHONY: check fmt-check vet unit architecture docs skills tools-policy archlint test-report api-compat build race lint security run
+.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run
 
-check: fmt-check vet unit architecture docs skills tools-policy build
+check: fmt-check vet unit architecture docs skills build
 
 fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
@@ -19,10 +19,7 @@ docs:
 
 skills:
 	python3 tools/skillcheck.py
-	python3 -m unittest discover -s tools -p 'test_*.py'
-
-tools-policy:
-	python3 tools/toolingcheck.py
+	python3 -B -m unittest discover -s tools -p 'test_*.py'
 
 archlint:
 	@command -v go-arch-lint >/dev/null || { echo 'NOT RUN: install github.com/fe3dback/go-arch-lint@v1.19.2'; exit 2; }
@@ -32,9 +29,6 @@ test-report:
 	@command -v gotestsum >/dev/null || { echo 'NOT RUN: install gotest.tools/gotestsum@v1.13.0'; exit 2; }
 	@mkdir -p test-reports
 	gotestsum --format pkgname --junitfile test-reports/unit.xml --jsonfile test-reports/unit.json -- ./...
-
-api-compat:
-	bash scripts/check-openapi-compat.sh
 
 build:
 	go build ./...

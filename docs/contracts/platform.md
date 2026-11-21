@@ -1,6 +1,6 @@
 # Platform foundation
 
-Build the shared contracts that later capabilities use. The [package rules](../architecture.md), [PostgreSQL contract](postgresql.md), and [public HTTP contract](../adr/0003-public-http-contract.md) apply.
+The current binary reads listener addresses at startup and shuts down on cancellation. The database, event relay, and recovery procedures below are planned. The [package rules](../architecture.md), [PostgreSQL contract](postgresql.md), and [public HTTP contract](../adr/0003-public-http-contract.md) apply.
 
 ## Configuration, data, and operations
 

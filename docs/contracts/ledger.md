@@ -2,7 +2,7 @@
 
 The ledger is the sole writer of balances. See the [ledger and data ownership decision](../adr/0002-ledger-and-data-ownership.md).
 
-The bootstrap checks journal structure and arithmetic in memory. Durable ledger operations and ledger gate evidence are pending.
+Ledger implementation and integration evidence are pending.
 
 ## Posting and replay
 
@@ -77,4 +77,4 @@ Test `Read Committed` with explicit locks as a candidate. A Go design must prove
 | Account order and outbox | Transactional counters scoped to each affected account. Advance them under stable locks. A rollback leaves no account-order record for the rejected post. | Ledger producer, event relay |
 | Verifier runs | Store when the verifier ran, the results, and any differences. Keep the balance data read-only during the verification pass. | Ledger |
 
-Use the existing journal domain package for shape and arithmetic checks. A ledger use case owns the posting sequence. Its repository applies the atomic operation and returns the durable result. The composition root supplies approved gates and participants. Use one transaction for participant effects and do not make network calls inside it.
+Implement journal shape and arithmetic checks in the ledger domain package. A ledger use case owns the posting sequence. Its repository applies the atomic operation and returns the durable result. The composition root supplies approved gates and participants. Use one transaction for participant effects and do not make network calls inside it.
