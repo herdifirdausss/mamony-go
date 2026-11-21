@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -62,5 +63,20 @@ func TestSummarizeEventsRejectsInvalidEvidence(t *testing.T) {
 	_, err := summarizeEvents(strings.NewReader("not-json"), &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("invalid evidence was accepted")
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write denied")
+}
+
+func TestSummarizeEventsPropagatesWriterFailure(t *testing.T) {
+	t.Parallel()
+	input := "{\"Action\":\"output\",\"Output\":\"test output\"}\n"
+	_, err := summarizeEvents(strings.NewReader(input), failingWriter{})
+	if err == nil || !strings.Contains(err.Error(), "write integration output") {
+		t.Fatalf("expected a propagated write error, got %v", err)
 	}
 }
