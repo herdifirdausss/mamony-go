@@ -12,13 +12,13 @@ import (
 )
 
 type testGate struct {
-	called bool
-	allowed bool
+	called     bool
+	allowed    bool
 	errorValue error
-	peer netip.Addr
+	peer       netip.Addr
 }
 
-func (f *testGate) Admit(_ context.Context, _ usecase.AnonymousAction, _ string, p netip.Addr) (bool,error) {
+func (f *testGate) Admit(_ context.Context, _ usecase.AnonymousAction, _ string, p netip.Addr) (bool, error) {
 	f.called = true
 	f.peer = p
 	return f.allowed, f.errorValue
@@ -26,7 +26,9 @@ func (f *testGate) Admit(_ context.Context, _ usecase.AnonymousAction, _ string,
 
 func TestClientIPResolverTrustsOnlyDirectPeerByDefault(t *testing.T) {
 	resolver, err := NewClientIPResolver(nil)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "https://example.test/", nil)
 	req.RemoteAddr = "198.51.100.1:40123"
 	req.Header.Set("X-Forwarded-For", "1.1.1.1")
@@ -45,13 +47,15 @@ func TestClientIPResolverTrustsOnlyDirectPeerByDefault(t *testing.T) {
 }
 
 func TestClientIPResolverRejectsAmbiguousProxyHeaders(t *testing.T) {
-	for _, bad := range []string{"0.0.0.0/0","10.0.0.0/8","::/0","2001:db8::/64"} {
+	for _, bad := range []string{"0.0.0.0/0", "10.0.0.0/8", "::/0", "2001:db8::/64"} {
 		if _, err := NewClientIPResolver([]netip.Prefix{netip.MustParsePrefix(bad)}); err == nil {
 			t.Fatalf("unsafe trusted proxy scope accepted: %s", bad)
 		}
 	}
 	resolver, err := NewClientIPResolver([]netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	newRequest := func() *http.Request {
 		req := httptest.NewRequest(http.MethodPost, "https://example.test/", nil)
 		req.RemoteAddr = "127.0.0.1:44888"
@@ -64,13 +68,13 @@ func TestClientIPResolverRejectsAmbiguousProxyHeaders(t *testing.T) {
 		t.Fatalf("sanitized exact proxy IP not honored: %s %v", got, err)
 	}
 	for _, mutate := range []func(*http.Request){
-		func(req *http.Request){ req.Header.Del("X-Forwarded-For") },
-		func(req *http.Request){ req.Header.Set("X-Forwarded-For","198.51.100.10, 1.1.1.1") },
-		func(req *http.Request){ req.Header.Add("X-Forwarded-For","8.8.8.8") },
-		func(req *http.Request){ req.Header.Set("X-Forwarded-For", "spoofed.example.test") },
-		func(req *http.Request){ req.Header.Set("Forwarded", "for=1.1.1.1") },
-		func(req *http.Request){ req.Header.Set("X-Real-IP", "1.1.1.1") },
-		func(req *http.Request){ req.Header.Set("True-Client-IP", "1.1.1.1") },
+		func(req *http.Request) { req.Header.Del("X-Forwarded-For") },
+		func(req *http.Request) { req.Header.Set("X-Forwarded-For", "198.51.100.10, 1.1.1.1") },
+		func(req *http.Request) { req.Header.Add("X-Forwarded-For", "8.8.8.8") },
+		func(req *http.Request) { req.Header.Set("X-Forwarded-For", "spoofed.example.test") },
+		func(req *http.Request) { req.Header.Set("Forwarded", "for=1.1.1.1") },
+		func(req *http.Request) { req.Header.Set("X-Real-IP", "1.1.1.1") },
+		func(req *http.Request) { req.Header.Set("True-Client-IP", "1.1.1.1") },
 	} {
 		badReq := newRequest()
 		mutate(badReq)
@@ -84,11 +88,16 @@ func TestAnonymousBoundaryReceiptDoesNotEnumerateAccounts(t *testing.T) {
 	resolver, _ := NewClientIPResolver(nil)
 	f := &testGate{allowed: true}
 	b, err := NewAnonymousBoundary(resolver, f)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "https://example.test/", nil)
 	req.RemoteAddr = "198.51.100.45:8080"
 	var baseline string
-	for _, tc := range []struct{name, email string; allowed bool}{
+	for _, tc := range []struct {
+		name, email string
+		allowed     bool
+	}{
 		{"known account", "known@example.test", true},
 		{"unknown account", "missing@example.test", true},
 		{"exhausted anonymous budget", "known@example.test", false},
@@ -108,7 +117,9 @@ func TestAnonymousBoundaryReceiptDoesNotEnumerateAccounts(t *testing.T) {
 				t.Fatal("opaque receipt response contract changed")
 			}
 			got := w.Result().Status + "\n" + w.Body.String()
-			if baseline == "" { baseline = got } else if got != baseline {
+			if baseline == "" {
+				baseline = got
+			} else if got != baseline {
 				t.Fatalf("known/unknown/limited accounts have distinguishable body/status: %q vs %q", got, baseline)
 			}
 		})

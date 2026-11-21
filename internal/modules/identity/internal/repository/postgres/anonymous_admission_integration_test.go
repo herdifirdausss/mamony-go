@@ -63,8 +63,12 @@ func TestIdentityAnonymousAdmission(t *testing.T) {
 		close(start)
 		winners := 0
 		for i := 0; i < n; i++ {
-			if <-results { winners++ }
-			if err := <-errs; err != nil { t.Fatalf("concurrent admission failed: %v", err) }
+			if <-results {
+				winners++
+			}
+			if err := <-errs; err != nil {
+				t.Fatalf("concurrent admission failed: %v", err)
+			}
 		}
 		if winners != 3 {
 			t.Fatalf("cross-process email quota allowed %d of %d requests, expected 3", winners, n)
@@ -85,7 +89,9 @@ func TestIdentityAnonymousAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatalf("client budget write failed: %v", err)
 			}
-			if ok { winners++ }
+			if ok {
+				winners++
+			}
 		}
 		if winners != 8 {
 			t.Fatalf("per-client minute cap admitted %d requests, expected 8", winners)

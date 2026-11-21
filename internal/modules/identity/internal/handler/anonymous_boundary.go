@@ -91,7 +91,7 @@ type AnonymousAdmissionGate interface {
 // work enqueue and timing normalization before exposing registration/resend.
 type AnonymousBoundary struct {
 	resolver *ClientIPResolver
-	gate AnonymousAdmissionGate
+	gate     AnonymousAdmissionGate
 }
 
 func NewAnonymousBoundary(resolver *ClientIPResolver, gate AnonymousAdmissionGate) (*AnonymousBoundary, error) {

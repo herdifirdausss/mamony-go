@@ -127,7 +127,10 @@ func TestPostgresIdentityDeliveryRole(t *testing.T) {
 // not allow the registration runtime to delete/rewrite identity key material,
 // or broaden the roles used for verification and delivery.
 func TestPostgresIdentityAdmissionRole(t *testing.T) {
-	for _, tc := range []struct{env string; sql string}{
+	for _, tc := range []struct {
+		env string
+		sql string
+	}{
 		{"TEST_IDENTITY_RUNTIME_URL", "DELETE FROM mamony_identity.anonymous_admission_buckets"},
 		{"TEST_IDENTITY_RUNTIME_URL", "UPDATE mamony_identity.anonymous_admission_buckets SET key_digest='\\x00'::bytea"},
 		{"TEST_IDENTITY_VERIFIER_URL", "SELECT * FROM mamony_identity.anonymous_admission_buckets"},

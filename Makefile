@@ -3,10 +3,7 @@
 check: fmt-check vet unit architecture docs skills migrations-check build
 
 
-fmt-check: fmt-export
-
-fmt-export:
-	@python3 -c 'import json,subprocess; paths=["internal/modules/identity/internal/repository/postgres/anonymous_admission_integration_test.go","internal/modules/identity/internal/usecase/anonymous_admission_test.go","internal/modules/identity/internal/usecase/anonymous_admission.go","internal/modules/identity/internal/handler/anonymous_boundary.go","internal/modules/identity/internal/handler/anonymous_boundary_test.go","tools/postgrestest/identity_migration_integration_test.go"]; [print("GOFMT_JSON "+json.dumps({"path":p,"content":subprocess.check_output(["gofmt",p]).decode("utf-8")},ensure_ascii=True)) for p in paths]'
+fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:

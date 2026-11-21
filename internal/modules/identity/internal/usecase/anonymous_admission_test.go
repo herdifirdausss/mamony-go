@@ -11,9 +11,9 @@ import (
 
 type fakeAnonymousAdmissionStore struct {
 	allowed bool
-	err error
-	calls int
-	action AnonymousAction
+	err     error
+	calls   int
+	action  AnonymousAction
 	buckets []AdmissionBucket
 }
 
@@ -28,8 +28,14 @@ func TestAnonymousAdmissionHMACAndWindows(t *testing.T) {
 	store := &fakeAnonymousAdmissionStore{allowed: true}
 	key := bytes.Repeat([]byte{0xa7}, 32)
 	gate, err := NewAnonymousAdmission(store, key)
-	if err != nil { t.Fatal(err) }
-	for _, tc := range []struct{action AnonymousAction; email string; ip string}{
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		action AnonymousAction
+		email  string
+		ip     string
+	}{
 		{AnonymousRegister, "ALICE@example.test", "2001:db8:1:1::1"},
 		{AnonymousRegister, "alice@example.test", "2001:db8:1:1::2"},
 		{AnonymousRegister, "alice@example.test", "198.51.100.10"},
@@ -64,7 +70,9 @@ func TestAnonymousAdmissionHMACAndWindows(t *testing.T) {
 		t.Fatal("register and resend must not share allowance keys")
 	}
 	raw, err := json.Marshal(a)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if bytes.Contains(raw, []byte("alice@")) || bytes.Contains(raw, []byte("2001:db8")) {
 		t.Fatal("raw email or address escaped into accounting")
 	}
@@ -85,7 +93,10 @@ func TestAnonymousAdmissionFailClosedAndGeneric(t *testing.T) {
 	}
 	s := &fakeAnonymousAdmissionStore{}
 	g, _ := NewAnonymousAdmission(s, bytes.Repeat([]byte{1}, 32))
-	for _, tc := range []struct{op AnonymousAction; email, ip string}{
+	for _, tc := range []struct {
+		op        AnonymousAction
+		email, ip string
+	}{
 		{"OTHER", "alice@example.test", "127.0.0.1"},
 		{AnonymousRegister, "", "127.0.0.1"},
 		{AnonymousResend, "nope", "127.0.0.1"},
@@ -97,7 +108,9 @@ func TestAnonymousAdmissionFailClosedAndGeneric(t *testing.T) {
 			t.Fatalf("bad ingress admitted: %v %v", ok, err)
 		}
 	}
-	if s.calls != 0 { t.Fatal("invalid input reached persistence") }
+	if s.calls != 0 {
+		t.Fatal("invalid input reached persistence")
+	}
 	s.err = errors.New("sensitive SQL DSN with password")
 	ok, err := g.Admit(context.Background(), AnonymousRegister, "alice@example.test", netip.MustParseAddr("127.0.0.1"))
 	if ok || !errors.Is(err, ErrAnonymousAdmissionUnavailable) || err.Error() != ErrAnonymousAdmissionUnavailable.Error() {

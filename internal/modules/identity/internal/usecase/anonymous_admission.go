@@ -12,7 +12,7 @@ import (
 
 var (
 	ErrAnonymousAdmissionUnavailable = errors.New("identity admission unavailable")
-	ErrAnonymousAdmissionInvalid = errors.New("identity admission invalid")
+	ErrAnonymousAdmissionInvalid     = errors.New("identity admission invalid")
 )
 
 // AnonymousAction is an untrusted initiation category, never an authorized
@@ -21,16 +21,16 @@ type AnonymousAction string
 
 const (
 	AnonymousRegister AnonymousAction = "REGISTER"
-	AnonymousResend AnonymousAction = "RESEND"
+	AnonymousResend   AnonymousAction = "RESEND"
 )
 
 // AdmissionBucket is an allowlisted database accounting obligation. Keys are
 // HMAC-SHA256 digests, not plaintext contact or IP addresses.
 type AdmissionBucket struct {
-	Scope string
-	Key [32]byte
+	Scope         string
+	Key           [32]byte
 	WindowSeconds int64
-	Limit int32
+	Limit         int32
 }
 
 type AnonymousAdmissionPort interface {
@@ -41,7 +41,7 @@ type AnonymousAdmissionPort interface {
 // lookup/password hashing, but it does not authorize registering or resending.
 type AnonymousAdmission struct {
 	store AnonymousAdmissionPort
-	key [32]byte
+	key   [32]byte
 }
 
 func NewAnonymousAdmission(store AnonymousAdmissionPort, key []byte) (*AnonymousAdmission, error) {
