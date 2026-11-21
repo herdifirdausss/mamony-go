@@ -10,6 +10,18 @@ Terminate TLS at the public edge. Authorize the action and resource in the calle
 
 Use `application/problem+json` with a stable error code. Keep secrets, query text, and stack traces out of the response. Set body size, time, page size, and rate limits for each route before release. Do not expose the private listener to public traffic.
 
+## Input admission and browser boundary
+
+A public route must publish its authentication, authorization and input limits before use. The client cannot assert its tenant, roles, ownership, authentication level, or payment approval through editable headers or JSON. Resolve these from the trusted caller context and owning capability.
+
+- Bound request bytes independently of `http.Server.MaxHeaderBytes` (for example, `http.MaxBytesReader` in a JSON handler). Bound nested input, item counts, pagination, processing time and request concurrency according to the route. For expensive password verification, cap concurrent work as well as request rate.
+- Reject unexpected fields **and duplicate JSON object keys** in security- or money-relevant requests. `encoding/json.Decoder.DisallowUnknownFields` alone does not reject duplicate keys. Choose and test the decoder policy before exposing the first JSON write endpoint.
+- Accept forwarded identity, original IP and scheme headers only from an explicitly configured trusted proxy boundary. CORS does not grant authorization. Do not treat a SameSite cookie as sufficient CSRF defense.
+- If browser cookie sessions are introduced, use host-only `Secure`, `HttpOnly`, appropriate `SameSite`, origin/CSRF validation on state-changing requests, and server-side expiry and revocation. A session authenticates a subject; it never supplies object-level permission by itself.
+- Return uniform non-sensitive error responses. Verify public/private route inventories after ingress or reverse-proxy changes. The current loopback listeners do not establish production TLS or network isolation.
+
+The [identity contract](../contracts/identity.md) owns session and authorization rules. The [platform contract](../contracts/platform.md) owns deployment and resource budgets. These constraints remain **pending** for routes that do not yet exist.
+
 ## HTTP idempotency
 
 Require an `Idempotency-Key` for requests that change money or state. Scope the key to the authorized caller. Store a fingerprint of the canonical request in the owning capability's database.
