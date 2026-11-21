@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -147,6 +148,40 @@ func TestIdentityPasswordAuthentication(t *testing.T) {
 	if err != nil || candidate != subject {
 		t.Fatal("real Argon2id verified ACTIVE subject was not an internal candidate")
 	}
+	// Compose the actual password verifier with shared PostgreSQL admission.
+	// The sixth attempt must be blocked BEFORE this measuring wrapper can
+	// invoke credential lookup and its 64 MiB Argon2id operation.
+	loginStore, err := identitypg.NewAdmissionStore(regPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gate, err := usecase.NewLoginAdmission(loginStore, bytes.Repeat([]byte{0xd9}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counted := &countedPasswordAuthenticator{real: login}
+	composed, err := usecase.NewPasswordLoginFlow(gate, counted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	network := netip.MustParseAddr("192.0.2.179")
+	okSubject, err := composed.Authenticate(ctx, email, password, network)
+	if err != nil || okSubject != subject {
+		t.Fatal("admitted real Argon2id login did not produce internal subject")
+	}
+	for i := 0; i < 4; i++ {
+		negative, err := composed.Authenticate(ctx, email, password+"wrong", network)
+		if negative != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
+			t.Fatal("wrong password escaped admitted generic denial")
+		}
+	}
+	if counted.calls != 5 {
+		t.Fatalf("expected five real post-admission KDF checks, got %d", counted.calls)
+	}
+	negative, err := composed.Authenticate(ctx, email, password, network)
+	if negative != "" || !errors.Is(err, usecase.ErrPasswordLoginThrottled) || counted.calls != 5 {
+		t.Fatalf("login quota failed to prevent expensive sixth KDF: %v %d", err, counted.calls)
+	}
 	denied("wrong password after activation", email, password+"wrong")
 	denied("unknown after activation", (strings.ToLower(randomSyntheticID(t, "login_")) + "@example.test"), password)
 
@@ -168,4 +203,15 @@ func TestIdentityPasswordAuthentication(t *testing.T) {
 		err.Error() != usecase.ErrPasswordAuthenticationUnavailable.Error() {
 		t.Fatal("wrong PostgreSQL role was treated as an unknown account")
 	}
+}
+
+// Count real Argon2id invocations without creating any session capability.
+type countedPasswordAuthenticator struct {
+	real *usecase.PasswordAuthentication
+	calls int
+}
+
+func (c *countedPasswordAuthenticator) Authenticate(ctx context.Context, email, password string) (string, error) {
+	c.calls++
+	return c.real.Authenticate(ctx, email, password)
 }
