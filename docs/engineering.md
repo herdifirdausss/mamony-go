@@ -36,7 +36,7 @@ Follow the [Go conventions](conventions.md) when implementing capabilities; add 
 | `make race` | Check Go shared-memory behavior. |
 | `make test-repeat` | Run tests three times with shuffled order to reveal some state leakage. |
 | `make coverage` | Diagnostic per-function coverage; no percentage implies safety. |
-| `make integration` | Fail-closed placeholder that always returns `NOT RUN` until actual PostgreSQL fixtures, tagged tests, and enforced integration CI are implemented. |
+| `make integration` | Verify real PostgreSQL fixture roles and tenant RLS with tagged Go tests, guarded DSNs, `psql`, and an independent CI job; not production DB/ledger proof. |
 | `make lint` | Run golangci-lint, including gosec. |
 | `make security` | Check for reachable vulnerabilities in Go dependencies and the standard library. |
 | `make archlint` | Run the additional Go architecture check. |

@@ -1,4 +1,4 @@
-.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration
+.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration integration-local
 
 check: fmt-check vet unit architecture docs skills build
 
@@ -21,11 +21,14 @@ coverage:
 	go test -coverprofile=test-reports/coverage.out ./...
 	go tool cover -func=test-reports/coverage.out
 
-# Fail closed until a real, disposable PostgreSQL integration harness is
-# implemented and a CI job verifies that its tests actually execute.
-# File existence and TEST_DATABASE_URL alone cannot prove any test ran.
+# Run only tagged PostgreSQL tests with strict URL guards and nonempty PASS
+# evidence from the exact required test names (not a package-level PASS).
 integration:
-	@echo 'NOT RUN: PostgreSQL test harness and enforced integration CI are not implemented'; exit 2
+	go run ./tools/testgate
+
+# Start a disposable, loopback-only PostgreSQL container and clean it up.
+integration-local:
+	sh tools/postgrestest/run-local.sh
 
 architecture:
 	go run ./tools/archcheck

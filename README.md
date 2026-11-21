@@ -21,3 +21,13 @@ curl -i http://127.0.0.1:8081/readyz
 ```
 
 The private listener binds to loopback. Use `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to set listener addresses. The private readiness endpoint checks the HTTP process. See [engineering practices](docs/engineering.md#verification) for the test and CI commands.
+
+## Disposable PostgreSQL integration tests
+
+The [PostgreSQL foundation proposal](docs/proposals/postgresql-foundation.md) describes the intentionally limited synthetic fixture. With Docker and the PostgreSQL `psql` client installed:
+
+```sh
+make integration-local
+```
+
+This creates an ephemeral PostgreSQL 18.7 container bound to a random **loopback-only** port, tests separate synthetic runtime/admin roles and tenant RLS, then removes the container. The equivalent CI job runs on every PR and push to `main`. Without a disposable database, `make integration` fails closed rather than reporting PASS. **No production migrations, ledger code, provider calls or real identities are exercised.**

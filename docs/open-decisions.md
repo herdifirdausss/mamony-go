@@ -4,6 +4,9 @@ Use the local [architecture decision index](adr/README.md) for baseline requirem
 
 ## Foundation and access
 
+The [PostgreSQL foundation proposal](proposals/postgresql-foundation.md) tests synthetic roles/RLS independently of runtime driver/migration selection. **DEC-01 remains open**: the test-only PostgreSQL image and `psql` fixture are not approval of a production version, Go driver or migration runner.
+
+
 | ID | Choice | Decision evidence |
 |---|---|---|
 | DEC-01 | Pin the PostgreSQL release, Go driver, migration runner, and role bootstrap. | Clean boot, upgrade, real runtime roles, and restore on the same target. |
