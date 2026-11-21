@@ -54,11 +54,16 @@ func ReconcileEnrollmentOnce(ctx context.Context, cfg EnrollmentReconciliationCo
 	if err != nil {
 		return empty, ErrEnrollmentReconciliation
 	}
-	issuer, err := usecase.NewEmailVerification(proofs, keys)
+	// Explicit owner-defined ports preserve the repository-to-usecase boundary.
+	var proofPort usecase.EmailProofPort = proofs
+	var sealPort usecase.ProofEnvelopeSealer = keys
+	issuer, err := usecase.NewEmailVerification(proofPort, sealPort)
 	if err != nil {
 		return empty, ErrEnrollmentReconciliation
 	}
-	reconciler, err := usecase.NewEnrollmentReconciler(proofs, issuer)
+	var finderPort usecase.UnissuedEnrollmentFinder = proofs
+	var issuerPort usecase.EnrollmentProofIssuer = issuer
+	reconciler, err := usecase.NewEnrollmentReconciler(finderPort, issuerPort)
 	if err != nil {
 		return empty, ErrEnrollmentReconciliation
 	}
