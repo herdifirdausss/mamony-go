@@ -28,3 +28,9 @@ jobs:
           echo '===BEGIN_GO_SUM==='
           cat go.sum
           echo '===END_GO_SUM==='
+          gofmt -w internal/platform/migration/files.go internal/platform/migration/runner.go internal/platform/migration/files_test.go tools/postgrestest/platform_migration_integration_test.go
+          for file in internal/platform/migration/files.go internal/platform/migration/runner.go internal/platform/migration/files_test.go tools/postgrestest/platform_migration_integration_test.go; do
+            echo "===BEGIN_GO_FILE:$file==="
+            cat "$file"
+            echo "===END_GO_FILE:$file==="
+          done
