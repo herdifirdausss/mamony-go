@@ -89,8 +89,7 @@ func TestIdentityConfirmationAdmission(t *testing.T) {
 	// CONFIRM action rows. Stored values remain 32-byte HMACs.
 	var invalidDigests int
 	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.anonymous_admission_buckets
-		WHERE action='CONFIRM' AND octet_length(key_digest)<>32`).Scan(&invalidDigests);
-		err != nil || invalidDigests != 0 {
+		WHERE action='CONFIRM' AND octet_length(key_digest)<>32`).Scan(&invalidDigests); err != nil || invalidDigests != 0 {
 		t.Fatalf("confirmation budget persisted non-HMAC data: %d %v", invalidDigests, err)
 	}
 	// Any registration/resend window remains independent, even for
