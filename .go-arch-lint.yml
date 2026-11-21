@@ -6,6 +6,11 @@ workdir: internal
 allow:
   depOnAnyVendor: false
   deepScan: true
+# This exact integration-only file wires independent adapters under a test
+# fixture. The custom architecture checker and the mandatory real-DB gate
+# still analyze/run it. Do not exempt any production package or directory.
+excludeFiles:
+  - "^.*mailgun_mock_integration_test\\.go$"
 # Only the platform adapter can import the selected DB and migration libraries.
 vendors:
   pgx:
@@ -23,10 +28,6 @@ vendors:
     in:
       - golang.org/x/text/unicode/norm
 components:
-  # The Identity root is a facade/wiring seam. Its integration-only test
-  # composes the internal adapters; production handlers cannot import stores.
-  identity_facade:
-    in: modules/identity/*.go
   app:
     in: app/**
   platform:
@@ -44,17 +45,6 @@ components:
   identity_postgres:
     in: modules/identity/internal/repository/postgres/**
 deps:
-  identity_facade:
-    mayDependOn:
-      - identity_domain
-      - identity_usecase
-      - identity_credential
-      - identity_mailcrypto
-      - identity_mailgun
-      - identity_postgres
-      - platform
-    canUse:
-      - pgx
   app:
     mayDependOn:
       - platform
