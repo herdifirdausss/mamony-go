@@ -8,14 +8,14 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 |---|---|---|---|
 | Unit | Pure domain rules, usecase orchestration, invalid inputs and error classification with fakes for external ports | `make unit`; files named `*_test.go` | **Implemented** for existing bootstrap/checker packages; financial rules absent |
 | HTTP/component | Handler routing, method/resource exposure, request/response mapping, deadlines and private/public listener separation using `httptest` or bound ephemeral listeners | `make unit`; focused Go tests | **Implemented** only for health endpoints |
-| Integration — database | Actual SQL, migrations, constraints, runtime roles, tenant RLS, transaction/retry, outbox, balance-floor and race semantics | `make integration` is a fail-closed placeholder; enable only with a disposable PostgreSQL fixture, tagged `*_integration_test.go` and a required CI integration job | **NOT RUN**: database code, fixtures and integration cases not yet available |
+| Integration — database | Actual SQL constraints, runtime roles and tenant RLS; future migrations, transaction/retry, outbox, balance-floor and contention | `make integration-local` starts a disposable PostgreSQL 18.7 container; `make integration` verifies exact tagged test cases and requires separate admin/runtime test URLs | **Implemented for synthetic role/RLS primitives only**; production migrations, Go DB pool, ledger and restore remain NOT RUN |
 | Contract | Public OpenAPI/schema compatibility, event versions, external provider signature fixtures and stub behavior | Focused tests when published contracts/adapters exist | **NOT RUN** for payment/provider APIs |
 | Scenario / E2E | Customer/operator flows crossing capability boundaries with synthetic providers, including recovery, denial, retry, duplicate/out-of-order messages | Dedicated scenario tests after target flows exist | **NOT RUN** for financial flows |
 | Concurrency / fault | Race, lost response, concurrent idempotency key, rollback, outbox replay, restart/restore | `make race` for shared memory; real DB multi-connection fault tests for durable state | Race detector runs; **financial fault tests NOT RUN** |
 | Property / fuzz | Arithmetic conservation, allowed state transitions, parsers/decoders on hostile inputs | `go test -fuzz=Fuzz... -fuzztime=... <package>` when targets exist; committed corpus runs during unit tests | **NOT RUN** for absent financial/parser targets |
 | Performance / recovery | Bounded latency, resource budget, load, backups and safe restoration | Dedicated reproducible benchmarks and restore drills with declared fixtures | **NOT RUN** |
 
-**Never claim `make race` proves a SQL concurrency invariant.** Never report `make unit` as a database integration PASS. The `integration` Make target deliberately returns `NOT RUN` (exit 2) on every invocation until a real PostgreSQL test harness and required CI integration job exist. An integration filename and `TEST_DATABASE_URL` are insufficient: `go test` can return success with **no tests executed**. Do not relax this gate merely to make it green.
+**Never claim `make race` proves a SQL concurrency invariant.** Never report `make unit` as a database integration PASS. The `integration` Make target now enforces actual `TestPostgres*` results from Go's JSON events, refusing missing URLs, an unsafe target, unavailable `psql`, missing required tests and any test failure. A file and `TEST_DATABASE_URL` alone never prove tests executed. The synthetic RLS fixture tests **database mechanics**, not production authorization, migration integrity, or ledger semantics.
 
 ## Go test conventions
 
@@ -36,23 +36,27 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 | `make test-repeat` | `go test -shuffle=on -count=3 ./...` catches some order dependence but not all flakiness. |
 | `make race` | Shared-memory race detector; only exercised code paths are checked. |
 | `make coverage` | Generates `test-reports/coverage.out` and per-function coverage; diagnostic only, no arbitrary percentage gate. |
-| `make integration` | Currently returns `NOT RUN`; replace the placeholder only after a real disposable PostgreSQL fixture, executed tagged tests and a required CI job are present. |
+| `make integration` | Runs real tagged PostgreSQL **fixture** checks against strictly guarded runtime/admin test URLs; fails on missing or empty tests. Requires `psql`. |
+| `make integration-local` | Runs those tests against an isolated ephemeral Docker container on a random loopback port and removes it after the test. |
 | `make lint`, `make security`, `make archlint` | Static/vulnerability/dependency gates; not a substitute for behavioral proof. |
 | `make test-report` | Test evidence for base Go suite via gotestsum; does not cover absent database tests. |
 
 Run targeted tests while implementing, then required CI gates. For critical changes, independent review must inspect **both code and tests**: an AI can weaken a test to make an incorrect behavior pass. CI must not assume a changed test is trustworthy merely because it is green.
 
-## First real PostgreSQL integration gate
+## PostgreSQL integration stages
 
-When the first database schema/migration lands:
+The first fixture-only gate is implemented by `tools/postgrestest` and the `PostgreSQL integration / postgresql` CI job. It tests synthetic owner/runtime privileges and `FORCE ROW LEVEL SECURITY`, including tenant-context expiry on one PostgreSQL connection. Both the Go gate and the tagged suite reject unsafe test URLs. See the [foundation proposal](proposals/postgresql-foundation.md) for scope and limitations.
 
-1. Introduce a disposable PostgreSQL service matching the pinned version. Decide whether to use CI service containers or a reviewed Testcontainers adapter, but avoid introducing both without need.
-2. Add `*_integration_test.go` with `//go:build integration` and explicit setup/cleanup. Use `TEST_DATABASE_URL` only for isolated disposable test infrastructure. Fail closed if absent.
-3. Run migrations from empty database and a prior supported version. Verify ownership, `FORCE ROW LEVEL SECURITY`, runtime grants and unauthorized tenant access using **actual roles**.
-4. Add deterministic concurrent transactions, duplicate keys, forced abort, lost response and process restart tests for the first ledger slice.
-5. Then and **only then** replace the fail-closed `make integration` placeholder and enable a required CI integration job. Confirm it fails if PostgreSQL is unavailable, migrations fail, **no tests execute**, or an invariant is violated; do not mark it optional via `continue-on-error`. A test-file presence check is not sufficient.
+**Still NOT RUN:** production schema migrations, applied-file checksums and upgrades, a Go connection pool, end-to-end tenant authorization, ledger locks/idempotency/reversal, outbox, restore and true concurrent SQL execution. The fixture tests do not use or validate an actual application repository.
 
-Dependency selection and pinning belong to DEC-01 in the [decision register](open-decisions.md). An off-the-shelf test container library is an option, not a prerequisite for Go unit tests.
+Next, after DEC-01 is accepted:
+1. Choose the supported PostgreSQL version, Go driver and migration tool, with explicit immutable migration evidence and scoped owner/runtime credentials.
+2. Test production migrations from an empty database and a supported prior version. Verify actual role ownership and grants, including the tenant table's `FORCE ROW LEVEL SECURITY`.
+3. Add direct connection-pool tenant reuse tests, not only `psql` sequential connection tests. Exercise deterministic contention and rollback against the first actual ledger schema.
+4. Add failed-startup, ambiguous commit, crash/restart and fresh restore tests before claiming financial or recovery gates.
+5. Keep the integration CI job non-optional, and fail it on missing database, failed migrations, zero required tests or any invariant failure. A test-file presence check is insufficient.
+
+Dependency and release choices remain DEC-01 in the [decision register](open-decisions.md).
 
 ## Test evidence for AI changes
 

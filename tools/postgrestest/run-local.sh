@@ -1,0 +1,40 @@
+#!/bin/sh
+# Run only on a disposable local Docker container. Requires docker and psql.
+set -eu
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo 'NOT RUN: docker missing' >&2
+  exit 2
+fi
+if ! command -v psql >/dev/null 2>&1; then
+  echo 'NOT RUN: PostgreSQL client (psql) missing' >&2
+  exit 2
+fi
+
+container="$(docker run --rm -d -e POSTGRES_DB=mamony_test_local \
+  -e POSTGRES_USER=mamony_test_admin -e POSTGRES_PASSWORD=local-test-admin \
+  -p 127.0.0.1::5432 postgres:18.7)"
+cleanup() {
+  docker rm -f "$container" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT HUP INT TERM
+
+port="$(docker port "$container" 5432/tcp | sed -n '1s/.*://p')"
+case "$port" in
+  ''|*[!0-9]*) echo 'Cannot identify the ephemeral loopback port' >&2; exit 2 ;;
+esac
+
+attempt=0
+until docker exec "$container" pg_isready -U mamony_test_admin -d mamony_test_local >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if [ "$attempt" -ge 30 ]; then
+    echo 'NOT RUN: disposable PostgreSQL did not become ready' >&2
+    exit 2
+  fi
+  sleep 1
+done
+
+export TEST_DATABASE_ADMIN_URL="postgres://mamony_test_admin:local-test-admin@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_DATABASE_URL="postgres://mamony_test_runtime:local-test-runtime@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+
+make integration
