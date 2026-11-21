@@ -35,7 +35,7 @@ const (
 // EmailProofRequest is a trusted, single-transaction repository command.
 // The token digest must never be used as a bearer or logged.
 type EmailProofRequest struct {
-	OnlyIfFirst bool // recovery must never replace an existing historical proof
+	OnlyIfFirst   bool // recovery must never replace an existing historical proof
 	SubjectID     string
 	ChallengeID   string
 	EventID       string
