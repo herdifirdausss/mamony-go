@@ -18,7 +18,7 @@
 
 Set `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to override the addresses. The private listener accepts `127.0.0.1` and `::1`. It maps `localhost` to `127.0.0.1`. Readiness reports only HTTP process readiness.
 
-| `internal/modules/identity` | Internal pending-registration policy, Argon2id adapter, PostgreSQL enrollment, plus draft one-use email-proof digest/activation store, AES-GCM envelope adapter, leased delivery queue/worker ports, and database-serialized per-subject issuance/resend limits; public Identity HTTP routes, deployed Mailgun credentials and executing worker absent. |
+| `internal/modules/identity` | Internal pending-registration policy, Argon2id adapter, PostgreSQL enrollment, plus draft one-use email-proof digest/activation store, AES-GCM envelope adapter, leased delivery queue/worker ports, database-serialized per-subject issuance/resend limits, and an unmounted HMAC-keyed anonymous admission layer (v5); public Identity HTTP routes, deployed Mailgun credentials and executing worker absent. |
 
 ## Capability packages
 

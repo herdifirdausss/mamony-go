@@ -122,3 +122,21 @@ func TestPostgresIdentityDeliveryRole(t *testing.T) {
 		}
 	}
 }
+
+// TestPostgresIdentityAdmissionRole verifies the v5 admission-only table does
+// not allow the registration runtime to delete/rewrite identity key material,
+// or broaden the roles used for verification and delivery.
+func TestPostgresIdentityAdmissionRole(t *testing.T) {
+	for _, tc := range []struct{env string; sql string}{
+		{"TEST_IDENTITY_RUNTIME_URL", "DELETE FROM mamony_identity.anonymous_admission_buckets"},
+		{"TEST_IDENTITY_RUNTIME_URL", "UPDATE mamony_identity.anonymous_admission_buckets SET key_digest='\\x00'::bytea"},
+		{"TEST_IDENTITY_VERIFIER_URL", "SELECT * FROM mamony_identity.anonymous_admission_buckets"},
+		{"TEST_IDENTITY_DELIVERY_URL", "SELECT * FROM mamony_identity.anonymous_admission_buckets"},
+		{"TEST_PLATFORM_RUNTIME_URL", "SELECT * FROM mamony_identity.anonymous_admission_buckets"},
+	} {
+		out, err := invokePSQL(tc.env, "-c", tc.sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("untrusted Identity role must refuse %q: %v %s", tc.sql, err, out)
+		}
+	}
+}

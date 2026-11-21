@@ -29,11 +29,13 @@ var requiredTests = []string{
 	"TestPostgresIdentityMigration",
 	"TestPostgresIdentityVerifierRole",
 	"TestPostgresIdentityDeliveryRole",
+	"TestPostgresIdentityAdmissionRole",
 	"TestIdentityRegistrationPersistence",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
 	"TestIdentityResendAdmission",
+	"TestIdentityAnonymousAdmission",
 }
 
 type testEvent struct {
