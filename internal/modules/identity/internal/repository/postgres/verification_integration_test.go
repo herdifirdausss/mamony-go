@@ -57,7 +57,7 @@ func TestIdentityEmailVerification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service, err := usecase.NewEmailVerification(proofs)
+	service, err := usecase.NewEmailVerification(proofs, fakeProofSealer{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,10 +200,12 @@ func TestIdentityEmailVerification(t *testing.T) {
 	t.Run("outbox failure rolls back consume and activation", func(t *testing.T) {
 		pending := newPending(t)
 		req := usecase.EmailProofRequest{
-			SubjectID:   pending.SubjectID,
-			ChallengeID: randomID(t, "vch_"),
-			EventID:     randomID(t, "evt_"),
-			TokenDigest: bytes.Repeat([]byte{0x63}, 32),
+			SubjectID:     pending.SubjectID,
+			ChallengeID:   randomID(t, "vch_"),
+			EventID:       randomID(t, "evt_"),
+			TokenDigest:   bytes.Repeat([]byte{0x63}, 32),
+			EnvelopeKeyID: "testkey",
+			SealedToken:   bytes.Repeat([]byte{0xA5}, 71),
 		}
 		if _, err := proofs.Issue(ctx, req); err != nil {
 			t.Fatal(err)
@@ -231,6 +233,7 @@ func TestIdentityEmailVerification(t *testing.T) {
 		first := usecase.EmailProofRequest{
 			SubjectID: pending.SubjectID, ChallengeID: randomID(t, "vch_"),
 			EventID: randomID(t, "evt_"), TokenDigest: bytes.Repeat([]byte{0x71}, 32),
+			EnvelopeKeyID: "testkey", SealedToken: bytes.Repeat([]byte{0xA5}, 71),
 		}
 		if _, err := proofs.Issue(ctx, first); err != nil {
 			t.Fatal(err)
@@ -238,6 +241,7 @@ func TestIdentityEmailVerification(t *testing.T) {
 		conflict := usecase.EmailProofRequest{
 			SubjectID: pending.SubjectID, ChallengeID: randomID(t, "vch_"),
 			EventID: first.EventID, TokenDigest: bytes.Repeat([]byte{0x72}, 32),
+			EnvelopeKeyID: "testkey", SealedToken: bytes.Repeat([]byte{0xA5}, 71),
 		}
 		if _, err := proofs.Issue(ctx, conflict); err == nil {
 			t.Fatal("duplicate issuance outbox event must fail")
@@ -275,4 +279,12 @@ func TestIdentityEmailVerification(t *testing.T) {
 		}
 		verifyPending(t, pending.SubjectID, "ACTIVE")
 	})
+}
+
+// fakeProofSealer is test-only. Production requires an authenticated
+// encryption envelope and externally provisioned key from the mailcrypto adapter.
+type fakeProofSealer struct{}
+
+func (fakeProofSealer) Seal(_, _, _ string) (string, []byte, error) {
+	return "testkey", bytes.Repeat([]byte{0xA5}, 71), nil
 }

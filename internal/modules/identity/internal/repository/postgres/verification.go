@@ -26,7 +26,9 @@ func NewProofStore(db Transactor) (*ProofStore, error) {
 func (s *ProofStore) Issue(ctx context.Context, r usecase.EmailProofRequest) (usecase.EmailProofDestination, error) {
 	var dest usecase.EmailProofDestination
 	if s == nil || s.db == nil || len(r.SubjectID) != 26 || len(r.ChallengeID) != 26 ||
-		len(r.EventID) != 26 || len(r.TokenDigest) != 32 {
+		len(r.EventID) != 26 || len(r.TokenDigest) != 32 ||
+		len(r.EnvelopeKeyID) < 1 || len(r.EnvelopeKeyID) > 32 ||
+		len(r.SealedToken) < 60 || len(r.SealedToken) > 256 {
 		return dest, ErrStorageUnavailable
 	}
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
@@ -55,6 +57,11 @@ func (s *ProofStore) Issue(ctx context.Context, r usecase.EmailProofRequest) (us
 			VALUES ($1, $2, $3, $4, 'EMAIL_VERIFY', $5,
 			 clock_timestamp(), clock_timestamp() + interval '20 minutes')`,
 			r.ChallengeID, r.SubjectID, dest.CanonicalEmail, dest.ContactVersion, r.TokenDigest); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO mamony_identity.email_proof_deliveries
+			(challenge_id, key_id, sealed_token) VALUES ($1, $2, $3)`,
+			r.ChallengeID, r.EnvelopeKeyID, r.SealedToken); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO mamony_identity.security_outbox

@@ -26,6 +26,8 @@ type EmailProofRequest struct {
 	ChallengeID string
 	EventID     string
 	TokenDigest []byte
+	EnvelopeKeyID string
+	SealedToken []byte
 }
 
 type EmailProofDestination struct {
@@ -63,16 +65,24 @@ func (PreparedEmailProof) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("email proof cannot be marshaled to JSON")
 }
 
+// ProofEnvelopeSealer keeps the provider-ready bearer recoverable for
+// controlled retries without persisting a plaintext token. Its key must be
+// supplied by a trusted secret source outside PostgreSQL and the repository.
+type ProofEnvelopeSealer interface {
+	Seal(subjectID, challengeID, bearer string) (keyID string, ciphertext []byte, err error)
+}
+
 type EmailVerification struct {
 	store  EmailProofPort
+	sealer ProofEnvelopeSealer
 	random io.Reader
 }
 
-func NewEmailVerification(store EmailProofPort) (*EmailVerification, error) {
-	if store == nil {
+func NewEmailVerification(store EmailProofPort, sealer ProofEnvelopeSealer) (*EmailVerification, error) {
+	if store == nil || sealer == nil {
 		return nil, ErrEmailProofUnavailable
 	}
-	return &EmailVerification{store: store, random: rand.Reader}, nil
+	return &EmailVerification{store: store, sealer: sealer, random: rand.Reader}, nil
 }
 
 func tokenDigest(secret string) []byte {
@@ -84,7 +94,7 @@ func tokenDigest(secret string) []byte {
 // its return value must be handed directly to a vetted delivery adapter with
 // bounded issuance and resend/recovery behavior.
 func (v *EmailVerification) Prepare(ctx context.Context, subjectID string) (PreparedEmailProof, error) {
-	if v == nil || v.store == nil || len(subjectID) != 26 || subjectID[:4] != "sub_" {
+	if v == nil || v.store == nil || v.sealer == nil || len(subjectID) != 26 || subjectID[:4] != "sub_" {
 		return PreparedEmailProof{}, ErrEmailProofUnavailable
 	}
 	bytes := make([]byte, 32)
@@ -100,9 +110,14 @@ func (v *EmailVerification) Prepare(ctx context.Context, subjectID string) (Prep
 	if err != nil {
 		return PreparedEmailProof{}, ErrEmailProofUnavailable
 	}
+	keyID, sealed, err := v.sealer.Seal(subjectID, challengeID, secret)
+	if err != nil || len(keyID) == 0 || len(sealed) < 60 || len(sealed) > 256 {
+		return PreparedEmailProof{}, ErrEmailProofUnavailable
+	}
 	target, err := v.store.Issue(ctx, EmailProofRequest{
 		SubjectID: subjectID, ChallengeID: challengeID,
 		EventID: eventID, TokenDigest: tokenDigest(secret),
+		EnvelopeKeyID: keyID, SealedToken: sealed,
 	})
 	if err != nil || target.ContactVersion < 1 || target.CanonicalEmail == "" {
 		return PreparedEmailProof{}, ErrEmailProofUnavailable
