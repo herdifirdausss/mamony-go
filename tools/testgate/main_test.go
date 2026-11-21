@@ -42,8 +42,9 @@ func TestSummarizeEventsRejectsEmptyOrSubtests(t *testing.T) {
 		passed       int
 	}{
 		{"no tests", "{\"Action\":\"pass\",\"Package\":\"foo\"}\n", 0},
-		{"subtest only", "{\"Action\":\"pass\",\"Test\":\"TestPostgresTenantIsolation/one\"}\n", 0},
-		{"real test", "{\"Action\":\"pass\",\"Test\":\"TestPostgresTenantIsolation\"}\n", 1},
+		{"subtest only", "{\"Action\":\"pass\",\"Package\":\"github.com/herdifirdausss/mamony-go/tools/postgrestest\",\"Test\":\"TestPostgresTenantIsolation/one\"}\n", 0},
+		{"wrong package", "{\"Action\":\"pass\",\"Package\":\"github.com/herdifirdausss/mamony-go/tools/testgate\",\"Test\":\"TestPostgresTenantIsolation\"}\n", 0},
+		{"real test", "{\"Action\":\"pass\",\"Package\":\"github.com/herdifirdausss/mamony-go/tools/postgrestest\",\"Test\":\"TestPostgresTenantIsolation\"}\n", 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
