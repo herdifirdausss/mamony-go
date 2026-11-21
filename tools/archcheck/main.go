@@ -158,7 +158,8 @@ func productionViolation(from, to string) string {
 	if capName == "" || (layer != "domain" && layer != "usecase") {
 		return ""
 	}
-	if to == "net/http" || to == "database/sql" || to == "database/sql/driver" {
+	if to == "net/http" || strings.HasPrefix(to, "net/http/") ||
+		to == "database/sql" || strings.HasPrefix(to, "database/sql/") {
 		return "domain/usecase cannot directly import HTTP or database APIs; use a port"
 	}
 	for _, prefix := range []string{

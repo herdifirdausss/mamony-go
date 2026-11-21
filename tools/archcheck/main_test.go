@@ -38,6 +38,8 @@ func TestProductionImportPolicy(t *testing.T) {
 	}{
 		{"domain database sql", "internal/modules/ledger/internal/domain", "database/sql", false},
 		{"domain HTTP", "internal/modules/ledger/internal/domain", "net/http", false},
+		{"domain HTTP subpackage", "internal/modules/ledger/internal/domain", "net/http/httputil", false},
+		{"usecase SQL driver", "internal/modules/ledger/internal/usecase", "database/sql/driver", false},
 		{"usecase pgx", "internal/modules/ledger/internal/usecase", "github.com/jackc/pgx/v5/pgxpool", false},
 		{"usecase redis", "internal/modules/ledger/internal/usecase", "github.com/redis/go-redis/v9", false},
 		{"usecase RabbitMQ", "internal/modules/ledger/internal/usecase", "github.com/rabbitmq/amqp091-go", false},
