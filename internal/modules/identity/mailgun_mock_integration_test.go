@@ -277,14 +277,14 @@ func TestIdentityMailgunMockPipeline(t *testing.T) {
 	go func() {
 		runDone <- RunDelivery(runCtx, DeliveryConfig{
 			DSN: deliveryDSN, Region: "US", Domain: "mg.example.test",
-			From: "Mamony Security <security@mg.example.test>",
+			From:            "Mamony Security <security@mg.example.test>",
 			VerificationURL: "https://app.example.test/verify-email",
-			MailgunKey: "test-mailgun-domain-key",
-			ActiveKeyID: "fixture-key",
-			EnvelopeKeys: map[string][]byte{"fixture-key": bytes.Repeat([]byte{0x83}, 32)},
-			PollInterval: 100 * time.Millisecond,
+			MailgunKey:      "test-mailgun-domain-key",
+			ActiveKeyID:     "fixture-key",
+			EnvelopeKeys:    map[string][]byte{"fixture-key": bytes.Repeat([]byte{0x83}, 32)},
+			PollInterval:    100 * time.Millisecond,
 			HTTPClient: &http.Client{
-				Timeout: 2 * time.Second,
+				Timeout:   2 * time.Second,
 				Transport: mockMailgunTransport{origin: mockURL},
 			},
 		})

@@ -9,8 +9,8 @@ const (
 	// Polling is intentionally serialized: one process does not start a
 	// second send until the previous send/finalization has returned.
 	DefaultMailPollInterval = 5 * time.Second
-	MinMailPollInterval = 100 * time.Millisecond
-	MaxMailPollInterval = 30 * time.Second
+	MinMailPollInterval     = 100 * time.Millisecond
+	MaxMailPollInterval     = 30 * time.Second
 )
 
 type DeliveryDispatcher interface {

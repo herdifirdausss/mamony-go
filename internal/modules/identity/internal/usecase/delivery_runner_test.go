@@ -9,9 +9,10 @@ import (
 
 type fakeDispatcher struct {
 	calls int
-	done chan struct{}
-	fail error
+	done  chan struct{}
+	fail  error
 }
+
 func (f *fakeDispatcher) DispatchOnce(context.Context) (bool, error) {
 	f.calls++
 	if f.done != nil {
@@ -23,7 +24,9 @@ func (f *fakeDispatcher) DispatchOnce(context.Context) (bool, error) {
 func TestDeliveryRunnerPollsSeriallyAndStopsOnShutdown(t *testing.T) {
 	f := &fakeDispatcher{done: make(chan struct{}, 4)}
 	r, err := NewDeliveryRunner(f, DefaultMailPollInterval)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	ticks := make(chan time.Time, 2)
 	result := make(chan error, 1)
@@ -34,7 +37,9 @@ func TestDeliveryRunnerPollsSeriallyAndStopsOnShutdown(t *testing.T) {
 	cancel()
 	select {
 	case err := <-result:
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 	case <-time.After(time.Second):
 		t.Fatal("shutdown did not stop delivery polling")
 	}
@@ -44,7 +49,7 @@ func TestDeliveryRunnerPollsSeriallyAndStopsOnShutdown(t *testing.T) {
 }
 
 func TestDeliveryRunnerRejectsMissingAuthorityAndUnsafeIntervals(t *testing.T) {
-	for _, d := range []time.Duration{0, MinMailPollInterval-time.Nanosecond, MaxMailPollInterval+time.Nanosecond} {
+	for _, d := range []time.Duration{0, MinMailPollInterval - time.Nanosecond, MaxMailPollInterval + time.Nanosecond} {
 		if _, err := NewDeliveryRunner(&fakeDispatcher{}, d); !errors.Is(err, ErrDeliveryUnavailable) {
 			t.Fatal("unsafe interval accepted")
 		}

@@ -47,19 +47,19 @@ func RunDelivery(ctx context.Context, cfg DeliveryConfig) error {
 		return ErrDeliveryRuntime
 	}
 	sender, err := mailgun.NewSender(mailgun.Config{
-		Region: mailgun.Region(cfg.Region),
-		Domain: cfg.Domain,
-		From: cfg.From,
-		APIKey: cfg.MailgunKey,
+		Region:          mailgun.Region(cfg.Region),
+		Domain:          cfg.Domain,
+		From:            cfg.From,
+		APIKey:          cfg.MailgunKey,
 		VerificationURL: cfg.VerificationURL,
 	}, cfg.HTTPClient)
 	if err != nil {
 		return ErrDeliveryRuntime
 	}
 	pool, err := platformpg.Open(ctx, platformpg.Config{
-		DSN: cfg.DSN,
+		DSN:         cfg.DSN,
 		RuntimeRole: "mamony_identity_delivery_runtime",
-		MaxConns: 2,
+		MaxConns:    2,
 	})
 	if err != nil {
 		return ErrDeliveryRuntime

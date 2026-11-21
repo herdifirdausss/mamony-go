@@ -81,7 +81,7 @@ func readRuntimeConfig(getenv func(string) string, args []string) (identity.Deli
 	}
 	var doc struct {
 		Active string            `json:"active"`
-		Keys map[string]string    `json:"keys"`
+		Keys   map[string]string `json:"keys"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(material))
 	decoder.DisallowUnknownFields()
@@ -107,15 +107,15 @@ func readRuntimeConfig(getenv func(string) string, args []string) (identity.Deli
 		return empty, errStartup
 	}
 	return identity.DeliveryConfig{
-		DSN: dsn,
-		Region: getenv("MAMONY_IDENTITY_MAILGUN_REGION"),
-		Domain: getenv("MAMONY_IDENTITY_MAILGUN_DOMAIN"),
-		From: getenv("MAMONY_IDENTITY_MAIL_FROM"),
+		DSN:             dsn,
+		Region:          getenv("MAMONY_IDENTITY_MAILGUN_REGION"),
+		Domain:          getenv("MAMONY_IDENTITY_MAILGUN_DOMAIN"),
+		From:            getenv("MAMONY_IDENTITY_MAIL_FROM"),
 		VerificationURL: getenv("MAMONY_IDENTITY_MAIL_VERIFY_URL"),
-		MailgunKey: key,
-		ActiveKeyID: doc.Active,
-		EnvelopeKeys: keys,
-		PollInterval: 5*time.Second,
+		MailgunKey:      key,
+		ActiveKeyID:     doc.Active,
+		EnvelopeKeys:    keys,
+		PollInterval:    5 * time.Second,
 	}, nil
 }
 
