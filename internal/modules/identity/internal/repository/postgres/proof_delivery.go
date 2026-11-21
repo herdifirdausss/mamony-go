@@ -36,7 +36,6 @@ func (s *DeliveryStore) Claim(ctx context.Context, leaseID string) (usecase.Proo
 			WHERE d.status='PENDING' AND d.attempts < 5
 			  AND d.next_attempt_at <= clock_timestamp()
 			  AND (d.leased_until IS NULL OR d.leased_until < clock_timestamp())
-			  AND c.purpose='EMAIL_VERIFY'
 			  AND c.consumed_at IS NULL AND c.revoked_at IS NULL
 			  AND c.expires_at > clock_timestamp() + interval '15 seconds'
 			  AND s.status='UNVERIFIED' AND a.verified_at IS NULL

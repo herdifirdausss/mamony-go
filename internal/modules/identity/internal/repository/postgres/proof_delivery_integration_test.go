@@ -5,7 +5,6 @@ package postgres
 import (
 	"bytes"
 	"context"
-	"errors"
 	"net/url"
 	"sync"
 	"testing"
@@ -86,6 +85,9 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 			(SELECT count(*) FROM mamony_identity.email_proof_deliveries WHERE challenge_id=$1) +
 			(SELECT count(*) FROM mamony_identity.email_verification_challenges WHERE challenge_id=$1)`,conflict.ChallengeID).Scan(&count)
 		if err!=nil || count!=0{t.Fatalf("envelope or challenge escaped rollback: %d %v",count,err)}
+		// Keep later subtests isolated: a pending queue can be globally claimed.
+		if _,err:=admin.Exec(ctx,`UPDATE mamony_identity.email_proof_deliveries
+			SET status='DEAD' WHERE challenge_id=$1`,issue.ChallengeID);err!=nil{t.Fatal(err)}
 	})
 
 	t.Run("lease fences concurrent workers and retries",func(t *testing.T){
@@ -183,4 +185,3 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 // Delivery unit tests assert encryption and provider error redaction separately.
 // This test intentionally uses synthetic sealed blobs to validate SQL state,
 // not as evidence of a production AEAD key or provider integration.
-var _=errors.Is
