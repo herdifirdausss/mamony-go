@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
-	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/credential"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	platformpg "github.com/herdifirdausss/mamony-go/internal/platform/postgres"
 	"github.com/jackc/pgx/v5"
@@ -148,12 +147,9 @@ func TestIdentityRegistrationPersistence(t *testing.T) {
 		}
 	})
 
-	t.Run("usecase plus real Argon2id creates pending only", func(t *testing.T) {
-		hasher, err := credential.NewPasswordHasher(1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Synthetic fixture only; not an acceptable production blocklist.
+	t.Run("usecase plus limited store creates pending only", func(t *testing.T) {
+		hasher := syntheticHasher{}
+		// Synthetic fixture and fake verifier only; real Argon2id is tested in the credential adapter.
 		enrollment, err := usecase.NewRegistration(store, hasher,
 			domain.PasswordPolicy{IsBlocked: func(string, string) bool { return false }})
 		if err != nil {
@@ -213,7 +209,7 @@ func randomID(t *testing.T, prefix string) string {
 
 func syntheticEmail(t *testing.T) string {
 	t.Helper()
-	return fmt.Sprintf("%s@example.test", randomID(t, "user_"))
+	return fmt.Sprintf("%s@example.test", strings.ToLower(randomID(t, "user_")))
 }
 
 func syntheticPending(t *testing.T, email string) usecase.PendingRegistration {
@@ -242,4 +238,13 @@ func expectSubjectCount(t *testing.T, ctx context.Context, admin *pgx.Conn, subj
 		"SELECT count(*) FROM mamony_identity.subjects WHERE subject_id=$1", subject).Scan(&got); err != nil || got != want {
 		t.Fatalf("subject rollback mismatch: got=%d want=%d err=%v", got, want, err)
 	}
+}
+
+type syntheticHasher struct{}
+
+func (syntheticHasher) Hash(_ context.Context, _ string) (domain.PasswordVerifier, error) {
+	return domain.PasswordVerifier{
+		Version: 1, MemoryKiB: 65536, Iterations: 3, Parallelism: 1,
+		Salt: []byte("synthetic-salt01"), Digest: bytes.Repeat([]byte{0x5a}, 32),
+	}, nil
 }

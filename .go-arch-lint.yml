@@ -66,5 +66,6 @@ deps:
     mayDependOn:
       - identity_domain
       - identity_usecase
+      - platform
     canUse:
       - pgx
