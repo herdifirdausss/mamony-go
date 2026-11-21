@@ -31,7 +31,7 @@ A capability can omit an adapter or use feature-specific folders beneath an exis
 | app | Construct dependencies, register routes and lifecycle | Own business invariants or reach into nested capability internals |
 | platform | Reusable transport/config/storage mechanics with explicit boundaries | Import capabilities or make business authorization decisions |
 
-`tools/archcheck` enforces cross-capability, layer and selected forbidden **production** imports. Test-only imports can use integration fixtures. Static rules do not yet prove all of the business obligations above; reviewers must trace the actual data flow.
+`tools/archcheck` enforces known capability-layer package roots (feature subpackages must sit within a known layer), cross-capability boundaries, and selected forbidden **production** imports. Test-only imports can use integration fixtures. Static rules do not yet prove all of the business obligations above; reviewers must trace the actual data flow.
 
 ## Go style and deterministic behavior
 
