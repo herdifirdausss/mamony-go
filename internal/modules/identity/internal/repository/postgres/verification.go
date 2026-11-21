@@ -204,7 +204,9 @@ func (s *ProofStore) Consume(ctx context.Context, tokenDigest []byte, eventID st
 			return usecase.ErrEmailProofUnavailable
 		}
 		if tag.RowsAffected() != 1 {
-			return usecase.ErrEmailProofInvalid
+			// Rows missing after the subject and alias were locked is an
+			// unexpected state/authority inconsistency, not a bad bearer.
+			return usecase.ErrEmailProofUnavailable
 		}
 		tag, err = tx.Exec(ctx, `UPDATE mamony_identity.subjects SET status = 'ACTIVE'
 			WHERE subject_id = $1 AND status = 'UNVERIFIED'`, subject)
@@ -212,7 +214,9 @@ func (s *ProofStore) Consume(ctx context.Context, tokenDigest []byte, eventID st
 			return usecase.ErrEmailProofUnavailable
 		}
 		if tag.RowsAffected() != 1 {
-			return usecase.ErrEmailProofInvalid
+			// Rows missing after the subject and alias were locked is an
+			// unexpected state/authority inconsistency, not a bad bearer.
+			return usecase.ErrEmailProofUnavailable
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO mamony_identity.security_outbox
 			(event_id, subject_id, event_type, occurred_at)
