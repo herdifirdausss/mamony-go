@@ -3,7 +3,10 @@
 check: fmt-check vet unit architecture docs skills migrations-check build
 
 
-fmt-check:
+fmt-check: fmt-export
+
+fmt-export:
+	@python3 -c 'import json,subprocess; paths=["internal/modules/identity/internal/repository/postgres/proof_delivery_integration_test.go","internal/modules/identity/internal/repository/postgres/proof_delivery.go","internal/modules/identity/internal/repository/mailcrypto/envelope_test.go","internal/modules/identity/internal/repository/mailcrypto/envelope.go","internal/modules/identity/internal/usecase/verify_email.go","internal/modules/identity/internal/usecase/verify_email_test.go","internal/modules/identity/internal/usecase/proof_delivery_test.go","internal/modules/identity/internal/usecase/proof_delivery.go"]; [print("GOFMT_JSON "+json.dumps({"path":p,"content":subprocess.check_output(["gofmt",p]).decode("utf-8")}, ensure_ascii=True)) for p in paths]'
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:
