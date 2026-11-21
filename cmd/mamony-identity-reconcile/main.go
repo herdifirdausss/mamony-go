@@ -60,7 +60,7 @@ func main() {
 	defer cancel()
 	report, err := execute(ctx, cfg, commandDeps{
 		inspect: identity.InspectEnrollmentBacklog,
-		repair: identity.ReconcileEnrollmentOnce,
+		repair:  identity.ReconcileEnrollmentOnce,
 	})
 	if err != nil {
 		// Do not log underlying DB/provider/crypto or filesystem errors.
