@@ -11,36 +11,36 @@ import (
 )
 
 var (
-	ErrKDFUnavailable = errors.New("password processing unavailable")
+	ErrKDFUnavailable  = errors.New("password processing unavailable")
 	ErrVerifierInvalid = errors.New("stored password verifier is not supported")
 )
 
 // Parameters are a versioned allowlist, not attacker-provided KDF settings.
 // v1 is a benchmark candidate; capacity approval is still required.
 const (
-	passwordVersion uint16 = 1
-	passwordMemoryKiB uint32 = 64 * 1024
-	passwordIterations uint32 = 3
-	passwordParallelism uint8 = 1
-	passwordSaltBytes = 16
-	passwordHashBytes = 32
+	passwordVersion     uint16 = 1
+	passwordMemoryKiB   uint32 = 64 * 1024
+	passwordIterations  uint32 = 3
+	passwordParallelism uint8  = 1
+	passwordSaltBytes          = 16
+	passwordHashBytes          = 32
 )
 
 // PasswordVerifier holds no plaintext password or reversible secret. Its
 // exported fields are persistence data, NOT a trusted request contract.
 type PasswordVerifier struct {
-	Version uint16
-	MemoryKiB uint32
-	Iterations uint32
+	Version     uint16
+	MemoryKiB   uint32
+	Iterations  uint32
 	Parallelism uint8
-	Salt []byte
-	Digest []byte
+	Salt        []byte
+	Digest      []byte
 }
 
 // PasswordHasher bounds concurrent memory-hard operations. The admission
 // budget must be measured at the actual deployment size before any public use.
 type PasswordHasher struct {
-	slots chan struct{}
+	slots  chan struct{}
 	random io.Reader
 }
 
@@ -76,7 +76,7 @@ func (h *PasswordHasher) Hash(ctx context.Context, normalized string) (PasswordV
 	if err := h.acquire(ctx); err != nil {
 		return PasswordVerifier{}, err
 	}
-	defer func(){ <-h.slots }()
+	defer func() { <-h.slots }()
 	salt := make([]byte, passwordSaltBytes)
 	if _, err := io.ReadFull(h.random, salt); err != nil {
 		return PasswordVerifier{}, ErrKDFUnavailable
@@ -98,7 +98,7 @@ func (h *PasswordHasher) Verify(ctx context.Context, password string, stored Pas
 	if err := h.acquire(ctx); err != nil {
 		return false, err
 	}
-	defer func(){ <-h.slots }()
+	defer func() { <-h.slots }()
 	got := argon2.IDKey([]byte(normalized), stored.Salt, stored.Iterations, stored.MemoryKiB, stored.Parallelism, passwordHashBytes)
 	return subtle.ConstantTimeCompare(got, stored.Digest) == 1, nil
 }

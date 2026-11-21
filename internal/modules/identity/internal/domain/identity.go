@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrInvalidEmail = errors.New("invalid enrollment email")
+	ErrInvalidEmail    = errors.New("invalid enrollment email")
 	ErrInvalidPassword = errors.New("password does not satisfy enrollment policy")
 )
 

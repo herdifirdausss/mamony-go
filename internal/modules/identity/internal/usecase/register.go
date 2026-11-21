@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ErrAliasAlreadyReserved = errors.New("identity alias already reserved")
+	ErrAliasAlreadyReserved    = errors.New("identity alias already reserved")
 	ErrRegistrationUnavailable = errors.New("registration unavailable")
 )
 
@@ -21,12 +21,12 @@ var (
 // with a durable identifier-only audit/outbox obligation. No public route,
 // identity activation, email proof or login exists in this slice.
 type PendingRegistration struct {
-	SubjectID string
-	CanonicalEmail string
-	Status string
+	SubjectID        string
+	CanonicalEmail   string
+	Status           string
 	PasswordVerifier domain.PasswordVerifier
-	EventID string
-	CreatedAt time.Time
+	EventID          string
+	CreatedAt        time.Time
 }
 
 type RegistrationStore interface {
@@ -34,11 +34,11 @@ type RegistrationStore interface {
 }
 
 type Registration struct {
-	store RegistrationStore
+	store  RegistrationStore
 	hasher *domain.PasswordHasher
 	policy domain.PasswordPolicy
 	random io.Reader
-	clock func() time.Time
+	clock  func() time.Time
 }
 
 func NewRegistration(store RegistrationStore, hasher *domain.PasswordHasher, policy domain.PasswordPolicy) (*Registration, error) {
@@ -83,8 +83,8 @@ func (s *Registration) RegisterPending(ctx context.Context, email, password stri
 		return err
 	}
 	err = s.store.CreatePendingWithObligation(ctx, PendingRegistration{
-		SubjectID: subject, CanonicalEmail: alias, Status:"UNVERIFIED",
-		PasswordVerifier: verifier, EventID:event, CreatedAt:s.clock().UTC(),
+		SubjectID: subject, CanonicalEmail: alias, Status: "UNVERIFIED",
+		PasswordVerifier: verifier, EventID: event, CreatedAt: s.clock().UTC(),
 	})
 	// The caller must use a generic public response when this is eventually
 	// exposed. A duplicate is indistinguishable at the usecase-result layer;
