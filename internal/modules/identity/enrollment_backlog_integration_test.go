@@ -91,7 +91,7 @@ func TestIdentityZEnrollmentBacklogDB(t *testing.T) {
 		return subject
 	}
 	eligible := newPending(time.Now().UTC().Add(-5 * time.Minute))
-	_ = newPending(time.Now().UTC()) // not yet old enough for reconciliation
+	_ = newPending(time.Now().UTC())                      // not yet old enough for reconciliation
 	_ = newPending(time.Now().UTC().Add(-26 * time.Hour)) // stale: manual intervention
 	observed, err := InspectEnrollmentBacklog(ctx, verifyDSN)
 	if err != nil {
