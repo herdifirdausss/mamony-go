@@ -35,7 +35,7 @@ func (s *DeliveryStore) Claim(ctx context.Context, leaseID string) (usecase.Proo
 			JOIN mamony_identity.email_verification_challenges c USING (challenge_id)
 			JOIN mamony_identity.subjects s ON s.subject_id = c.subject_id
 			JOIN mamony_identity.email_aliases a ON a.subject_id = c.subject_id
-			WHERE d.status='PENDING' AND d.attempts < 5
+			WHERE d.status='PENDING' AND d.sealed_token IS NOT NULL AND d.attempts < 5
 			  AND d.next_attempt_at <= clock_timestamp()
 			  AND (d.leased_until IS NULL OR d.leased_until < clock_timestamp())
 			  AND c.consumed_at IS NULL AND c.revoked_at IS NULL
