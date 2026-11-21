@@ -35,7 +35,10 @@ func TestIdentityRetentionPurge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = admin.Close(context.Background()) }()
+	// Register close before test-fixture cleanup. t.Cleanup runs callbacks
+	// in LIFO order, so the synthetic pending jobs are marked DEAD while
+	// this admin connection is still open.
+	t.Cleanup(func() { _ = admin.Close(context.Background()) })
 	open := func(dsn, role string) *platformpg.Pool {
 		p, err := platformpg.Open(ctx, platformpg.Config{
 			DSN: dsn, RuntimeRole: role, MaxConns: 4,
