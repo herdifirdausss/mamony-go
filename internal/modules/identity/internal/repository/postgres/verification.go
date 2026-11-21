@@ -71,6 +71,21 @@ func (s *ProofStore) Issue(ctx context.Context, r usecase.EmailProofRequest) (us
 		if status != "UNVERIFIED" || verifiedAt != nil || dest.ContactVersion != 1 {
 			return usecase.ErrEmailProofIneligible
 		}
+		// Reconciliation must never rotate an existing proof, even when a
+		// concurrent issuer committed after its advisory candidate scan.
+		// This check shares the subject/alias lock with ordinary issuance.
+		if r.OnlyIfFirst {
+			var hadProof bool
+			if err := tx.QueryRow(ctx, `SELECT EXISTS (
+				SELECT 1 FROM mamony_identity.email_verification_challenges
+				WHERE subject_id=$1 AND purpose='EMAIL_VERIFY'
+			)`, r.SubjectID).Scan(&hadProof); err != nil {
+				return err
+			}
+			if hadProof {
+				return usecase.ErrEmailProofThrottled
+			}
+		}
 		// The subject and alias row locks above serialize concurrent reissues
 		// BEFORE the budget read. Count all historical attempts, including
 		// revoked/expired challenges, using a single DB clock sample. A denied
