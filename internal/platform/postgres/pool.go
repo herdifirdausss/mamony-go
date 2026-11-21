@@ -50,8 +50,10 @@ func Open(ctx context.Context, cfg Config) (*Pool, error) {
 	u, _ := url.Parse(cfg.DSN) // Validated by validate above.
 	port, _ := strconv.Atoi(u.Port())
 	password, _ := u.User.Password()
+	if int(poolCfg.ConnConfig.Port) != port {
+		return nil, errors.New("runtime PostgreSQL port does not match validated URL")
+	}
 	poolCfg.ConnConfig.Host = u.Hostname()
-	poolCfg.ConnConfig.Port = uint16(port)
 	poolCfg.ConnConfig.User = u.User.Username()
 	poolCfg.ConnConfig.Password = password
 	poolCfg.ConnConfig.Database = strings.TrimPrefix(u.Path, "/")
