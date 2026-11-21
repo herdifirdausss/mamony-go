@@ -9,7 +9,7 @@ import (
 var (
 	// ErrPasswordLoginThrottled is an INTERNAL budget result, not a public
 	// account-specific HTTP error. No login HTTP route is mounted.
-	ErrPasswordLoginThrottled = errors.New("password login admission exhausted")
+	ErrPasswordLoginThrottled   = errors.New("password login admission exhausted")
 	ErrPasswordLoginUnavailable = errors.New("password login unavailable")
 )
 
