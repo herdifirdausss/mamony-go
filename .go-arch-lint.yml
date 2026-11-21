@@ -52,6 +52,7 @@ deps:
   identity_facade:
     mayDependOn:
       - identity_handler
+      - identity_domain
       - identity_usecase
       - identity_mailcrypto
       - identity_mailgun
