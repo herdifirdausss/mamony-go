@@ -86,6 +86,7 @@ func TestMailWorkerRejectsUnsafeSecretFileAndDisposableDBForLiveMode(t *testing.
 			env["MAMONY_IDENTITY_MAILGUN_KEY_FILE"] = "secret.txt"
 		}},
 		{"world-readable file", func(t *testing.T, env map[string]string) {
+			// #nosec G302 -- negative fixture deliberately makes a secret world-readable; startup must reject it.
 			if err := os.Chmod(env["MAMONY_IDENTITY_MAILGUN_KEY_FILE"], 0644); err != nil {
 				t.Fatal(err)
 			}

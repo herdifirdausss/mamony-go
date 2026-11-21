@@ -128,7 +128,14 @@ func readPrivateFile(path string, limit int64) ([]byte, error) {
 		before.Mode().Perm()&0077 != 0 || before.Mode().Perm()&0400 == 0 {
 		return nil, errStartup
 	}
-	f, err := os.Open(path)
+	// os.Root confines file opens to the selected directory. Combined with
+	// Lstat + SameFile this refuses symlinks and unexpected path replacement.
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return nil, errStartup
+	}
+	defer func() { _ = root.Close() }()
+	f, err := root.Open(filepath.Base(path))
 	if err != nil {
 		return nil, errStartup
 	}
