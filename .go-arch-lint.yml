@@ -16,11 +16,23 @@ vendors:
     in:
       - github.com/golang-migrate/migrate/v4
       - github.com/golang-migrate/migrate/v4/**
+  identity_argon2:
+    in:
+      - golang.org/x/crypto/argon2
+  identity_unicode:
+    in:
+      - golang.org/x/text/unicode/norm
 components:
   app:
     in: app/**
   platform:
     in: platform/**
+  identity_domain:
+    in: modules/identity/internal/domain/**
+  identity_usecase:
+    in: modules/identity/internal/usecase/**
+  identity_credential:
+    in: modules/identity/internal/repository/credential/**
 deps:
   app:
     mayDependOn:
@@ -33,3 +45,18 @@ deps:
     canUse:
       - pgx
       - migrate
+  # Identity keeps domain pure, usecase port-owned and crypto in one adapter.
+  # tools/archcheck additionally blocks cross-capability and forbidden imports.
+  identity_domain:
+    mayDependOn:
+      - identity_domain
+    canUse:
+      - identity_unicode
+  identity_usecase:
+    mayDependOn:
+      - identity_domain
+  identity_credential:
+    mayDependOn:
+      - identity_domain
+    canUse:
+      - identity_argon2
