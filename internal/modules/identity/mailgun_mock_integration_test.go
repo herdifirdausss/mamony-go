@@ -248,4 +248,81 @@ func TestIdentityMailgunMockPipeline(t *testing.T) {
 		WHERE subject_id=$1`, subject).Scan(&active); err != nil || active != "ACTIVE" {
 		t.Fatal("mocked email challenge could not activate persisted subject")
 	}
+
+	// Now exercise the newly executable facade/runner (rather than only
+	// constructing the usecase worker directly) against the same isolated
+	// PostgreSQL database and the same local Mailgun HTTP mock.
+	subject2 := randomSyntheticID(t, "sub_")
+	email2 := strings.ToLower(randomSyntheticID(t, "test_")) + "@example.test"
+	pending2 := pending
+	pending2.SubjectID = subject2
+	pending2.EventID = randomSyntheticID(t, "evt_")
+	pending2.CanonicalEmail = email2
+	pending2.CreatedAt = time.Now().UTC()
+	if err := reg.CreatePendingWithObligation(ctx, pending2); err != nil {
+		t.Fatal(err)
+	}
+	prepared2, err := issuer.Prepare(ctx, subject2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, secret2 := prepared2.ForTrustedDelivery()
+	// No previous request is in flight; only the next local test server
+	// request can observe these values.
+	email, secret = email2, secret2
+	responseCode.Store(200)
+
+	runCtx, stopRun := context.WithCancel(ctx)
+	runDone := make(chan error, 1)
+	go func() {
+		runDone <- RunDelivery(runCtx, DeliveryConfig{
+			DSN: deliveryDSN, Region: "US", Domain: "mg.example.test",
+			From: "Mamony Security <security@mg.example.test>",
+			VerificationURL: "https://app.example.test/verify-email",
+			MailgunKey: "test-mailgun-domain-key",
+			ActiveKeyID: "fixture-key",
+			EnvelopeKeys: map[string][]byte{"fixture-key": bytes.Repeat([]byte{0x83}, 32)},
+			PollInterval: 100 * time.Millisecond,
+			HTTPClient: &http.Client{
+				Timeout: 2 * time.Second,
+				Transport: mockMailgunTransport{origin: mockURL},
+			},
+		})
+	}()
+	defer stopRun()
+
+	// Poll only the authoritative DB state; the worker never reports token,
+	// recipient or provider response details via its process interface.
+	deadline := time.Now().Add(5 * time.Second)
+	var runStatus string
+	for {
+		if err := admin.QueryRow(ctx, `SELECT d.status FROM mamony_identity.email_proof_deliveries d
+			JOIN mamony_identity.email_verification_challenges c USING(challenge_id)
+			WHERE c.subject_id=$1`, subject2).Scan(&runStatus); err != nil {
+			t.Fatal(err)
+		}
+		if runStatus == "ACCEPTED" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("facade runner did not accept a local mock message: %s", runStatus)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	stopRun()
+	select {
+	case err := <-runDone:
+		if err != nil {
+			t.Fatalf("facade runner stopped with error: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("facade runner did not stop after cancellation")
+	}
+	if err := issuer.Confirm(ctx, secret2); err != nil {
+		t.Fatal(err)
+	}
+	if err := admin.QueryRow(ctx, `SELECT status FROM mamony_identity.subjects
+		WHERE subject_id=$1`, subject2).Scan(&active); err != nil || active != "ACTIVE" {
+		t.Fatal("facade worker delivery did not permit single-use activation")
+	}
 }
