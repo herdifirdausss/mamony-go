@@ -69,7 +69,12 @@ func RunDelivery(ctx context.Context, cfg DeliveryConfig) error {
 	if err != nil {
 		return ErrDeliveryRuntime
 	}
-	worker, err := usecase.NewProofDeliveryWorker(store, ring, sender)
+	// Adapt concrete storage/crypto/provider implementations to the ports
+	// explicitly before crossing the business usecase boundary.
+	var storePort usecase.ProofDeliveryStore = store
+	var openerPort usecase.ProofEnvelopeOpener = ring
+	var senderPort usecase.EmailSender = sender
+	worker, err := usecase.NewProofDeliveryWorker(storePort, openerPort, senderPort)
 	if err != nil {
 		return ErrDeliveryRuntime
 	}

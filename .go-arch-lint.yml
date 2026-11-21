@@ -47,12 +47,7 @@ components:
   identity_postgres:
     in: modules/identity/internal/repository/postgres/**
 deps:
-  # This is the single explicitly reviewed dependency injection composition
-  # root. Global deep scanning remains ON for all capability implementation
-  # layers; disabling only the composition root prevents false reverse-flow
-  # adapter -> usecase dependencies when injecting a concrete into a port.
   identity_facade:
-    deepScan: false
     mayDependOn:
       - identity_usecase
       - identity_mailcrypto
