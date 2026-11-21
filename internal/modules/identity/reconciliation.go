@@ -62,7 +62,7 @@ func ReconcileEnrollmentOnce(ctx context.Context, cfg EnrollmentReconciliationCo
 		return empty, ErrEnrollmentReconciliation
 	}
 	var finderPort usecase.UnissuedEnrollmentFinder = proofs
-	var issuerPort usecase.EnrollmentProofIssuer = issuer
+	var issuerPort usecase.EnrollmentFirstIssuer = issuer
 	reconciler, err := usecase.NewEnrollmentReconciler(finderPort, issuerPort)
 	if err != nil {
 		return empty, ErrEnrollmentReconciliation
