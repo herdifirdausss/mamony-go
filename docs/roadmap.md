@@ -19,7 +19,7 @@ Use the [security verification matrix](engineering.md#security-verification) and
 
 | Order | Contract | Prerequisites and outcome |
 |---:|---|---|
-| 1 | [Platform foundation](contracts/platform.md) | Synthetic PostgreSQL role/RLS fixture is verified; [DEC-01 runtime and migrations](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) remain proposed. Implement and verify real migrations, configuration, audit, and event relay before the ledger. |
+| 1 | [Platform foundation](contracts/platform.md) | Synthetic PostgreSQL role/RLS fixture is verified; [DEC-01 database design](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) was accepted on 2026-11-21. Real migration and platform runtime integration still require independent verification. Implement and verify real migrations, configuration, audit, and event relay before the ledger. |
 | 2 | [Ledger](contracts/ledger.md) | Use PostgreSQL to prove durable posting, replay, reversal, delivery, and restore. |
 
 Pass the ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).

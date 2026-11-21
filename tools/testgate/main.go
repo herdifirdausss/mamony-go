@@ -21,6 +21,7 @@ var requiredTests = []string{
 	"TestPostgresRoleSeparation",
 	"TestPostgresTenantIsolation",
 	"TestPostgresTenantContext",
+	"TestPostgresPlatformMigration",
 }
 
 type testEvent struct {
@@ -40,16 +41,28 @@ func main() {
 func run() error {
 	runtimeDSN := os.Getenv("TEST_DATABASE_URL")
 	adminDSN := os.Getenv("TEST_DATABASE_ADMIN_URL")
+	platformMigratorDSN := os.Getenv("TEST_PLATFORM_MIGRATION_URL")
+	platformRuntimeDSN := os.Getenv("TEST_PLATFORM_RUNTIME_URL")
 	if err := validateDSN(runtimeDSN, "mamony_test_runtime"); err != nil {
 		return fmt.Errorf("runtime fixture: %w", err)
 	}
 	if err := validateDSN(adminDSN, "mamony_test_admin"); err != nil {
 		return fmt.Errorf("admin fixture: %w", err)
 	}
+	if err := validateDSN(platformMigratorDSN, "mamony_platform_migrator"); err != nil {
+		return fmt.Errorf("platform migrator fixture: %w", err)
+	}
+	if err := validateDSN(platformRuntimeDSN, "mamony_platform_runtime"); err != nil {
+		return fmt.Errorf("platform runtime fixture: %w", err)
+	}
 	runtimeURL, _ := url.Parse(runtimeDSN)
 	adminURL, _ := url.Parse(adminDSN)
-	if runtimeURL.Path != adminURL.Path || runtimeURL.Port() != adminURL.Port() || runtimeURL.Hostname() != adminURL.Hostname() {
-		return errors.New("runtime and admin must target the same isolated test database")
+	migratorURL, _ := url.Parse(platformMigratorDSN)
+	platformRuntimeURL, _ := url.Parse(platformRuntimeDSN)
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL} {
+		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
+			return errors.New("all test roles must target the same isolated test database")
+		}
 	}
 	if _, err := exec.LookPath("psql"); err != nil {
 		return errors.New("NOT RUN: PostgreSQL client psql is missing")

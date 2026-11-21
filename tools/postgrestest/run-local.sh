@@ -36,5 +36,7 @@ done
 
 export TEST_DATABASE_ADMIN_URL="postgres://mamony_test_admin:local-test-admin@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_DATABASE_URL="postgres://mamony_test_runtime:local-test-runtime@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_PLATFORM_MIGRATION_URL="postgres://mamony_platform_migrator:local-test-platform-migrator@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_PLATFORM_RUNTIME_URL="postgres://mamony_platform_runtime:local-test-platform-runtime@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 
 make integration

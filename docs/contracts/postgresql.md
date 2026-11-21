@@ -1,6 +1,6 @@
 # PostgreSQL contract
 
-**Implementation status:** Production PostgreSQL integration is pending. The bootstrap runs without a database. A separate [synthetic PostgreSQL test harness](../proposals/postgresql-foundation.md) exercises disposable owner/runtime roles and RLS primitives; it is **not** a migration implementation, application connection, or proof that the rest of this contract passes.
+**Implementation status:** DEC-01 architecture accepted; the application binary still runs without a database. Platform migration tooling is under implementation and requires actual CI evidence. Full production schema/ledger/recovery remains pending. A separate [synthetic PostgreSQL test harness](../proposals/postgresql-foundation.md) exercises disposable owner/runtime roles and RLS primitives; it is **not** a migration implementation, application connection, or proof that the rest of this contract passes.
 
 ## Schemas and roles
 

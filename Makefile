@@ -1,6 +1,6 @@
-.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration integration-local
+.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration integration-local migrations-check migrate-platform
 
-check: fmt-check vet unit architecture docs skills build
+check: fmt-check vet unit architecture docs skills migrations-check build
 
 fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
@@ -68,3 +68,12 @@ security:
 
 run:
 	go run ./cmd/mamony
+
+# Static verification of committed SQL migration trailers (no DB required).
+migrations-check:
+	go test -count=1 -run TestRepositoryMigrationFiles ./internal/platform/migration
+
+# Production migrations run separately from the HTTP process with dedicated role.
+# MAMONY_MIGRATION_DSN must come from a provisioned migration secret source.
+migrate-platform:
+	go run ./cmd/mamony-migrate

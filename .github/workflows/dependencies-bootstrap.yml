@@ -1,0 +1,30 @@
+# Temporary CI helper: removed after go.mod and go.sum are committed.
+name: Dependency checksum bootstrap
+on:
+  pull_request:
+    paths:
+      - go.mod
+      - internal/platform/migration/**
+      - cmd/mamony-migrate/**
+      - .github/workflows/dependencies-bootstrap.yml
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: false
+      - run: |
+          go mod tidy
+          echo '===BEGIN_GO_MOD==='
+          cat go.mod
+          echo '===END_GO_MOD==='
+          echo '===BEGIN_GO_SUM==='
+          cat go.sum
+          echo '===END_GO_SUM==='
