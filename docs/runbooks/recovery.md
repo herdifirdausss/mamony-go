@@ -33,3 +33,21 @@ Run these procedures in the synthetic test environment before claiming a gate. R
 2. Check its attempt history, error, and deduplication record.
 3. Resolve the cause. Replay the original event with approval where required.
 4. Check the consumer effect and progress for the aggregate. Check that later events follow in order.
+
+## Recover compromised identity or approval state
+
+1. Declare the attacker scope: application runtime, tenant/business tables, authoritative identity data, session store, keys, approval state, migration/deploy administration and backups. Record which independent authorities, if any, are still trusted.
+2. Restrict affected authentication and financial actions using the owning authority. Do not report a freeze complete until the required deny state and propagation barrier are acknowledged.
+3. Revoke compromised credentials and sessions, pause risky recovery and key actions, and preserve audit evidence outside the suspect writer's permissions where possible.
+4. Verify trusted subject-to-credential and account-owner bindings. A row signature or a restored snapshot alone does not prove latest authorized state when its current-head authority was compromised.
+5. Restore into an isolated environment. Compare credential generations, revoked sessions, consumed approvals, financial ownership, outbox/notice obligations and ledger journals against surviving trusted evidence. If independent evidence is unavailable, treat the result as an unresolved security hold.
+6. Resume only after authorization negative tests, reconciliation and independent review of the scope and residual risk. Record measured recovery time, lost evidence and affected references.
+
+This procedure has **not** been exercised in the HTTP bootstrap. The initial Profile A cannot claim containment of an arbitrary write to its own authoritative database.
+
+## Recover a suppressed mandatory security notice
+
+1. Find the original committed security command and its durable notification obligation, if the feature exists.
+2. Compare the destination/policy generation and event ID against the owning authority, not against mutable marketing preferences.
+3. Determine whether the failure is an unsent obligation, provider acknowledgement, or unconfirmed user receipt; do not treat these as equivalent.
+4. Replay with the original event identity and bounded retries. Audit the repair and the verified dispatch result without duplicating the logical obligation.

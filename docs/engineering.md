@@ -29,6 +29,38 @@
 
 GitHub Actions runs these checks with pinned tools. Use the [workflow definitions](../.github/workflows/) to see the exact commands. Use real PostgreSQL and multiple connections for ledger concurrency, role, transaction, and restore evidence. Report `PASS`, `FAIL`, or `NOT RUN` for each relevant check.
 
+## Security verification
+
+Define **attacker capability, surviving trust root, enforcement owner, negative test, and residual risk** for any change to authentication, authorization, money, provider trust, secrets, deployment or recovery. The [authority map](architecture.md#security-authority-and-trust-boundaries) is the starting point; requirements remain in the owning capability's contract. A control that shares the compromised authority does not independently withstand that compromise.
+
+| Gate | Existing requirement and security failure to prove | Test evidence when implemented |
+|---|---|---|
+| HTTP / platform | [Public HTTP](adr/0003-public-http-contract.md#input-admission-and-browser-boundary), `FND-09`–`FND-11`: private route exposure, malformed/duplicate/oversized input, spoofed proxy identity and secret leakage | Public/private route tests, strict parser fixtures, deployed ingress test, CI/secret privilege review |
+| Identity | `IAM-01`, `IAM-06`, `IAM-08`–`IAM-13`: BOLA, cross-tenant write, stale/revoked session, recovery downgrade, altered or reused action approval | Table-driven subject/action/resource cases; browser/challenge clock tests; real tenant-role DB tests |
+| PostgreSQL | [Tenant isolation](contracts/postgresql.md#tenant-isolation): privileged bypass, missing tenant context, pooled connection reuse and security-definer escape | Real PostgreSQL with the migration, runtime and job roles; negative read/insert/update/delete |
+| Ledger / payments | `LGR-01`–`LGR-03`, `LGR-12`, `PAY-05`, `OUT-05`: unauthorized posting, duplicate journal, changed intent, balance-floor race and uncertain commit | Multi-connection PostgreSQL barriers, crash/replay, one-time approval and recovery tests |
+| Provider / merchant delivery | `PRV-05`–`PRV-08`, `DVL-05`: forged message, replay, unknown dispatch, SSRF and redirect/DNS bypass | Provider-specific signed raw-message fixtures, egress and connect-time DNS tests, inquiry/reconciliation |
+| Security operations | `FND-12`, `IAM-13`, `OPS-02`: missing durable audit/notice, malicious suppression and stale restore | Atomic outbox, isolated worker failure, privilege tests, restore with revoked session and consumed approval |
+
+Mark each check `PASS` with an executed command, commit and evidence; `FAIL` with its error; `NOT RUN` when unimplemented or untested; and `N/A-disabled` only when the feature and all applicable routes are verifiably disabled. A scanner PASS **never** substitutes for the behavior tests. If the selected threat model does not survive an arbitrary authority-database writer or compromised deployer, declare that residual risk rather than claiming it is prevented by signatures or encryption.
+
+### Public security references and applicability
+
+Use current, official references to choose feature-specific controls; verify a version when implementing the feature. This table is guidance, not an assertion that Mamony is compliant or that a standard mandates every optional mechanism.
+
+| Source | Use and limit |
+|---|---|
+| [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS) | Verification catalog. Map applicable requirements and test cases per released feature, not as a blanket compliance label. |
+| [OWASP API Security Top 10 (2023)](https://owasp.org/API-Security/) and [Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) | Object/function/field authorization, resource abuse and deny-by-default. |
+| [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html) | Authentication and authenticator lifecycle; explicitly distinguish the chosen assurance profile from a formal conformance claim. |
+| [OWASP Password Storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) and [Transaction Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html) | Password KDF, session lifecycle and exact-intent approval; values need testing under the chosen environment. |
+| [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700.html) | OAuth 2.0 security when OAuth/OIDC is actually enabled; do not create a custom protocol for the bootstrap. |
+| [PostgreSQL row security](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) | RLS, owner/role bypass semantics and FORCE RLS; verify behavior on the actual selected PostgreSQL version. |
+| [Go security](https://go.dev/doc/security/best-practices) and [Go fuzzing](https://go.dev/doc/security/fuzz/) | Standard Go code and fuzz-testing practices for new parsers and trust boundaries. |
+| [GitHub Actions security](https://docs.github.com/en/actions/reference/security/secure-use) | Workflow token permissions, untrusted PR inputs, pinned dependencies and release provenance where relevant. |
+
+Use patterns from other implementations only as hypotheses. Do not copy another company's private source, credentials, configuration, URLs or security architecture into Mamony Go. Keep project acceptance criteria and rationale self-contained in the local contracts above.
+
 ## Security and agent use
 
 Use the [HTTP decision](adr/0003-public-http-contract.md) for route permissions and the [PostgreSQL contract](contracts/postgresql.md) for database access. Check unauthorized access and tenant isolation in the affected flows. Keep the private listener on loopback in the bootstrap. Use test data and never commit credentials.

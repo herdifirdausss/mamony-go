@@ -23,6 +23,10 @@ Define the dispute event and evidence-submission port in [the provider connector
 
 **DVL-01.** Test delayed and duplicate delivery, key rotation, a disallowed destination, and an endpoint that fails. Verify tenant isolation of delivery records.
 
+**DVL-05.** Merchant webhook destinations are untrusted configuration, not privileged network destinations. Enforce HTTPS and a documented destination policy at URL validation, DNS resolution and connection time; forbid metadata, internal and other disallowed IP ranges, schemes and ports. Do not follow an unchecked redirect. Bound attempts, timeouts, payload size and endpoint-secret access. Sign each event using the selected versioned delivery contract and rotate keys with an explicit overlap.
+
+**Acceptance:** Reject loopback/private/metadata destinations, DNS rebinding, unsafe redirects, changed host/port after validation and a revoked endpoint key. Exercise duplicate/retried delivery, endpoint refusal and a compromised tenant attempting to reach another tenant's delivery records. Use network egress restrictions as an additional boundary where the deployment supports them.
+
 ## Developer sandbox
 
 | ID | Requirement | Acceptance check |
