@@ -4,11 +4,9 @@ Use the local [architecture decision index](adr/README.md) for baseline requirem
 
 ## Foundation and access
 
-The [PostgreSQL foundation proposal](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) now contains a **reviewable DEC-01 recommendation** and explicit options. The synthetic role/RLS fixture is verified, but **DEC-01 remains OPEN**: production PostgreSQL version/image digest, Go minimum, `pgx` driver, SQL migration runner, immutable applied migration checks and real runtime grants are **not accepted or implemented**. The next production schema PR is blocked until this design is accepted and its applied-file fingerprint/transaction recovery plan is executable.
-
-| ID | Choice | Decision evidence |
+**DEC-01 ACCEPTED by the repository owner on 2026-11-21:** PostgreSQL 18.7, Go 1.27 (CI toolchain 1.27.4), native pgx v5, and SQL-only golang-migrate v4 with database-committed SHA-256 fingerprint verification and separate owner/migrator/runtime roles. [Research and trade-offs](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) remain available for context. Acceptance of the design is not equivalent to passing migration tests or deploying production credentials; see [migration runbook](runbooks/platform-migrations.md). The release image digest and production secret source must be pinned/verified at deployment.\n\n| ID | Choice | Decision evidence |
 |---|---|---|
-| DEC-01 | Pin the PostgreSQL release, Go driver, migration runner, and role bootstrap. | Clean boot, upgrade, real runtime roles, and restore on the same target. |
+| DEC-01 | **ACCEPTED** — PostgreSQL 18.7, Go 1.27, native pgx v5, golang-migrate v4, applied-file SHA-256 verification and separate credentials. | Verify fresh/upgrade migration, dirty state, runtime grants, and restore; implementation evidence remains separately tracked. |
 | DEC-02 | Choose the Go transaction and locking design for posting. Define which metadata belongs in the replay fingerprint. | Same-key contention, floor race, close and post race, and lost response after commit. |
 | DEC-03 | Choose Go password and factor storage, recovery, credential rotation, and revocation timing. | Threat review and tests for operator second factor, revocation, and recovery. |
 | DEC-04 | Choose a screening matcher and rule version policy. Choose list age and review limits. | Synthetic false-positive and miss fixtures. A missing or stale list always causes hold. |

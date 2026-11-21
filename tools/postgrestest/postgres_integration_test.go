@@ -24,6 +24,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "PostgreSQL fixture setup failed: %v; output: %s\n", err, output)
 		os.Exit(1)
 	}
+	if output, err := invokePSQL("TEST_DATABASE_ADMIN_URL", "-f", filepath.Join("testdata", "platform-bootstrap.sql")); err != nil {
+		fmt.Fprintf(os.Stderr, "Platform fixture setup failed: %v; output: %s\n", err, output)
+		os.Exit(1)
+	}
 	os.Exit(m.Run())
 }
 
@@ -34,6 +38,8 @@ func safeFixture() error {
 	for _, pair := range []struct{ key, user string }{
 		{"TEST_DATABASE_ADMIN_URL", "mamony_test_admin"},
 		{"TEST_DATABASE_URL", "mamony_test_runtime"},
+		{"TEST_PLATFORM_MIGRATION_URL", "mamony_platform_migrator"},
+		{"TEST_PLATFORM_RUNTIME_URL", "mamony_platform_runtime"},
 	} {
 		raw := os.Getenv(pair.key)
 		u, err := url.Parse(raw)

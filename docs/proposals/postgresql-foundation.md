@@ -1,6 +1,6 @@
 # PostgreSQL foundation: research and first verifiable slice
 
-**Status:** Test-only RLS/role harness verified and merged in [PR #15](https://github.com/herdifirdausss/mamony-go/pull/15); production DEC-01 **PROPOSED / NOT ACCEPTED**. Owner/technical acceptance is required before implementing production database choices.  
+**Status:** Test-only RLS/role harness verified and merged in [PR #15](https://github.com/herdifirdausss/mamony-go/pull/15); production DEC-01 **ACCEPTED by the repository owner on 2026-11-21**. Implementation and deployment evidence remain separate. Owner/technical acceptance is required before implementing production database choices.  
 **Initiating issue:** [Issue #14](https://github.com/herdifirdausss/mamony-go/issues/14) (GitHub issue; the text below is self-contained).  
 **Research checked:** 2026-11-21.  
 **Risk path:** Critical.  
@@ -60,7 +60,7 @@ Do not promote this proposal's examples into accepted production contracts witho
 
 ## DEC-01 — Proposed runtime/database implementation decision (G1–G3)
 
-**Status: PROPOSED, not accepted.** Checked against the Mamony Go repository and the linked primary sources on 2026-11-21. This section records one coherent candidate that can be accepted or amended by the owner, rather than introducing unchosen dependencies to production code. It does not supersede [DEC-01](../open-decisions.md) or the [PostgreSQL contract](../contracts/postgresql.md).
+**Status: ACCEPTED by the repository owner on 2026-11-21.** Checked against the Mamony Go repository and the linked primary sources on 2026-11-21. This section records one coherent candidate that can be accepted or amended by the owner, rather than introducing unchosen dependencies to production code. It does not supersede [DEC-01](../open-decisions.md) or the [PostgreSQL contract](../contracts/postgresql.md).
 
 ### Decision matrix: minimum viable financial database foundation
 
@@ -111,7 +111,7 @@ Application composition root
 
 | Slice | Minimum code and tests | Required observed outcome | Status |
 |---|---|---|---|
-| DEC-01 acceptance | Record approved version/tool and exact role/credential model; update `go.mod` minimum in an independent diff | Go/tool/driver compatibility proof, checked primary-source versions, explicit owner acceptance | **PROPOSED** |
+| DEC-01 acceptance | Record approved version/tool and exact role/credential model; align Go minimum | Explicit repository-owner acceptance on 2026-11-21; actual dependency and database behavior still need tests | **ACCEPTED / evidence pending** |
 | 1. Migration foundation | `db/migrations/<schema>/` with SQL-only versioned migrations; separate bootstrap/migration entrypoint and applied-file hash gate | Empty DB, supported upgrade, edited historical SQL rejection, interruption/dirty-state recovery, least-privilege catalog queries | **NOT RUN** |
 | 2. Runtime data adapter | `internal/platform` connection primitive plus an owning module repository wired by `internal/app` | Scoped runtime role, bounded `pgxpool`, no admin credentials, invalid config refusal, cancellation, explicit retryability classification | **NOT RUN** |
 | 3. Tenant adapter verification | One real owned table and owning repository/usecase; no new payments behavior | Real `pgxpool` connection reuse, cross-tenant negative reads/writes, missing identity denial, transaction-local context cleanup | **NOT RUN** |
@@ -128,4 +128,4 @@ A candidate G2 acceptance record must state the *minimum supported Go version*, 
 - Row security, ownership and safe privileged functions: [PostgreSQL 18 RLS](https://www.postgresql.org/docs/18/ddl-rowsecurity.html) and [function execution context](https://www.postgresql.org/docs/18/sql-createfunction.html).
 - **Executed in Mamony Go:** PR #15 validated only the synthetic PostgreSQL role/RLS fixture. It **did not** execute or verify any production choice above.
 
-**Decision requested from repository owner:** approve the proposed PostgreSQL 18 / Go 1.27 / pgx native / golang-migrate + applied-hash approach **as a coherent bundle**, or identify the part requiring modification. Until then, no production migration/driver dependency is approved.
+**Decision recorded:** The repository owner accepted PostgreSQL 18.7 / Go 1.27 / native pgx v5 / golang-migrate v4 + applied-file SHA-256 verification and separate roles on 2026-11-21. This approves the architectural choice; it does **not** declare any production database migration, runtime schema, independent identity authority or restore drill verified. Implement in reviewable slices using the [platform migration runbook](../runbooks/platform-migrations.md) and explicit test evidence.
