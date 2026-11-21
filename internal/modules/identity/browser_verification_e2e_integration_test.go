@@ -249,12 +249,14 @@ func TestIdentityZBrowserVerificationE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 	sender, err := mailgun.NewSender(mailgun.Config{
-		Region: mailgun.RegionUS, Domain: "mg.example.test",
-		From: "Mamony Security <security@mg.example.test>",
-		APIKey: "synthetic-mailgun-key",
+		Region:          mailgun.RegionUS,
+		Domain:          "mg.example.test",
+		From:            "Mamony Security <security@mg.example.test>",
+		APIKey:          "synthetic-mailgun-key",
 		VerificationURL: "https://app.example.test/verify-email",
 	}, &http.Client{
-		Timeout: 3 * time.Second, Transport: mockMailgunTransport{origin: mockURL},
+		Timeout:   3 * time.Second,
+		Transport: mockMailgunTransport{origin: mockURL},
 	})
 	if err != nil {
 		t.Fatal(err)
