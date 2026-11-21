@@ -62,7 +62,8 @@ func TestIdentityZEmailConfirmationHTTPDB(t *testing.T) {
 		t.Cleanup(p.Close)
 		return p
 	}
-	reg, err := identitypg.NewStore(open(regDSN, "mamony_identity_runtime"))
+	regPool := open(regDSN, "mamony_identity_runtime")
+	reg, err := identitypg.NewStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +128,7 @@ func TestIdentityZEmailConfirmationHTTPDB(t *testing.T) {
 		})
 		return subject, bearer
 	}
-	post := func(token string) *httptest.ResponseRecorder {
+	postWith := func(target http.Handler, token string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(http.MethodPost, "https://app.example.test/v1/identity/verify-email",
 			strings.NewReader(`{"token":"`+token+`"}`))
 		r.TLS = &tls.ConnectionState{}
@@ -136,8 +137,11 @@ func TestIdentityZEmailConfirmationHTTPDB(t *testing.T) {
 		r.Header.Set("Sec-Fetch-Site", "same-origin")
 		r.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, r)
+		target.ServeHTTP(w, r)
 		return w
+	}
+	post := func(token string) *httptest.ResponseRecorder {
+		return postWith(h, token)
 	}
 	checkState := func(subject string, expectedStatus string, expectedEvents int) {
 		t.Helper()
@@ -157,6 +161,35 @@ func TestIdentityZEmailConfirmationHTTPDB(t *testing.T) {
 	}
 
 	validSubject, secret := newPending()
+
+	// The registration-role credential is intentionally prohibited from
+	// reading proof material. A correctly shaped bearer with a broken
+	// verifier authority must return 503, not pretend the token is invalid.
+	unprivilegedProof, err := identitypg.NewProofStore(regPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var unprivilegedProofPort usecase.EmailProofPort = unprivilegedProof
+	unprivilegedConfirm, err := usecase.NewEmailVerification(unprivilegedProofPort, sealPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var unprivilegedConfirmPort handler.EmailConfirmer = unprivilegedConfirm
+	unavailableHandler, err := handler.NewEmailConfirmationHTTP(peer, admissionPort,
+		unprivilegedConfirmPort, "https://app.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unavailable := postWith(unavailableHandler, secret)
+	if unavailable.Code != http.StatusServiceUnavailable ||
+		unavailable.Header().Get("Cache-Control") != "no-store" ||
+		unavailable.Header().Get("Referrer-Policy") != "no-referrer" ||
+		strings.Contains(unavailable.Body.String(), secret) {
+		t.Fatalf("inaccessible verifier authority was exposed as a bad proof or leaked secret: %d %q",
+			unavailable.Code, unavailable.Body.String())
+	}
+	checkState(validSubject, "UNVERIFIED", 0)
+
 	success := post(secret)
 	if success.Code != 204 || success.Body.Len() != 0 ||
 		success.Header().Get("Cache-Control") != "no-store" {
