@@ -20,7 +20,7 @@ import (
 // untrusted database value. The two roles must not own each other's schema.
 type target struct {
 	schema string
-	role string
+	role   string
 	lockID int64
 }
 
@@ -128,7 +128,9 @@ func sameFiles(a, b []File) bool {
 	return true
 }
 
-func checkRole(ctx context.Context, conn *pgx.Conn) error { return checkRoleFor(ctx, conn, platformTarget) }
+func checkRole(ctx context.Context, conn *pgx.Conn) error {
+	return checkRoleFor(ctx, conn, platformTarget)
+}
 
 func checkRoleFor(ctx context.Context, conn *pgx.Conn, target target) error {
 	var name string
@@ -156,10 +158,14 @@ func checkRoleFor(ctx context.Context, conn *pgx.Conn, target target) error {
 // Verify checks database-committed digests against the current SQL directory.
 // Missing or inconsistent history fails closed, including after an interrupted
 // migration. It does not repair dirty versions or detect superuser tampering.
-func Verify(ctx context.Context, conn *pgx.Conn, files []File) error { return verifyFor(ctx, conn, files, platformTarget.schema) }
+func Verify(ctx context.Context, conn *pgx.Conn, files []File) error {
+	return verifyFor(ctx, conn, files, platformTarget.schema)
+}
 
 // VerifyIdentity checks identity migration fingerprints with the same rules.
-func VerifyIdentity(ctx context.Context, conn *pgx.Conn, files []File) error { return verifyFor(ctx, conn, files, identityTarget.schema) }
+func VerifyIdentity(ctx context.Context, conn *pgx.Conn, files []File) error {
+	return verifyFor(ctx, conn, files, identityTarget.schema)
+}
 
 func verifyFor(ctx context.Context, conn *pgx.Conn, files []File, schema string) error {
 	var hasVersion, hasHistory bool

@@ -83,7 +83,6 @@ func run() error {
 		return errors.New("NOT RUN: PostgreSQL client psql is missing")
 	}
 
-
 	passed := make(map[string]bool)
 	for _, suite := range []struct {
 		pattern string
