@@ -62,7 +62,7 @@ func (h *EmailVerificationPage) ServeHTTP(w http.ResponseWriter, r *http.Request
 	// confirmation, not the landing page, requires matching Origin.
 	// Never accept credentials, request query/fragment or forwarded schemes.
 	if r.TLS == nil || r.Host != h.host ||
-		r.URL.RawQuery != "" || r.URL.Fragment != "" ||
+		r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "" ||
 		len(r.Header.Values("Cookie")) != 0 ||
 		len(r.Header.Values("Authorization")) != 0 ||
 		len(r.Header.Values("Forwarded")) != 0 ||
