@@ -3,7 +3,10 @@
 check: fmt-check vet unit architecture docs skills migrations-check build
 
 
-fmt-check:
+fmt-check: fmt-inspect
+
+fmt-inspect:
+	@gofmt -d internal/platform/migration/runner.go tools/testgate/main.go
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:
