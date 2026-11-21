@@ -28,7 +28,7 @@ var requiredTests = []string{
 	"TestPostgresRuntimePoolRejectsElevatedRole",
 	"TestPostgresIdentityMigration",
 	"TestPostgresIdentityVerifierRole",
-	"TestPostgresIdentityAuthenticatorRole",
+	"TestPostgresIdentityZAuthenticatorRole",
 	"TestPostgresIdentityDeliveryRole",
 	"TestPostgresIdentityAdmissionRole",
 	"TestPostgresIdentityMaintenanceRole",
