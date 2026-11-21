@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,6 +44,18 @@ func Open(ctx context.Context, cfg Config) (*Pool, error) {
 	if err != nil {
 		return nil, errors.New("invalid PostgreSQL runtime configuration")
 	}
+	// pgx also reads libpq PG* environment variables (including services and
+	// fallback hosts). Do not allow ambient process configuration to silently
+	// redirect an explicitly supplied runtime endpoint or credential.
+	u, _ := url.Parse(cfg.DSN) // Validated by validate above.
+	port, _ := strconv.Atoi(u.Port())
+	password, _ := u.User.Password()
+	poolCfg.ConnConfig.Host = u.Hostname()
+	poolCfg.ConnConfig.Port = uint16(port)
+	poolCfg.ConnConfig.User = u.User.Username()
+	poolCfg.ConnConfig.Password = password
+	poolCfg.ConnConfig.Database = strings.TrimPrefix(u.Path, "/")
+	poolCfg.ConnConfig.Fallbacks = nil
 	poolCfg.MinConns = 0
 	poolCfg.MaxConns = cfg.MaxConns
 	poolCfg.MaxConnIdleTime = time.Minute
@@ -95,9 +108,15 @@ func validate(cfg Config) error {
 	if err != nil || u == nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
 		return errors.New("invalid PostgreSQL runtime URL")
 	}
-	if u.Hostname() == "" || u.Path == "" || u.Path == "/" || u.User == nil ||
-		u.User.Username() != cfg.RuntimeRole || u.Fragment != "" || u.RawFragment != "" {
+	if u.Hostname() == "" || strings.Contains(u.Hostname(), ",") ||
+		u.Path == "" || u.Path == "/" || strings.Contains(strings.TrimPrefix(u.Path, "/"), "/") ||
+		u.User == nil || u.User.Username() != cfg.RuntimeRole ||
+		u.Fragment != "" || u.RawFragment != "" {
 		return errors.New("invalid PostgreSQL runtime endpoint or role")
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || port < 1 || port > 65535 {
+		return errors.New("runtime PostgreSQL URL requires an explicit valid port")
 	}
 	if password, ok := u.User.Password(); !ok || password == "" {
 		return errors.New("runtime database password is required")
