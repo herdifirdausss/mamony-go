@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -31,6 +30,11 @@ type File struct {
 // A changed old file and recalculated trailer will still be rejected against
 // the fingerprint previously committed inside PostgreSQL.
 func Load(dir string) ([]File, error) {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("open migration directory: %w", err)
+	}
+	defer func() { _ = root.Close() }()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("read migration directory: %w", err)
@@ -51,7 +55,7 @@ func Load(dir string) ([]File, error) {
 			return nil, fmt.Errorf("invalid or duplicate migration version in %q", name)
 		}
 		seen[version] = true
-		b, err := os.ReadFile(filepath.Join(dir, name))
+		b, err := root.ReadFile(name)
 		if err != nil {
 			return nil, fmt.Errorf("read %q: %w", name, err)
 		}
