@@ -3,6 +3,7 @@
 ALTER TABLE mamony_identity.subjects DROP CONSTRAINT subjects_status_check;
 ALTER TABLE mamony_identity.subjects ADD CONSTRAINT subjects_status_check
     CHECK (status IN ('UNVERIFIED', 'ACTIVE', 'SUSPENDED', 'FROZEN', 'DELETED'));
+ALTER TABLE mamony_identity.subjects ALTER COLUMN status SET DEFAULT 'UNVERIFIED';
 
 ALTER TABLE mamony_identity.email_aliases DROP CONSTRAINT email_aliases_verified_at_check;
 
@@ -28,6 +29,20 @@ CREATE UNIQUE INDEX email_verify_one_live_per_subject
     ON mamony_identity.email_verification_challenges(subject_id, purpose)
     WHERE consumed_at IS NULL AND revoked_at IS NULL;
 
+-- Registration runtime had full-table INSERT in v1. Revoke it BEFORE
+-- allowing ACTIVE/verified states; grant only fields that cannot bypass
+-- the verifier and rely on server-set defaults for protected state.
+ALTER TABLE mamony_identity.security_outbox
+    ALTER COLUMN event_type SET DEFAULT 'ENROLLMENT_PENDING';
+REVOKE INSERT ON mamony_identity.subjects, mamony_identity.email_aliases,
+    mamony_identity.security_outbox FROM mamony_identity_runtime;
+GRANT INSERT (subject_id, created_at) ON mamony_identity.subjects
+    TO mamony_identity_runtime;
+GRANT INSERT (canonical_email, subject_id, created_at)
+    ON mamony_identity.email_aliases TO mamony_identity_runtime;
+GRANT INSERT (event_id, subject_id, occurred_at)
+    ON mamony_identity.security_outbox TO mamony_identity_runtime;
+
 REVOKE ALL ON mamony_identity.email_verification_challenges FROM PUBLIC;
 
 -- The verifier has a separate bounded credential; it cannot read password
@@ -43,4 +58,4 @@ GRANT UPDATE (consumed_at, revoked_at) ON mamony_identity.email_verification_cha
     TO mamony_identity_verifier_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (2, '231d449ec701b1066a36195dc38666eb17c2b3e3c94f1485b7ff167dac835456');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (2, '06f2ca92610637a029250e759b8d2ec0231612e13e30f954097aba9a6ffc73d1');

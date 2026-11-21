@@ -42,14 +42,14 @@ func (s *Store) CreatePendingWithObligation(ctx context.Context, r usecase.Pendi
 	}
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO mamony_identity.subjects (subject_id, status, created_at)
-			 VALUES ($1, 'UNVERIFIED', $2)`, r.SubjectID, r.CreatedAt.UTC()); err != nil {
+			`INSERT INTO mamony_identity.subjects (subject_id, created_at)
+			 VALUES ($1, $2)`, r.SubjectID, r.CreatedAt.UTC()); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO mamony_identity.email_aliases
-			 (canonical_email, subject_id, contact_version, verified_at, created_at)
-			 VALUES ($1, $2, 1, NULL, $3)`,
+			 (canonical_email, subject_id, created_at)
+			 VALUES ($1, $2, $3)`,
 			r.CanonicalEmail, r.SubjectID, r.CreatedAt.UTC()); err != nil {
 			return err
 		}
@@ -64,8 +64,8 @@ func (s *Store) CreatePendingWithObligation(ctx context.Context, r usecase.Pendi
 		}
 		_, err := tx.Exec(ctx,
 			`INSERT INTO mamony_identity.security_outbox
-			 (event_id, subject_id, event_type, occurred_at)
-			 VALUES ($1, $2, 'ENROLLMENT_PENDING', $3)`,
+			 (event_id, subject_id, occurred_at)
+			 VALUES ($1, $2, $3)`,
 			r.EventID, r.SubjectID, r.CreatedAt.UTC())
 		return err
 	})

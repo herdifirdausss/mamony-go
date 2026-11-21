@@ -64,8 +64,13 @@ func TestPostgresIdentityMigration(t *testing.T) {
 	activeID := "sub_AAAAAAAAAAAAAAAAAAAAAA"
 	output, err := invokePSQL("TEST_IDENTITY_RUNTIME_URL", "-c",
 		"INSERT INTO mamony_identity.subjects (subject_id, status, created_at) VALUES ('"+activeID+"','ACTIVE',now())")
-	if err == nil || !strings.Contains(output, "23514") {
-		t.Fatalf("direct ACTIVE insert must fail the migration constraint: %q %v", output, err)
+	if err == nil || !strings.Contains(output, "42501") {
+		t.Fatalf("registration role must not INSERT the protected status column: %q %v", output, err)
+	}
+	output, err = invokePSQL("TEST_IDENTITY_RUNTIME_URL", "-c",
+		"INSERT INTO mamony_identity.email_aliases (canonical_email, subject_id, verified_at, created_at) VALUES ('fake@example.test','"+activeID+"',now(),now())")
+	if err == nil || !strings.Contains(output, "42501") {
+		t.Fatalf("registration role must not INSERT the verified_at column: %q %v", output, err)
 	}
 	for _, stmt := range []string{
 		"SELECT * FROM mamony_identity.subjects",
