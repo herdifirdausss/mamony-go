@@ -7,6 +7,12 @@
 - Put build order in the [roadmap](roadmap.md). Use stable IDs for architecture decisions and requirements so changes and tests can cite them.
 - Name a document for what it explains. Keep research pack names in [development history](history.md). Use a version in a published API, event schema, or dependency when versioning carries compatibility meaning.
 
+## From idea to reviewed implementation
+
+Follow the [change lifecycle](development-workflow.md) before starting a feature. First classify the change as Routine, Feature or Critical. Critical includes new money/identity authorization behavior, new trust boundaries, irreversible migrations and unresolved high-impact uncertainty. Require validated research, accepted PRD/requirements, technical design and threat review **before** implementing a Critical feature. For ordinary features, an issue plus an updated owning capability contract and a short design plan are usually sufficient; do not create a mandatory new PRD file for each change.
+
+Use the [feature issue form](../.github/ISSUE_TEMPLATE/feature.yml) for intake. A Critical change needing a durable record uses the [proposal template](templates/feature-proposal.md) in `docs/proposals/<short-topic>.md`; promote its accepted acceptance criteria into the relevant existing contract. Accepted ADRs record long-lived decisions; the PR contains AC-to-test evidence and links to accepted scope. Agent-generated proposals are **not** equivalent to owner approval.
+
 ## Design and review
 
 1. Read the issue and the relevant [contract](roadmap.md). Identify the owning capability and the behavior the change must demonstrate.

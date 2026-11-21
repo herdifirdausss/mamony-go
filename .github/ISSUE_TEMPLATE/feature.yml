@@ -1,0 +1,70 @@
+name: "Feature or capability proposal"
+description: "Start a verified Mamony Go change before choosing a technical solution."
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with a problem, not a proposed framework. Follow the [change lifecycle](../../docs/development-workflow.md). Sensitive money, identity, authorization, recovery, or cross-boundary changes use the Critical path until reviewed. Do not include secrets or real customer data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem and current behavior"
+      description: "Who experiences the problem? What is observable? Why change it?"
+      placeholder: "When ... the current system ... which causes ..."
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: "Desired outcome and actor"
+      description: "State the user or system result, not the implementation."
+    validations:
+      required: true
+  - type: dropdown
+    id: path
+    attributes:
+      label: "Initial risk path"
+      description: "If uncertain, choose Critical until discovery reduces the risk."
+      options:
+        - "Routine"
+        - "Feature"
+        - "Critical or unknown"
+    validations:
+      required: true
+  - type: textarea
+    id: existing
+    attributes:
+      label: "Owning capability and existing contracts"
+      description: "Link relevant docs/contracts, ADRs, code paths and existing issues when known."
+      placeholder: "docs/contracts/...; undecided"
+    validations:
+      required: false
+  - type: textarea
+    id: scope
+    attributes:
+      label: "Scope, non-goals and constraints"
+      description: "Include permissions, tenant boundary, privacy, API/schema compatibility and operational constraints where relevant."
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "Research, alternatives and uncertainties"
+      description: "Verified primary references and dates if available; distinguish observations from hypotheses. Research can follow intake."
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Candidate acceptance and failure cases"
+      description: "Describe how to tell a correct result from a failure, including negative tests."
+    validations:
+      required: false
+  - type: textarea
+    id: decisions
+    attributes:
+      label: "Blocking decisions"
+      description: "What cannot be safely decided without repository-owner or technical review?"
+    validations:
+      required: false

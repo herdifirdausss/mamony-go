@@ -4,6 +4,17 @@
 - Changed behavior and owning capability
 - Applicable decision, trade-offs, or open choices
 
+## Change lifecycle and traceability
+
+- Path: Routine / Feature / Critical (explain uncertainty or escalation)
+- Intake issue and approved product decision (for Critical; otherwise issue/contract):
+- Research/PRD/technical design proposal (when required) and any accepted ADR:
+- Requirement IDs from the owning contract and relevant implementation changes:
+- AC-to-test mapping; identify negative, concurrency, migration and recovery cases:
+- Any departure from accepted scope and its explicit acceptance:
+
+A PR link or checkbox is **not** evidence of product approval, independent review or successful tests. For Critical changes, record explicit owner and technical acceptance **before coding**; if a security hotfix used the expedited path, explain why and how the skipped evidence will be completed. See [change lifecycle](../docs/development-workflow.md).
+
 ## Evidence
 
 | Check | Command or test | Result |
