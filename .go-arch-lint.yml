@@ -6,6 +6,16 @@ workdir: internal
 allow:
   depOnAnyVendor: false
   deepScan: true
+# Only the platform adapter can import the selected DB and migration libraries.
+vendors:
+  pgx:
+    in:
+      - github.com/jackc/pgx/v5
+      - github.com/jackc/pgx/v5/**
+  migrate:
+    in:
+      - github.com/golang-migrate/migrate/v4
+      - github.com/golang-migrate/migrate/v4/**
 components:
   app:
     in: app/**
@@ -20,3 +30,6 @@ deps:
   platform:
     mayDependOn:
       - platform
+    canUse:
+      - pgx
+      - migrate
