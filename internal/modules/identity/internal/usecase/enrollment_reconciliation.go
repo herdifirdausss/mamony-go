@@ -26,12 +26,18 @@ type EnrollmentReconcileResult struct {
 // EnrollmentReconciler repairs the crash window between a committed pending
 // registration and its first proof. It never rotates an existing proof,
 // activates a subject, or exposes a bearer or email address to its caller.
-type EnrollmentReconciler struct {
-	finder UnissuedEnrollmentFinder
-	issuer EnrollmentProofIssuer
+// EnrollmentFirstIssuer enforces a fresh under-lock no-prior-proof check,
+// unlike ordinary user-admitted resend which may rotate a previous challenge.
+type EnrollmentFirstIssuer interface {
+	FirstIfMissing(context.Context, string) error
 }
 
-func NewEnrollmentReconciler(finder UnissuedEnrollmentFinder, issuer EnrollmentProofIssuer) (*EnrollmentReconciler, error) {
+type EnrollmentReconciler struct {
+	finder UnissuedEnrollmentFinder
+	issuer EnrollmentFirstIssuer
+}
+
+func NewEnrollmentReconciler(finder UnissuedEnrollmentFinder, issuer EnrollmentFirstIssuer) (*EnrollmentReconciler, error) {
 	if finder == nil || issuer == nil {
 		return nil, ErrEnrollmentUnavailable
 	}
@@ -39,9 +45,9 @@ func NewEnrollmentReconciler(finder UnissuedEnrollmentFinder, issuer EnrollmentP
 }
 
 // ReconcileOnce performs at most one bounded scan. Discovery is advisory:
-// concurrent registration/resend/repair may win the race, but the proof
-// repository still serializes issuance under subject/contact locks and applies
-// the regular cooldown and rolling hourly/daily budgets. A timeout is not
+// concurrent registration/resend/repair may win the race. The proof repository
+// rechecks the no-prior-challenge precondition under the subject/contact lock
+// and applies the regular cooldown and rolling hourly/daily budgets. A timeout is not
 // evidence that the first issuer failed to commit.
 func (r *EnrollmentReconciler) ReconcileOnce(ctx context.Context) (EnrollmentReconcileResult, error) {
 	var result EnrollmentReconcileResult
@@ -57,7 +63,7 @@ func (r *EnrollmentReconciler) ReconcileOnce(ctx context.Context) (EnrollmentRec
 		if ctx.Err() != nil || len(subject) != 26 || !strings.HasPrefix(subject, "sub_") {
 			return result, ErrEnrollmentUnavailable
 		}
-		switch err := r.issuer.Resend(ctx, subject); {
+		switch err := r.issuer.FirstIfMissing(ctx, subject); {
 		case err == nil:
 			result.Issued++
 		case errors.Is(err, ErrEmailProofThrottled):
