@@ -1,0 +1,52 @@
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 32px 16px;
+  display: grid;
+  place-items: center;
+  background: #f6f7fb;
+  color: #17243d;
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.panel {
+  width: min(100%, 460px);
+  padding: 40px 36px;
+  background: white;
+  border: 1px solid #e3e8f0;
+  border-radius: 18px;
+  box-shadow: 0 18px 54px rgba(26, 38, 61, 0.09);
+}
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  color: #506c9a;
+}
+h1 {
+  margin: 0 0 16px;
+  font-size: clamp(26px, 5vw, 32px);
+  line-height: 1.2;
+}
+#status { min-height: 72px; }
+button {
+  display: block;
+  width: 100%;
+  margin: 16px 0 24px;
+  padding: 12px 18px;
+  background: #174a94;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:hover { background: #113a75; }
+button:focus-visible { outline: 3px solid #174a94; outline-offset: 3px; }
+button:disabled { opacity: 0.65; cursor: default; }
+[hidden] { display: none !important; }
+.footnote { margin: 24px 0 0; font-size: 13px; color: #54657d; }
+@media (max-width: 400px) { .panel { padding: 30px 24px; } }
