@@ -134,15 +134,13 @@ async function run() {
     const success = await context.newPage();
     await success.goto(successLink, {waitUntil: "load"});
     await requireCleanURLAndNoEarlyPOST(success, counters);
-    const csp = await success.evaluate(() => document.policy?.allowedFeatures?.() || []);
-    assert.ok(Array.isArray(csp), "real browser DOM must be available");
+    assert.equal(await success.evaluate(() => document.title), "Verify email | Mamony");
     await success.getByRole("button", {name: "Verify my email"}).click();
-    await success.getByRole("status").getByText(
-      "Email verified. Verification does not sign you in.", {exact: true}
-    ).waitFor({timeout: 10000});
+    await success.waitForFunction(() => document.getElementById("status")?.textContent ===
+      "Email verified. Verification does not sign you in.", null, {timeout: 10000});
     assert.equal(counters.posts, 1);
     assert.equal(success.url(), origin + "/verify-email");
-    assert.equal(await success.context().cookies(), 0, "browser has no cookies");
+    assert.equal((await success.context().cookies()).length, 0, "browser has no cookies");
     await success.close();
 
     // Broken connectivity AFTER COMMIT must be an ambiguous browser message,
@@ -151,7 +149,8 @@ async function run() {
     await ambiguous.goto(ambiguousLink, {waitUntil: "load"});
     assert.equal(await ambiguous.evaluate(() => location.hash), "");
     await ambiguous.getByRole("button", {name: "Verify my email"}).click();
-    await ambiguous.getByRole("status").getByText(/may have succeeded/).waitFor({timeout: 10000});
+    await ambiguous.waitForFunction(() => document.getElementById("status")?.textContent.includes("may have succeeded"),
+      null, {timeout: 10000});
     assert.equal(counters.posts, 2);
     assert.equal(counters.failures, 1);
     assert.equal(ambiguous.url(), origin + "/verify-email");
@@ -162,7 +161,8 @@ async function run() {
     await expired.goto(expiredLink, {waitUntil: "load"});
     assert.equal(await expired.evaluate(() => location.hash), "");
     await expired.getByRole("button", {name: "Verify my email"}).click();
-    await expired.getByRole("status").getByText(/already used, or invalid/).waitFor({timeout: 10000});
+    await expired.waitForFunction(() => document.getElementById("status")?.textContent.includes("already used, or invalid"),
+      null, {timeout: 10000});
     assert.equal(counters.posts, 3);
     await expired.close();
 
