@@ -7,7 +7,10 @@ import (
 )
 
 func TestRetentionFacadeFailsClosedWithoutPool(t *testing.T) {
-	for _, tc := range []struct{ctx context.Context; dsn string}{
+	for _, tc := range []struct {
+		ctx context.Context
+		dsn string
+	}{
 		{nil, "unused"},
 		{context.Background(), ""},
 		{context.Background(), "not a PostgreSQL URL"},

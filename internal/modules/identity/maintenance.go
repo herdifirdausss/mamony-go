@@ -18,7 +18,7 @@ type RetentionConfig struct {
 // RetentionResult contains counts only, never identifiers, tokens or emails.
 type RetentionResult struct {
 	EnvelopesPurged int
-	CountersPurged int
+	CountersPurged  int
 }
 
 // PurgeRetention runs ONE bounded, atomic cleanup batch. The owner/operator

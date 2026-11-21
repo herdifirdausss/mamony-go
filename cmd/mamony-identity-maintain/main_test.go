@@ -59,7 +59,9 @@ func TestRetentionCommandRejectsUnsafeSecretFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := readConfig(func(k string) string {
-		if k == "MAMONY_IDENTITY_MAINTENANCE_DSN_FILE" { return link }
+		if k == "MAMONY_IDENTITY_MAINTENANCE_DSN_FILE" {
+			return link
+		}
 		return env(k)
 	}, []string{"--purge-expired"}); !errors.Is(err, errMaintenanceApproval) {
 		t.Fatal("symlink secret accepted")
@@ -70,7 +72,9 @@ func TestRetentionCommandRejectsUnsafeSecretFile(t *testing.T) {
 		"postgres://mamony_identity_maintenance_runtime:synthetic@db.example.test:5432/mamony?sslmode=disable",
 		strings.Repeat("a", 2049),
 	} {
-		if err := os.WriteFile(path, []byte(bad), 0600); err != nil { t.Fatal(err) }
+		if err := os.WriteFile(path, []byte(bad), 0600); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := readConfig(env, []string{"--purge-expired"}); !errors.Is(err, errMaintenanceApproval) {
 			t.Fatal("unsafe DSN accepted")
 		}

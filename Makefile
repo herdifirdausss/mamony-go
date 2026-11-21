@@ -4,7 +4,7 @@ check: fmt-check vet unit architecture docs skills migrations-check build
 
 
 fmt-check:
-	@out="$(gofmt -l $(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; gofmt -d ./cmd/mamony-identity-maintain/main_test.go ./internal/modules/identity/internal/repository/postgres/retention_integration_test.go ./internal/modules/identity/maintenance.go ./internal/modules/identity/maintenance_test.go; exit 1; fi
+	@out="$(gofmt -l $(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
 
 vet:
 	go vet ./...

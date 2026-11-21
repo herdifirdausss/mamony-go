@@ -116,7 +116,7 @@ func TestIdentityRetentionPurge(t *testing.T) {
 		_, err := admin.Exec(ctx, `INSERT INTO mamony_identity.anonymous_admission_buckets
 			(action,scope,key_digest,window_start,hits)
 			VALUES ('REGISTER','CLIENT_MINUTE',$1,
-				clock_timestamp() - make_interval(hours => $2::int),1)`, key, map[string]int{"50 hours":50,"0 hours":0}[when])
+				clock_timestamp() - make_interval(hours => $2::int),1)`, key, map[string]int{"50 hours": 50, "0 hours": 0}[when])
 		if err != nil {
 			t.Fatal(err)
 		}
