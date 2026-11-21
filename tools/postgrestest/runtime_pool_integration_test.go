@@ -137,6 +137,32 @@ func TestPostgresRuntimePoolIsolation(t *testing.T) {
 	}); err == nil {
 		t.Fatal("canceled transaction accepted")
 	}
+	// Cancel after a write has begun, not only before pool acquisition:
+	// the pending write must be rolled back and the pool must recover.
+	midCtx, cancelMid := context.WithCancel(ctx)
+	err = pool.WithTenantTx(midCtx, "tenant_a", func(tx pgx.Tx) error {
+		if _, err := tx.Exec(midCtx, "INSERT INTO mamony_test_fixture.records(id,tenant_id,note) VALUES (803,'tenant_a','must-not-commit')"); err != nil {
+			return err
+		}
+		cancelMid()
+		return midCtx.Err()
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("mid-transaction cancellation was not propagated: %v", err)
+	}
+	if err := pool.WithTenantTx(ctx, "tenant_a", func(tx pgx.Tx) error {
+		var count int
+		if err := tx.QueryRow(ctx, "SELECT COUNT(*) FROM mamony_test_fixture.records WHERE id=803").Scan(&count); err != nil {
+			return err
+		}
+		if count != 0 {
+			t.Errorf("canceled transaction persisted %d rows", count)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("connection unusable after transaction cancellation: %v", err)
+	}
+
 	// A canceled/failed request must not poison the same limited pool.
 	if err := pool.WithTenantTx(ctx, "tenant_b", func(tx pgx.Tx) error {
 		var count int
