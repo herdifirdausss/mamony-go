@@ -106,7 +106,7 @@ func TestEmailVerificationPageRejectsUnsafeNavigationWithoutRenderingSecrets(t *
 		{"wrong method", "/verify-email", func(r *http.Request) { r.Method = http.MethodPost }, 405},
 		{"query credential", "/verify-email?token=secret", nil, 403},
 		{"empty query marker", "/verify-email?", nil, 403},
-		{"URL fragment in server request", "/verify-email#token=secret", nil, 403},
+		{"URL fragment in server request", "/verify-email", func(r *http.Request) { r.URL.Fragment = "token=secret" }, 403},
 		{"plain HTTP", "/verify-email", func(r *http.Request) { r.TLS = nil }, 403},
 		{"spoofed Host", "/verify-email", func(r *http.Request) { r.Host = "evil.test" }, 403},
 		{"cookies", "/verify-email", func(r *http.Request) { r.Header.Set("Cookie", "sid=synthetic") }, 403},
