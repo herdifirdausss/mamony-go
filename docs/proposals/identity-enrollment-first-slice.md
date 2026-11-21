@@ -1,6 +1,6 @@
 # Identity enrollment: first implementation slice
 
-**Status:** DRAFT / stacked PRs #22–#29; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Status:** DRAFT / stacked PRs #22–#30; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
 The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Real provider delivery, running worker and public HTTP activation are still disabled.
 
@@ -81,3 +81,7 @@ The new additive SQL migration v4 only adds the `(subject_id, requested_at DESC)
 ## Unmounted anonymous ingress admission primitive (stacked Draft PR #29)
 
 Add internal `AnonymousAdmission` (HMAC-email and peer-IP/privacy-keyed budget) and PostgreSQL v5 counter table with one atomic transaction per request. Initial per-action buckets: 8/client/min, 80/client/hour, 3/email/hour, 5/email/day with fixed UTC boundaries; IPv6 /64 coalescing and NAT may affect legitimate users. `ClientIPResolver` trusts no proxy header by default, optionally restricts to one XFF value from an allowlisted narrow private/loopback TCP proxy. A reusable `WriteOpaqueAdmissionReceipt` returns constant HTTP 202 response metadata for approved/limited and known/unknown recipients. No route is mounted; no registration/resend callback, proof-token emission or external email is possible through this primitive. Secrets, data retention, public origin/CSRF/timing requirements, deploy ingress configuration, fail-closed error response and global abuse control remain release gates. Named real database evidence is mandatory before review.
+
+## Draft retention slice — stacked PR #30
+
+Additive Identity migration v6, a dedicated maintenance role, two bounded SQL erasure functions, and an opt-in single-run command. Email ciphertext is NULLed only after expiration +24h without active lease, while delivery/security evidence survives; HMAC anonymous admission counters older than 48h from window start are deleted. No endpoint or live provider is enabled. Backup/replica/WAL disposal, legal holds and retention approval remain blockers.

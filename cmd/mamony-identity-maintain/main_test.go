@@ -45,7 +45,7 @@ func TestRetentionCommandRejectsUnsafeSecretFile(t *testing.T) {
 	if cfg, err := readConfig(env, []string{"--purge-expired"}); err != nil || cfg.DSN != raw {
 		t.Fatalf("safe synthetic configuration unexpectedly rejected: %v", err)
 	}
-	if err := os.Chmod(path, 0644); err != nil { //nolint:gosec // Deliberately insecure negative fixture.
+	if err := os.Chmod(path, 0644); err != nil { // #nosec G302 -- deliberately unsafe negative test.
 		t.Fatal(err)
 	}
 	if _, err := readConfig(env, []string{"--purge-expired"}); !errors.Is(err, errMaintenanceApproval) {

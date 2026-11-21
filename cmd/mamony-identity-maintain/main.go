@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -74,7 +75,7 @@ func readConfig(getenv func(string) string, args []string) (identity.RetentionCo
 		return empty, errMaintenanceApproval
 	}
 	b := make([]byte, after.Size())
-	if n, err := f.Read(b); err != nil || int64(n) != after.Size() {
+	if n, err := io.ReadFull(f, b); err != nil || int64(n) != after.Size() {
 		return empty, errMaintenanceApproval
 	}
 	dsn := strings.TrimSuffix(string(b), "\n")
