@@ -165,10 +165,15 @@ func (v *EmailVerification) Resend(ctx context.Context, subjectID string) error 
 	return err
 }
 
-// Confirm accepts exactly one canonical 32-byte random bearer, and does not
-// issue a login/session token. All failures are generic at this layer.
+// Confirm accepts exactly one canonical 32-byte random bearer and never
+// creates a session. Only an authoritative negative proof decision returns
+// ErrEmailProofInvalid; all failures of the owning verifier authority remain
+// ErrEmailProofUnavailable without leaking their underlying error chains.
 func (v *EmailVerification) Confirm(ctx context.Context, secret string) error {
-	if v == nil || v.store == nil || len(secret) != 43 {
+	if v == nil || v.store == nil || ctx == nil || ctx.Err() != nil {
+		return ErrEmailProofUnavailable
+	}
+	if len(secret) != 43 {
 		return ErrEmailProofInvalid
 	}
 	decoded, err := base64.RawURLEncoding.DecodeString(secret)
@@ -180,7 +185,10 @@ func (v *EmailVerification) Confirm(ctx context.Context, secret string) error {
 		return ErrEmailProofUnavailable
 	}
 	if err := v.store.Consume(ctx, tokenDigest(secret), eventID); err != nil {
-		return ErrEmailProofInvalid
+		if errors.Is(err, ErrEmailProofInvalid) {
+			return ErrEmailProofInvalid
+		}
+		return ErrEmailProofUnavailable
 	}
 	return nil
 }
