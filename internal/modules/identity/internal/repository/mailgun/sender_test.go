@@ -235,8 +235,11 @@ func TestMailgunRejectsInvalidRecipientTokenAndExpiredContext(t *testing.T) {
 }
 
 func TestMailgunMockHTTPTimeoutIsRetryable(t *testing.T) {
-	s := testSender(t, "app.example.test", func(w http.ResponseWriter, r *http.Request) {
-		<-r.Context().Done()
+	s := testSender(t, "app.example.test", func(w http.ResponseWriter, _ *http.Request) {
+		// Bounded delay prevents a mock server handler from hanging forever
+		// if the test transport does not propagate client cancellation.
+		time.Sleep(150 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
