@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"errors"
 	"net/netip"
 )
 
@@ -67,13 +66,3 @@ var _ interface {
 	Admit(context.Context, netip.Addr) (bool, error)
 } = (*ConfirmationAdmission)(nil)
 
-// Normalized internal errors prevent database driver and secret-bearing
-// diagnostics from escaping a confirmation admission call.
-func (a *ConfirmationAdmission) String() string {
-	if a == nil {
-		return "confirmation admission unavailable"
-	}
-	return "confirmation admission"
-}
-
-var _ = errors.Is
