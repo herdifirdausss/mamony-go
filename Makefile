@@ -24,8 +24,8 @@ coverage:
 # Integration tests need real infrastructure; an empty suite must not be reported PASS.
 # Files must be named *_integration_test.go and use //go:build integration.
 integration:
-	@test -n "$(find . -name '*_integration_test.go' -not -path './vendor/*' -print -quit)" || { echo 'NOT RUN: no real integration test files exist'; exit 2; }
-	@test -n "$TEST_DATABASE_URL" || { echo 'NOT RUN: TEST_DATABASE_URL not configured'; exit 2; }
+	@test -n "$$(find . -name '*_integration_test.go' -not -path './vendor/*' -print -quit)" || { echo 'NOT RUN: no real integration test files exist'; exit 2; }
+	@test -n "$${TEST_DATABASE_URL:-}" || { echo 'NOT RUN: TEST_DATABASE_URL not configured'; exit 2; }
 	go test -tags=integration -count=1 -timeout=3m ./...
 
 architecture:
