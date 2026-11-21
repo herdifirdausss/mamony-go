@@ -85,16 +85,13 @@ func TestIdentityConfirmationAdmission(t *testing.T) {
 		rows < 1 || maxHits != 8 {
 		t.Fatalf("CONFIRM budget not durably capped: rows=%d max=%d err=%v", rows, maxHits, err)
 	}
-	// The 48h retention function from migration v6 remains responsible
-	// for these action-tagged HMAC rows. No new credential or privileges.
-	for _, raw := range []string{"2001:db8:75:ab::9", "confirmation bearer token"} {
-		var leaked int
-		err = admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.anonymous_admission_buckets
-			WHERE action='CONFIRM' AND convert_from(key_digest,'UTF8')=$1`, raw).Scan(&leaked)
-		// Key material is raw HMAC bytes, so UTF8 conversion is not
-		// required to succeed. A SQL error here is not leak evidence.
-		_ = err
-		_ = leaked
+	// The 48h retention function from migration v6 already handles
+	// CONFIRM action rows. Stored values remain 32-byte HMACs.
+	var invalidDigests int
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.anonymous_admission_buckets
+		WHERE action='CONFIRM' AND octet_length(key_digest)<>32`).Scan(&invalidDigests);
+		err != nil || invalidDigests != 0 {
+		t.Fatalf("confirmation budget persisted non-HMAC data: %d %v", invalidDigests, err)
 	}
 	// Any registration/resend window remains independent, even for
 	// the same client; this call must not rotate or issue a proof.
