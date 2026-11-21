@@ -68,6 +68,21 @@ func TestIdentityResendAdmission(t *testing.T) {
 		if err := reg.CreatePendingWithObligation(ctx, p); err != nil {
 			t.Fatal(err)
 		}
+		// The DB integration suites share one disposable database. Never
+		// leave a synthetic pending envelope for a later Mailgun mock suite
+		// to claim; production queue semantics are unchanged.
+		t.Cleanup(func() {
+			cleanupCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer stop()
+			_, err := admin.Exec(cleanupCtx, `UPDATE mamony_identity.email_proof_deliveries d
+				SET status='DEAD'
+				FROM mamony_identity.email_verification_challenges c
+				WHERE c.challenge_id=d.challenge_id AND c.subject_id=$1
+				  AND d.status='PENDING'`, p.SubjectID)
+			if err != nil {
+				t.Errorf("cleanup of isolated synthetic challenge fixture failed: %v", err)
+			}
+		})
 		return p
 	}
 	markOlder := func(t *testing.T, subject string, age string) {
