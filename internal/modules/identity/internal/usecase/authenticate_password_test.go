@@ -65,9 +65,10 @@ func TestPasswordAuthenticationDecisionMatrix(t *testing.T) {
 			reader := &passwordCredentialReaderFake{
 				found: tc.found,
 				record: AuthenticationCredential{
-					SubjectID: "sub_AAAAAAAAAAAAAAAAAAAAAA",
-					Status: tc.status, EmailVerified: tc.verified,
-					Verifier: real,
+					SubjectID:     "sub_AAAAAAAAAAAAAAAAAAAAAA",
+					Status:        tc.status,
+					EmailVerified: tc.verified,
+					Verifier:      real,
 				},
 			}
 			verifier := &passwordVerifierFake{pass: tc.match}
@@ -104,8 +105,10 @@ func TestPasswordAuthenticationUnavailableAndInputPolicy(t *testing.T) {
 	reader := &passwordCredentialReaderFake{
 		found: true,
 		record: AuthenticationCredential{
-			SubjectID: "sub_AAAAAAAAAAAAAAAAAAAAAA", Status: "ACTIVE", EmailVerified: true,
-			Verifier: dummyAuthenticationVerifier(),
+			SubjectID:     "sub_AAAAAAAAAAAAAAAAAAAAAA",
+			Status:        "ACTIVE",
+			EmailVerified: true,
+			Verifier:      dummyAuthenticationVerifier(),
 		},
 	}
 	verifier := &passwordVerifierFake{pass: true}
