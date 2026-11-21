@@ -22,6 +22,7 @@ type AnonymousAction string
 const (
 	AnonymousRegister AnonymousAction = "REGISTER"
 	AnonymousResend   AnonymousAction = "RESEND"
+	AnonymousConfirm  AnonymousAction = "CONFIRM"
 )
 
 // AdmissionBucket is an allowlisted database accounting obligation. Keys are
