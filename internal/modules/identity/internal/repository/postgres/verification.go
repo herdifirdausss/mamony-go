@@ -45,6 +45,31 @@ func (s *ProofStore) Issue(ctx context.Context, r usecase.EmailProofRequest) (us
 		if status != "UNVERIFIED" || verifiedAt != nil || dest.ContactVersion != 1 {
 			return usecase.ErrEmailProofIneligible
 		}
+		// The subject and alias row locks above serialize concurrent reissues
+		// BEFORE the budget read. Count all historical attempts, including
+		// revoked/expired challenges, using a single DB clock sample. A denied
+		// request must never revoke an existing valid proof or enqueue a mail.
+		var duringCooldown, inHour, inDay int
+		err = tx.QueryRow(ctx, `WITH stamp AS MATERIALIZED (SELECT clock_timestamp() AS moment)
+			SELECT
+			  COUNT(c.challenge_id) FILTER (
+			    WHERE c.requested_at > stamp.moment - make_interval(secs => $2::int)),
+			  COUNT(c.challenge_id) FILTER (
+			    WHERE c.requested_at > stamp.moment - interval '1 hour'),
+			  COUNT(c.challenge_id)
+			FROM stamp
+			LEFT JOIN mamony_identity.email_verification_challenges c
+			  ON c.subject_id=$1 AND c.purpose='EMAIL_VERIFY'
+			 AND c.requested_at > stamp.moment - interval '24 hours'
+			GROUP BY stamp.moment`, r.SubjectID, usecase.EmailProofCooldownSeconds).
+			Scan(&duringCooldown, &inHour, &inDay)
+		if err != nil {
+			return err
+		}
+		if duringCooldown > 0 || inHour >= usecase.EmailProofHourlyLimit ||
+			inDay >= usecase.EmailProofDailyLimit {
+			return usecase.ErrEmailProofThrottled
+		}
 		if _, err := tx.Exec(ctx, `UPDATE mamony_identity.email_verification_challenges
 			SET revoked_at = clock_timestamp()
 			WHERE subject_id = $1 AND purpose = 'EMAIL_VERIFY'
@@ -70,6 +95,9 @@ func (s *ProofStore) Issue(ctx context.Context, r usecase.EmailProofRequest) (us
 			r.EventID, r.SubjectID)
 		return err
 	})
+	if errors.Is(err, usecase.ErrEmailProofThrottled) {
+		return usecase.EmailProofDestination{}, usecase.ErrEmailProofThrottled
+	}
 	if err != nil {
 		return usecase.EmailProofDestination{}, ErrStorageUnavailable
 	}

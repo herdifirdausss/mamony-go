@@ -114,3 +114,28 @@ func TestEmailProofFailClosed(t *testing.T) {
 		t.Fatal("database consume details leaked")
 	}
 }
+
+// TestResendDoesNotExposeBearerAndPreservesTrustedThrottle is an internal
+// contract: no plaintext token is returned by the resend API.
+func TestResendDoesNotExposeBearerAndPreservesTrustedThrottle(t *testing.T) {
+	fake := &fakeEmailProofPort{}
+	s, err := NewEmailVerification(fake, fakeEnvelopeSealer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Resend(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA"); err != nil {
+		t.Fatal(err)
+	}
+	if fake.issues != 1 || len(fake.issued.TokenDigest) != 32 {
+		t.Fatal("resend did not create one digest-only delivery obligation")
+	}
+	fake.issueErr = ErrEmailProofThrottled
+	if err := s.Resend(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA"); !errors.Is(err, ErrEmailProofThrottled) {
+		t.Fatalf("internal trusted throttle not returned: %v", err)
+	}
+	fake.issueErr = errors.New("sensitive SQL database error")
+	if err := s.Resend(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA"); !errors.Is(err, ErrEmailProofUnavailable) ||
+		err.Error() != ErrEmailProofUnavailable.Error() {
+		t.Fatalf("raw SQL details escaped internal resend: %v", err)
+	}
+}
