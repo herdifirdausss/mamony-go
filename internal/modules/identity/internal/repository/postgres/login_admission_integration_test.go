@@ -74,7 +74,7 @@ func TestIdentityLoginAdmission(t *testing.T) {
 			go func() {
 				<-start
 				allowed, err := gate.Admit(ctx, strings.ToUpper(email),
-					netip.MustParseAddr("2001:db8:51:ab::" + "9"))
+					netip.MustParseAddr("2001:db8:51:ab::9"))
 				results <- allowed
 				failures <- err
 			}()
