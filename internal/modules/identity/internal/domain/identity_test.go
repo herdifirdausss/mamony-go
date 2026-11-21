@@ -28,6 +28,6 @@ func TestPasswordPolicyNFCAndBoundaries(t *testing.T) {
 	for _,password:=range []string{"short","known-compromised-string",strings.Repeat("a",129),strings.Repeat("界",129),"wrong\xffvalue","alice@example.com is secret"} {
 		if _,err:=p.NormalizeAndValidate(password,"alice@example.com");err==nil{t.Errorf("invalid password accepted")}
 	}
-	if _,err:=PasswordPolicy{}.NormalizeAndValidate(strings.Repeat("x",20),"");!errors.Is(err,ErrInvalidPassword){t.Fatal("missing blocklist must fail closed")}
+	if _,err:=(PasswordPolicy{}).NormalizeAndValidate(strings.Repeat("x",20),"");!errors.Is(err,ErrInvalidPassword){t.Fatal("missing blocklist must fail closed")}
 	if _,err:=p.NormalizeAndValidate("  "+strings.Repeat("a",15)+"  ","");err!=nil{t.Fatalf("surrounding spaces must remain accepted: %v",err)}
 }

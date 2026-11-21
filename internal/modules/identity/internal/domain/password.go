@@ -69,7 +69,8 @@ func (h *PasswordHasher) acquire(ctx context.Context) error {
 
 // Hash expects a policy-validated, NFC-normalized password.
 func (h *PasswordHasher) Hash(ctx context.Context, normalized string) (PasswordVerifier, error) {
-	if _, err := NormalizeForVerification(normalized); err != nil {
+	checked, err := NormalizeForVerification(normalized)
+	if err != nil {
 		return PasswordVerifier{}, err
 	}
 	if err := h.acquire(ctx); err != nil {
@@ -80,7 +81,7 @@ func (h *PasswordHasher) Hash(ctx context.Context, normalized string) (PasswordV
 	if _, err := io.ReadFull(h.random, salt); err != nil {
 		return PasswordVerifier{}, ErrKDFUnavailable
 	}
-	digest := argon2.IDKey([]byte(normalized), salt, passwordIterations, passwordMemoryKiB, passwordParallelism, passwordHashBytes)
+	digest := argon2.IDKey([]byte(checked), salt, passwordIterations, passwordMemoryKiB, passwordParallelism, passwordHashBytes)
 	return PasswordVerifier{Version: passwordVersion, MemoryKiB: passwordMemoryKiB, Iterations: passwordIterations, Parallelism: passwordParallelism, Salt: salt, Digest: digest}, nil
 }
 

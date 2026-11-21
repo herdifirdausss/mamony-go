@@ -3,6 +3,7 @@
 check: fmt-check vet unit architecture docs skills migrations-check build
 
 fmt-check:
+	@find ./internal/modules/identity -name '*.go' -exec gofmt -d {} \;
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:
