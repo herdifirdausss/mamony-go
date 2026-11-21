@@ -19,7 +19,7 @@ const sampleChallenge = "vch_AAAAAAAAAAAAAAAAAAAAAA"
 
 type redirectToMock struct {
 	target *url.URL
-	base http.RoundTripper
+	base   http.RoundTripper
 }
 
 func (r redirectToMock) RoundTrip(in *http.Request) (*http.Response, error) {
@@ -46,14 +46,14 @@ func testSender(t *testing.T, host string, handler http.HandlerFunc) *Sender {
 	}
 	client := &http.Client{
 		Transport: redirectToMock{target: u, base: http.DefaultTransport},
-		Timeout: 600 * time.Millisecond,
+		Timeout:   600 * time.Millisecond,
 	}
 	sender, err := NewSender(Config{
-		Region: RegionUS,
-		Domain: "mg.example.test",
-		From: "Mamony Security <security@mg.example.test>",
-		APIKey: "synthetic-mailgun-secret",
-		VerificationURL: "https://"+host+"/verify-email",
+		Region:          RegionUS,
+		Domain:          "mg.example.test",
+		From:            "Mamony Security <security@mg.example.test>",
+		APIKey:          "synthetic-mailgun-secret",
+		VerificationURL: "https://" + host + "/verify-email",
 	}, client)
 	if err != nil {
 		t.Fatal(err)
@@ -81,14 +81,14 @@ func TestMailgunSendsSingleTextOnlyVerificationWithMockHTTP(t *testing.T) {
 		}
 		form := r.MultipartForm.Value
 		want := map[string]string{
-			"from": "Mamony Security <security@mg.example.test>",
-			"to": "alice@example.test",
-			"subject": "Verify your Mamony email",
-			"o:tracking": "no",
+			"from":              "Mamony Security <security@mg.example.test>",
+			"to":                "alice@example.test",
+			"subject":           "Verify your Mamony email",
+			"o:tracking":        "no",
 			"o:tracking-clicks": "no",
-			"o:tracking-opens": "no",
-			"o:require-tls": "yes",
-			"o:deliver-within": "5m",
+			"o:tracking-opens":  "no",
+			"o:require-tls":     "yes",
+			"o:deliver-within":  "5m",
 		}
 		for k, expected := range want {
 			if len(form[k]) != 1 || form[k][0] != expected {
@@ -124,10 +124,10 @@ func TestMailgunRegionAndConfigAreStrict(t *testing.T) {
 		RegionAU: "https://api.au.mailgun.net/v3/mg.example.test/messages",
 	} {
 		s, err := NewSender(Config{
-			Region: region,
-			Domain: "mg.example.test",
-			From: "security@mg.example.test",
-			APIKey: "synthetic-key",
+			Region:          region,
+			Domain:          "mg.example.test",
+			From:            "security@mg.example.test",
+			APIKey:          "synthetic-key",
 			VerificationURL: "https://app.example.test/verify-email",
 		}, nil)
 		if err != nil || s.endpoint != expected {
@@ -136,7 +136,7 @@ func TestMailgunRegionAndConfigAreStrict(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		domain, from, key, verify string
-		region Region
+		region                    Region
 	}{
 		{"mg.example.test", "security@mg.example.test", "", "https://app.example.test/verify-email", RegionUS},
 		{"mg.example.test", "security@mg.example.test", "fake", "http://app.example.test/verify-email", RegionUS},
@@ -158,14 +158,14 @@ func TestMailgunRegionAndConfigAreStrict(t *testing.T) {
 
 func TestMailgunMockProviderStatusClassificationAndSecretsRedaction(t *testing.T) {
 	for _, tc := range []struct {
-		name string
+		name   string
 		status int
-		body string
-		want error
+		body   string
+		want   error
 	}{
 		{"accepted", 200, `{"id":"<fake@mailgun.test>"}`, nil},
 		{"bad accepted body", 200, `{"unexpected":"secret"}`, usecase.ErrDeliveryUnavailable},
-		{"validation", 400, `{"message":"`+sampleSecret+`"}`, usecase.ErrPermanentDelivery},
+		{"validation", 400, `{"message":"` + sampleSecret + `"}`, usecase.ErrPermanentDelivery},
 		{"unauthorized", 401, "synthetic-mailgun-secret", usecase.ErrPermanentDelivery},
 		{"forbidden", 403, "synthetic-mailgun-secret", usecase.ErrPermanentDelivery},
 		{"redirect", 302, "bad redirect", usecase.ErrPermanentDelivery},

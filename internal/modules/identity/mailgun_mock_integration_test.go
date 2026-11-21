@@ -132,14 +132,14 @@ func TestIdentityMailgunMockPipeline(t *testing.T) {
 	subject := randomSyntheticID(t, "sub_")
 	email := strings.ToLower(randomSyntheticID(t, "test_")) + "@example.test"
 	pending := usecase.PendingRegistration{
-		SubjectID: subject,
-		EventID: randomSyntheticID(t, "evt_"),
+		SubjectID:      subject,
+		EventID:        randomSyntheticID(t, "evt_"),
 		CanonicalEmail: email,
-		Status: "UNVERIFIED",
-		CreatedAt: time.Now().UTC(),
+		Status:         "UNVERIFIED",
+		CreatedAt:      time.Now().UTC(),
 		PasswordVerifier: domain.PasswordVerifier{
 			Version: 1, MemoryKiB: 65536, Iterations: 3, Parallelism: 1,
-			Salt: bytes.Repeat([]byte{0x23}, 16),
+			Salt:   bytes.Repeat([]byte{0x23}, 16),
 			Digest: bytes.Repeat([]byte{0x35}, 32),
 		},
 	}
@@ -186,13 +186,13 @@ func TestIdentityMailgunMockPipeline(t *testing.T) {
 		t.Fatal(err)
 	}
 	sender, err := mailgun.NewSender(mailgun.Config{
-		Region: mailgun.RegionUS,
-		Domain: "mg.example.test",
-		From: "Mamony Security <security@mg.example.test>",
-		APIKey: "test-mailgun-domain-key",
+		Region:          mailgun.RegionUS,
+		Domain:          "mg.example.test",
+		From:            "Mamony Security <security@mg.example.test>",
+		APIKey:          "test-mailgun-domain-key",
 		VerificationURL: "https://app.example.test/verify-email",
 	}, &http.Client{
-		Timeout: 2*time.Second,
+		Timeout:   2 * time.Second,
 		Transport: mockMailgunTransport{origin: mockURL},
 	})
 	if err != nil {

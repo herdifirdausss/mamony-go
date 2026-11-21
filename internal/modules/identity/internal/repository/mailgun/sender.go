@@ -30,19 +30,19 @@ const (
 )
 
 type Config struct {
-	Region Region
-	Domain string
-	From string
-	APIKey string
+	Region          Region
+	Domain          string
+	From            string
+	APIKey          string
 	VerificationURL string
 }
 
 type Sender struct {
-	endpoint string
-	from string
-	key string
+	endpoint  string
+	from      string
+	key       string
 	verifyURL url.URL
-	client http.Client
+	client    http.Client
 }
 
 // NewSender validates static deployment settings. The network target is
@@ -90,11 +90,11 @@ func NewSender(cfg Config, client *http.Client) (*Sender, error) {
 		return http.ErrUseLastResponse
 	}
 	return &Sender{
-		endpoint: "https://" + host + "/v3/" + cfg.Domain + "/messages",
-		from: cfg.From,
-		key: cfg.APIKey,
+		endpoint:  "https://" + host + "/v3/" + cfg.Domain + "/messages",
+		from:      cfg.From,
+		key:       cfg.APIKey,
 		verifyURL: *parsed,
-		client: c,
+		client:    c,
 	}, nil
 }
 
