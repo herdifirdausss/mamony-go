@@ -215,18 +215,18 @@ func syntheticEmail(t *testing.T) string {
 func syntheticPending(t *testing.T, email string) usecase.PendingRegistration {
 	t.Helper()
 	return usecase.PendingRegistration{
-		SubjectID: randomID(t, "sub_"),
-		EventID: randomID(t, "evt_"),
+		SubjectID:      randomID(t, "sub_"),
+		EventID:        randomID(t, "evt_"),
 		CanonicalEmail: email,
-		Status: "UNVERIFIED",
-		CreatedAt: time.Now().UTC(),
+		Status:         "UNVERIFIED",
+		CreatedAt:      time.Now().UTC(),
 		PasswordVerifier: domain.PasswordVerifier{
-			Version: 1,
-			MemoryKiB: 65536,
-			Iterations: 3,
+			Version:     1,
+			MemoryKiB:   65536,
+			Iterations:  3,
 			Parallelism: 1,
-			Salt: []byte("synthetic-salt01"),
-			Digest: bytes.Repeat([]byte{0x5a}, 32),
+			Salt:        []byte("synthetic-salt01"),
+			Digest:      bytes.Repeat([]byte{0x5a}, 32),
 		},
 	}
 }

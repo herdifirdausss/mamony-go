@@ -2,11 +2,8 @@
 
 check: fmt-check vet unit architecture docs skills migrations-check build
 
-# Temporary gofmt diff inspection; remove after formatting this draft branch.
-fmt-inspect:
-	@gofmt -d internal/modules/identity/internal/repository/postgres/registration_integration_test.go
 
-fmt-check: fmt-inspect
+fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:
