@@ -6,12 +6,12 @@ import (
 	"net/netip"
 )
 
-var (
-	// ErrPasswordLoginThrottled is an INTERNAL budget result, not a public
-	// account-specific HTTP error. No login HTTP route is mounted.
-	ErrPasswordLoginThrottled   = errors.New("password login admission exhausted")
-	ErrPasswordLoginUnavailable = errors.New("password login unavailable")
-)
+// ErrPasswordLoginThrottled is an INTERNAL budget result, not a public
+// account-specific HTTP error. No login HTTP route is mounted.
+var ErrPasswordLoginThrottled = errors.New("password login admission exhausted")
+
+// ErrPasswordLoginUnavailable signals sanitized admission/authentication failure.
+var ErrPasswordLoginUnavailable = errors.New("password login unavailable")
 
 type PasswordLoginAdmission interface {
 	Admit(context.Context, string, netip.Addr) (bool, error)
