@@ -78,6 +78,18 @@ func TestIdentityRetentionPurge(t *testing.T) {
 	oldSubject, old := create(t, 0xe1)
 	_, live := create(t, 0xe2)
 	_, leased := create(t, 0xe3)
+	// The next suite's local Mailgun worker must never claim synthetic
+	// retention fixtures that were intentionally left PENDING here.
+	t.Cleanup(func() {
+		cleanupCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		for _, challenge := range []string{old, live, leased} {
+			if _, err := admin.Exec(cleanupCtx, `UPDATE mamony_identity.email_proof_deliveries
+				SET status='DEAD' WHERE challenge_id=$1 AND status='PENDING'`, challenge); err != nil {
+				t.Errorf("cleanup of isolated synthetic proof failed: %v", err)
+			}
+		}
+	})
 	// Simulate expired proofs using administrator-only test fixture writes.
 	// Proof/challenge integrity and timestamp constraints still apply.
 	for _, challenge := range []string{old, leased} {
