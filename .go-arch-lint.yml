@@ -23,6 +23,10 @@ vendors:
     in:
       - golang.org/x/text/unicode/norm
 components:
+  # The Identity root is a facade/wiring seam. Its integration-only test
+  # composes the internal adapters; production handlers cannot import stores.
+  identity_facade:
+    in: modules/identity/*.go
   app:
     in: app/**
   platform:
@@ -40,6 +44,17 @@ components:
   identity_postgres:
     in: modules/identity/internal/repository/postgres/**
 deps:
+  identity_facade:
+    mayDependOn:
+      - identity_domain
+      - identity_usecase
+      - identity_credential
+      - identity_mailcrypto
+      - identity_mailgun
+      - identity_postgres
+      - platform
+    canUse:
+      - pgx
   app:
     mayDependOn:
       - platform
