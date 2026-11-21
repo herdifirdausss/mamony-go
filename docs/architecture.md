@@ -17,7 +17,7 @@
 
 Set `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to override the addresses. The private listener accepts `127.0.0.1` and `::1`. It maps `localhost` to `127.0.0.1`. Readiness reports only HTTP process readiness.
 
-| `internal/modules/identity` | Internal pending-registration policy, Argon2id credential adapter, and Identity PostgreSQL enrollment repository; public login/verification still absent. |
+| `internal/modules/identity` | Internal pending-registration policy, Argon2id adapter, PostgreSQL enrollment, plus draft one-use email-proof digest/activation store; public Identity HTTP routes and mail delivery absent. |
 
 ## Capability packages
 
@@ -32,7 +32,7 @@ See the [data ownership decision](adr/0002-ledger-and-data-ownership.md), [publi
 
 ## Security authority and trust boundaries
 
-**Current HTTP implementation:** only the health listeners run. Identity now has draft internal enrollment primitives and SQL storage with an identifier-only outbox, but no public routes, email proof, sessions, tenant membership, resource authorization or money/approval enforcement. The wider security boundaries below remain design contracts, not deployed controls. Mamony uses synthetic identities, balances, and providers; these requirements do not imply regulatory compliance or production readiness.
+**Current HTTP implementation:** only the health listeners run. Identity now has draft internal enrollment plus challenge issuance/consume and SQL storage with an identifier-only outbox, but no public routes, operational email delivery, sessions, tenant membership, resource authorization or money/approval enforcement. The wider security boundaries below remain design contracts, not deployed controls. Mamony uses synthetic identities, balances, and providers; these requirements do not imply regulatory compliance or production readiness.
 
 The initial modular-monolith security model assumes the application runtime and its authoritative database remain trusted (**Profile A**). It does **not** claim to resist an arbitrary writer to that authority database or complete application compromise. Before claiming stronger protection (**Profile B**), choose and verify independently controlled identity, approval, and execution authority, including their persistence, deployment administration, key-operation permissions, and recovery roots. Signed rows, checksums, and KMS alone cannot establish fresh, authorized current state when the signing caller or current-state authority is compromised. Multi-region fencing (**Profile G**) is deferred.
 

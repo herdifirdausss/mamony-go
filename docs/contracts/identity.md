@@ -2,7 +2,15 @@
 
 The identity module owns tenants, users, sessions, API credentials, roles, and change approvals. Capabilities own their resources. They supply the resource and tenant context for authorization.
 
-**Implementation status:** Draft internal registration primitives and dedicated PostgreSQL pending-enrollment storage are proposed in PRs #22 and its stacked storage PR. All public identity HTTP routes, email verification/delivery, login, sessions, recovery, tenant ownership and authorization enforcement remain **NOT IMPLEMENTED**. A credential table alone does not constitute a deployed authentication control.
+**Implementation status:** Draft internal registration/password primitives (PR #22), transactional PostgreSQL pending enrollment (PR #23), and email-proof issuance/consumption with contact-bound token digests and atomic ACTIVE transition (stacked PR #24). **No Identity HTTP routes, actual email sender/delivery, login, sessions, recovery, tenant membership, financial authorization or usable end-user verification exist.** Internal tests are not a deployed authentication control.
+
+## Internal contact verification — accepted narrow Phase 1 scope (IDF-02)
+
+For synthetic first-party users only: the email alias is tied to one stable subject and contact version. A 32-byte CSPRNG random, URL-safe secret is persisted **only as a SHA-256 domain-separated digest** with subject, exact canonical email, version, purpose `EMAIL_VERIFY`, and database-enforced expiry of 20 minutes. Issuing a new secret atomically revokes the earlier live proof. Confirmation succeeds once only: it checks the **current** unverified subject and contact/version, marks the challenge consumed, verifies the contact, changes subject status to `ACTIVE` and writes an identifier-only security event in **one PostgreSQL transaction**. Failed outbox insert rolls back activation. Confirming email **does not mint a session**.
+
+Separate registration and verification runtime credentials are intentionally used; the verifier may select its owning contact and update only the columns required for activation. The verifier database authority is trusted under Profile A and cannot claim arbitrary DB-writer containment. Verification tokens must never enter logs, HTTP responses or persistent plaintext storage. The internal implementation returns a short-lived in-memory delivery instruction; a trusted production email adapter, resend/compensating delivery and rate limiting are **NOT IMPLEMENTED**. Because outbox events contain no raw token, an interrupted delivery cannot be recovered from outbox alone: reissue is needed after a crash. Do not enable a public registration/verification route until reliable dispatch and security admission are separately verified.
+
+Acceptance evidence must include real database expiry, wrong-contact/version, replay, concurrent consume (one winner), failed-outbox rollback, reissue revocation, and database role denials. A positive mail delivery claim requires separate delivery evidence.
 
 ## Authentication and lifecycle
 

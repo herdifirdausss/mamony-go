@@ -1,6 +1,6 @@
 # Identity Phase 1 — Secure enrollment, login and authorization
 
-**Tracking issue:** [#20](https://github.com/herdifirdausss/mamony-go/issues/20). **Status:** PROPOSED / G0–G3 research and design; not accepted, implemented or verified. **Scope:** Mamony Go, one-process modular monolith; first-party browser customer flow with synthetic users. **Review date:** 2026-11-21.
+**Tracking issue:** [#20](https://github.com/herdifirdausss/mamony-go/issues/20). **Status:** The narrow first-party Profile A implementation direction and email-verification-before-activation were approved by the owner on 2026-11-21. PRs #22–#24 remain draft and public enablement is NOT accepted; detailed operational delivery, KDF budget and admission controls remain pending. Original G2 candidate text below is a historical design proposal, not proof of implementation. **Scope:** Mamony Go, one-process modular monolith; first-party browser customer flow with synthetic users. **Review date:** 2026-11-21.
 
 ## G0 — Problem, actors and goal
 
@@ -44,7 +44,7 @@ The current Go binary exposes only health endpoints. Its PostgreSQL migration ru
 |---|---|---|
 | IDF-01 | Register one stable opaque subject ID and a distinct email alias/verification version in `UNVERIFIED`; email isn't subject ID or tenant permission | Races and duplicate-alias attempts never create second ownership; registry cannot assign `ACTIVE` from client payload |
 | IDF-02 | Confirm email using a high-entropy, purpose/subject/value-version-bound, expiry-limited single-use challenge; deliver via a reviewed adapter | Old/replayed/wrong-subject/wrong-email/version challenges deny; concurrent consume has one winner; no contact proof implies legal identity/KYC |
-| IDF-03 | Password enrollment follows P01: 15–128 Unicode code points, at most 512 UTF-8 bytes, **exact input** (no trim/case-fold/silent truncation; deliberate no-NFC baseline deviation) and common/breached/contextual blocklist | Unicode composed/decomposed, whitespace, overlong, invalid encoding and listed passwords tested; all valid bytes used consistently |
+| IDF-03 | Password enrollment follows P01: 15–128 Unicode code points, at most 512 UTF-8 bytes, **NFC-normalized input** (no trim/case-fold/silent truncation; the original no-NFC baseline is superseded for newly issued credential verifiers) and common/breached/contextual blocklist | Unicode composed/decomposed, whitespace, overlong, invalid encoding and listed passwords tested; all valid bytes used consistently |
 | IDF-04 | Hash with Argon2id, unique random salt and versioned bounded params; private server-side admission/KDF concurrency and timing/error policy | DB dump has no plaintext; corrupted/too-expensive params are refused; load test enforces a measured finite resource budget; no password/verifier leaks |
 | IDF-05 | Login resolves an existing **active, verified** subject, validates the credential and status, and only then issues a full session under server authority | Unknown/wrong/unverified/suspended accounts get generic failure without account enumeration (including status/body/timing checks); no MFA or role claims from client |
 | IDF-06 | Use a 32-byte CSPRNG opaque bearer; persist only SHA-256 verifier/digest; send `__Host-...` Secure+HttpOnly+Path=/+SameSite=Lax first-party cookie | Stolen DB session verifier is not a bearer; no URL/localStorage tokens; session fixation and cookie scope tests |
@@ -117,7 +117,7 @@ Admin/CI provisioner → dedicated schema owner/migrator (never in HTTP app)
 2. Accept **Profile A trusted Identity DB** as a learning baseline; explicitly defer independent Profile B protected current heads, financial approvals and globally distributed authority, with no assertion of full DB-writer containment.
 3. Select Go-owned capability versus the **mature IdP** alternative, including the ongoing security maintenance commitment.
 4. Confirm registration requires email contact verification before an active login; select simulated delivery first versus a real email provider before external use.
-5. Confirm P01 exact password semantics (including no NFC), Argon2id candidate m=64 MiB/t=3/p=1 subject to actual load benchmark and safe fallback **not below accepted floor**, P03 30min/12h session ceilings, P10 max five sessions; reject implementation until the measured KDF resource budget is approved.
+5. Confirm P01 NFC-normalized password semantics (superseding the earlier no-NFC candidate), Argon2id candidate m=64 MiB/t=3/p=1 subject to actual load benchmark and safe fallback **not below accepted floor**, P03 30min/12h session ceilings, P10 max five sessions; reject implementation until the measured KDF resource budget is approved.
 6. Approve first-party HTTPS cookie/CSRF controls and no JWT/mobile/OIDC/public operator login in Phase 1. Operator MFA and sensitive recovery are separate mandatory gates if those features become enabled.
 
 **Until accepted:** leave `docs/contracts/identity.md`, `docs/roadmap.md` and runtime routes unchanged. This document is a design candidate, not working login or an authorization/security PASS.
