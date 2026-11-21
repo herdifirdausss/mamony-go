@@ -5,8 +5,8 @@ package postgrestest
 import (
 	"context"
 	"errors"
-	"os"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
