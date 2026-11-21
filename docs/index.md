@@ -7,6 +7,8 @@
 | Pick work or find its requirements and acceptance checks | [Roadmap and contracts](roadmap.md) |
 | Change Go packages, listeners, or cross-module interfaces | [Architecture](architecture.md) and [architecture decisions](adr/README.md) |
 | Check a design choice before implementing it | [Open decisions](open-decisions.md) |
+| Follow Go conventions and capability package patterns | [Go conventions](conventions.md) |
+| Plan unit, integration, concurrency and recovery tests | [Testing strategy](testing.md) and [test-plan checklist](templates/test-plan.md) |
 | Run checks and prepare review evidence | [Engineering practices](engineering.md) |
 | Review security authority, threat scope and tests | [Security boundaries](architecture.md#security-authority-and-trust-boundaries), [security verification](engineering.md#security-verification) and [open security decisions](open-decisions.md#security-architecture-decisions) |
 

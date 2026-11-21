@@ -1,4 +1,4 @@
-.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run
+.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration
 
 check: fmt-check vet unit architecture docs skills build
 
@@ -10,6 +10,22 @@ vet:
 
 unit:
 	go test ./...
+
+# Re-run tests with randomized order to expose hidden shared state; no coverage claim.
+test-repeat:
+	go test -shuffle=on -count=3 ./...
+
+# Coverage is diagnostic evidence, never a substitute for negative behavior tests.
+coverage:
+	@mkdir -p test-reports
+	go test -coverprofile=test-reports/coverage.out ./...
+	go tool cover -func=test-reports/coverage.out
+
+# Fail closed until a real, disposable PostgreSQL integration harness is
+# implemented and a CI job verifies that its tests actually execute.
+# File existence and TEST_DATABASE_URL alone cannot prove any test ran.
+integration:
+	@echo 'NOT RUN: PostgreSQL test harness and enforced integration CI are not implemented'; exit 2
 
 architecture:
 	go run ./tools/archcheck
