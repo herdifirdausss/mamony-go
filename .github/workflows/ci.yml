@@ -20,6 +20,8 @@ jobs:
           cache: false
       - run: make check
       - run: make race
+      - name: Repeat tests with randomized order
+        run: make test-repeat
 
   lint:
     runs-on: ubuntu-24.04

@@ -13,6 +13,12 @@ Follow the [change lifecycle](development-workflow.md) before starting a feature
 
 Use the [feature issue form](../.github/ISSUE_TEMPLATE/feature.yml) for intake. A Critical change needing a durable record uses the [proposal template](templates/feature-proposal.md) in `docs/proposals/<short-topic>.md`; promote its accepted acceptance criteria into the relevant existing contract. Accepted ADRs record long-lived decisions; the PR contains AC-to-test evidence and links to accepted scope. Agent-generated proposals are **not** equivalent to owner approval.
 
+## Golden path and testing
+
+Follow the [Go conventions](conventions.md) when implementing capabilities; add only packages that a verified vertical slice needs. Use the [testing strategy](testing.md) and [test-plan checklist](templates/test-plan.md) to turn accepted ACs into meaningful tests, including negative cases and real database evidence when applicable.
+
+`make architecture` and `make archlint` enforce package boundaries. The canonical architecture checker also rejects selected transport/database imports in domain/usecase **production code** (not test fixtures); these checks cannot establish correctness of money or access-control policy. Inspect all AI-written test changes for weakened assertions or mocked-away guarantees.
+
 ## Design and review
 
 1. Read the issue and the relevant [contract](roadmap.md). Identify the owning capability and the behavior the change must demonstrate.
@@ -28,6 +34,9 @@ Use the [feature issue form](../.github/ISSUE_TEMPLATE/feature.yml) for intake. 
 |---|---|
 | `make check` | Run formatting, vet, unit tests, import boundary checks, documentation links and skill metadata checks, and build. |
 | `make race` | Check Go shared-memory behavior. |
+| `make test-repeat` | Run tests three times with shuffled order to reveal some state leakage. |
+| `make coverage` | Diagnostic per-function coverage; no percentage implies safety. |
+| `make integration` | Real tagged integration suite requiring `TEST_DATABASE_URL`; intentionally NOT RUN until fixtures/tests exist. |
 | `make lint` | Run golangci-lint, including gosec. |
 | `make security` | Check for reachable vulnerabilities in Go dependencies and the standard library. |
 | `make archlint` | Run the additional Go architecture check. |

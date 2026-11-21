@@ -25,6 +25,16 @@ A PR link or checkbox is **not** evidence of product approval, independent revie
 
 Use `PASS`, `FAIL`, or `NOT RUN` for each check. See [engineering practices](../docs/engineering.md#verification) for commands. Record PostgreSQL contention, migration, or recovery evidence for affected changes.
 
+## Test integrity and evidence
+
+- [ ] Every affected accepted AC maps to an executed test or an explicitly documented NOT RUN.
+- [ ] Positive/negative and failure cases cover the risk; changed tests and assertions were reviewed for weakened behavior.
+- [ ] Database changes use real PostgreSQL, runtime/migration roles, concurrency/rollback and migration tests, or are blocked as NOT RUN.
+- [ ] Money/access/recovery changes address replay, unauthorized action, unknown outcome and crash/restart where applicable.
+- [ ] No skipped/disabled test or CI gate was introduced to manufacture a green result.
+
+See [testing strategy](../docs/testing.md) and the [test-plan checklist](../docs/templates/test-plan.md). A `make unit` PASS is not a PostgreSQL integration PASS.
+
 ## Security impact
 
 - Trust boundary, caller capability and owning resource:

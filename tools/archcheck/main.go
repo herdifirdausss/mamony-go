@@ -43,7 +43,15 @@ func main() {
 		if p.Error != nil {
 			fatal(fmt.Errorf("go list %s: %s", p.ImportPath, p.Error.Err))
 		}
-		for _, dep := range append(append(p.Imports, p.TestImports...), p.XTestImports...) {
+		for _, dep := range p.Imports {
+			if msg := productionViolation(p.ImportPath, dep); msg != "" {
+				fmt.Fprintf(os.Stderr, "ARCH VIOLATION: %s -> %s: %s\n", p.ImportPath, dep, msg)
+				count++
+			}
+		}
+		// Test-only imports can use transport and database drivers for fixtures.
+		// Cross-module boundaries must still hold for tests.
+		for _, dep := range append(p.TestImports, p.XTestImports...) {
 			if msg := violation(p.ImportPath, dep); msg != "" {
 				fmt.Fprintf(os.Stderr, "ARCH VIOLATION: %s -> %s: %s\n", p.ImportPath, dep, msg)
 				count++
@@ -109,6 +117,32 @@ func violation(from, to string) string {
 	}
 	if cb != "" && lb != "" && strings.HasPrefix(a, "internal/app") {
 		return "app cannot bypass capability facade to reach nested internals"
+	}
+	return ""
+}
+
+// productionViolation rejects transport/storage imports from business logic.
+// Apply this only to production imports: tests may use HTTP/SQL fixtures.
+func productionViolation(from, to string) string {
+	if msg := violation(from, to); msg != "" {
+		return msg
+	}
+	a := localPath(from)
+	capName, layer := capLayer(a)
+	if capName == "" || (layer != "domain" && layer != "usecase") {
+		return ""
+	}
+	if to == "net/http" || to == "database/sql" || to == "database/sql/driver" {
+		return "domain/usecase cannot directly import HTTP or database APIs; use a port"
+	}
+	for _, prefix := range []string{
+		"github.com/jackc/pgx", "gorm.io/gorm",
+		"github.com/redis/go-redis", "github.com/rabbitmq/amqp091-go",
+		"github.com/gin-gonic/gin", "github.com/go-chi/chi",
+	} {
+		if to == prefix || strings.HasPrefix(to, prefix+"/") {
+			return "domain/usecase cannot depend on infrastructure libraries; use a port"
+		}
 	}
 	return ""
 }

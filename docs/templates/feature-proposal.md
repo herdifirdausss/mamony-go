@@ -62,6 +62,8 @@ For accepted changes, update the **owning capability contract** with the final A
 
 Avoid mixing broad refactoring, speculative infrastructure and new product behavior in one PR. Block coding on unresolved money/security/irreversible-state decisions.
 
+For AC-to-test mapping, use the [test-plan checklist](test-plan.md) inside this proposal or the PR. A default `go test` PASS is not evidence for real PostgreSQL integration tests.
+
 ## G5–G7 — Verification and outcome
 
 | Requirement / threat | Test / command | Commit and evidence | Result |

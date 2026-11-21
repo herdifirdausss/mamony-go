@@ -1,4 +1,4 @@
-.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run
+.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration
 
 check: fmt-check vet unit architecture docs skills build
 
@@ -10,6 +10,23 @@ vet:
 
 unit:
 	go test ./...
+
+# Re-run tests with randomized order to expose hidden shared state; no coverage claim.
+test-repeat:
+	go test -shuffle=on -count=3 ./...
+
+# Coverage is diagnostic evidence, never a substitute for negative behavior tests.
+coverage:
+	@mkdir -p test-reports
+	go test -coverprofile=test-reports/coverage.out ./...
+	go tool cover -func=test-reports/coverage.out
+
+# Integration tests need real infrastructure; an empty suite must not be reported PASS.
+# Files must be named *_integration_test.go and use //go:build integration.
+integration:
+	@test -n "$(find . -name '*_integration_test.go' -not -path './vendor/*' -print -quit)" || { echo 'NOT RUN: no real integration test files exist'; exit 2; }
+	@test -n "$TEST_DATABASE_URL" || { echo 'NOT RUN: TEST_DATABASE_URL not configured'; exit 2; }
+	go test -tags=integration -count=1 -timeout=3m ./...
 
 architecture:
 	go run ./tools/archcheck
