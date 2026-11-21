@@ -22,7 +22,7 @@ type repairIssuerStub struct {
 	errs  map[string]error
 }
 
-func (s *repairIssuerStub) Resend(_ context.Context, subject string) error {
+func (s *repairIssuerStub) FirstIfMissing(_ context.Context, subject string) error {
 	s.calls = append(s.calls, subject)
 	return s.errs[subject]
 }
