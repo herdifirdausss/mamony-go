@@ -21,12 +21,11 @@ coverage:
 	go test -coverprofile=test-reports/coverage.out ./...
 	go tool cover -func=test-reports/coverage.out
 
-# Integration tests need real infrastructure; an empty suite must not be reported PASS.
-# Files must be named *_integration_test.go and use //go:build integration.
+# Fail closed until a real, disposable PostgreSQL integration harness is
+# implemented and a CI job verifies that its tests actually execute.
+# File existence and TEST_DATABASE_URL alone cannot prove any test ran.
 integration:
-	@test -n "$$(find . -name '*_integration_test.go' -not -path './vendor/*' -print -quit)" || { echo 'NOT RUN: no real integration test files exist'; exit 2; }
-	@test -n "$${TEST_DATABASE_URL:-}" || { echo 'NOT RUN: TEST_DATABASE_URL not configured'; exit 2; }
-	go test -tags=integration -count=1 -timeout=3m ./...
+	@echo 'NOT RUN: PostgreSQL test harness and enforced integration CI are not implemented'; exit 2
 
 architecture:
 	go run ./tools/archcheck
