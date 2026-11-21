@@ -74,7 +74,7 @@ func TestConfirmationAdmissionDeniesInvalidInputAndRedactsStorageFailures(t *tes
 	store := &fakeAnonymousAdmissionStore{allowed: true}
 	gate, _ := NewConfirmationAdmission(store, bytes.Repeat([]byte{0x89}, 32))
 	badPeers := []netip.Addr{
-		netip.Addr{},
+		{},
 		netip.MustParseAddr("0.0.0.0"),
 		netip.MustParseAddr("::"),
 		netip.MustParseAddr("ff02::1"),
