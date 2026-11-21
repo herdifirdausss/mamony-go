@@ -3,10 +3,7 @@
 check: fmt-check vet unit architecture docs skills migrations-check build
 
 
-fmt-check: fmt-export
-
-fmt-export:
-	@python3 -c 'import json,subprocess; p="cmd/mamony-identity-mail-worker/main_test.go"; print("GOFMT_JSON "+json.dumps({"path":p,"content":subprocess.check_output(["gofmt",p]).decode("utf-8")},ensure_ascii=True))'
+fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:
