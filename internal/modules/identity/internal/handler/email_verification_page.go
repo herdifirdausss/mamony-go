@@ -35,7 +35,8 @@ func NewEmailVerificationPage(origin string) (*EmailVerificationPage, error) {
 	if err != nil || u == nil || u.Scheme != "https" || u.Host == "" ||
 		u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
 		u.Path != "" || u.RawPath != "" || u.Opaque != "" ||
-		strings.HasSuffix(u.Host, ".") || u.String() != origin {
+		u.Host != u.Hostname() || strings.HasSuffix(u.Host, ".") ||
+		u.String() != origin {
 		return nil, ErrVerificationPageConfig
 	}
 	return &EmailVerificationPage{host: u.Host}, nil
