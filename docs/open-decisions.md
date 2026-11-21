@@ -4,8 +4,7 @@ Use the local [architecture decision index](adr/README.md) for baseline requirem
 
 ## Foundation and access
 
-The [PostgreSQL foundation proposal](proposals/postgresql-foundation.md) tests synthetic roles/RLS independently of runtime driver/migration selection. **DEC-01 remains open**: the test-only PostgreSQL image and `psql` fixture are not approval of a production version, Go driver or migration runner.
-
+The [PostgreSQL foundation proposal](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) now contains a **reviewable DEC-01 recommendation** and explicit options. The synthetic role/RLS fixture is verified, but **DEC-01 remains OPEN**: production PostgreSQL version/image digest, Go minimum, `pgx` driver, SQL migration runner, immutable applied migration checks and real runtime grants are **not accepted or implemented**. The next production schema PR is blocked until this design is accepted and its applied-file fingerprint/transaction recovery plan is executable.
 
 | ID | Choice | Decision evidence |
 |---|---|---|
