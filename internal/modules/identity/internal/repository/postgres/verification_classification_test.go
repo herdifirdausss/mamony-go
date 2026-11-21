@@ -49,12 +49,12 @@ func TestIdentityProofConsumeClassifiesDatabaseFailuresWithoutLeakingDetails(t *
 		t.Fatal("unexpected SQL result leaked an internal error")
 	}
 	var absent *ProofStore
-	if err := absent.Consume(context.Background(), make([]byte, 32), "evt_AAAAAAAAAAAAAAAAAAAAAA");
-		!errors.Is(err, usecase.ErrEmailProofUnavailable) {
+	err := absent.Consume(context.Background(), make([]byte, 32), "evt_AAAAAAAAAAAAAAAAAAAAAA")
+	if !errors.Is(err, usecase.ErrEmailProofUnavailable) {
 		t.Fatal("absent database authority must be unavailable")
 	}
-	if err := absent.Consume(context.Background(), nil, "evt_AAAAAAAAAAAAAAAAAAAAAA");
-		!errors.Is(err, usecase.ErrEmailProofInvalid) {
+	err = absent.Consume(context.Background(), nil, "evt_AAAAAAAAAAAAAAAAAAAAAA")
+	if !errors.Is(err, usecase.ErrEmailProofInvalid) {
 		t.Fatal("malformed digest must be invalid before any store access")
 	}
 }
