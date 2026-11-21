@@ -39,7 +39,7 @@ For the future production foundation, retain Issue #14's PGF-01–PGF-07 candida
 
 ## G3 — Technical design, security and trade-offs
 
-- `tools/testgate` performs a **strict loopback/test-name/role/URL-parameter preflight**, then reads `go test -json -tags=integration -run '^TestPostgres'` events. It requires specific top-level test cases to PASS; package-level PASS or zero tests never qualify. The tagged test suite repeats the safety preflight so manual invocation is also constrained.
+- `tools/testgate` performs a **strict loopback/test-name/role/URL-parameter preflight**, then reads `go test -json -tags=integration -run '^TestPostgres'` events. It requires specific top-level test cases to PASS; package-level PASS or zero tests never qualify. The tagged test suite repeats the safety preflight so manual invocation is also constrained. The `psql` subprocess additionally strips inherited libpq `PG*` environment variables, including `PGHOSTADDR` and `PGSERVICE`, that could redirect a loopback URL.
 - `tools/postgrestest/testdata/bootstrap.sql` provisions **disposable synthetic** owner/runtime roles and a single small RLS table. It re-creates only the `mamony_test_fixture` schema. No production schema or migration record is created.
 - `tools/postgrestest/postgres_integration_test.go` invokes `psql` under actual admin/runtime credentials and expects SQLSTATE 42501 on forbidden writes. Its tests are black-box SQL behavior checks, not application runtime tests.
 - The CI job starts official PostgreSQL `18.7` as a service. The local runner starts and cleans up a single loopback-only container with a random host port. Passwords in both are **synthetic test fixtures**, not deployable credentials.
