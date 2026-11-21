@@ -17,6 +17,14 @@ Use the signed 64-bit range for stored minor units. A posting amount must be pos
 
 Before implementation, record which fields are part of replay identity. Include the financial content. Decide how correlation metadata affects replay. For public requests, use the [HTTP idempotency contract](../adr/0003-public-http-contract.md#http-idempotency).
 
+## Financial authority before posting
+
+**LGR-12.** A ledger request must come from an explicitly permitted calling capability and carry its authenticated service authority, tenant/resource reference, canonical financial content and applicable posting policy. The business owner resolves the current subject, account ownership, action, beneficiary and approval when required; the ledger enforces its registered posting gate and protects monetary invariants independently. A client-provided `approved` flag, valid user session, known account ID or provider callback cannot directly authorize a journal.
+
+**Acceptance:** Try calling the ledger facade from a disallowed capability, substituting a tenant/account/recipient, replaying an approval for a different amount/currency, using it twice or after expiry/revocation, and racing a frozen account with posting. Require one durable effect or a safe refusal. For a protected high-impact action, the approval receipt must be bound to the exact intent and consumed under an explicitly documented consistency boundary; do not claim an independent approval domain exists in the current monolith.
+
+Money that has left the application through an external provider is not covered by a local database transaction. Keep unknown outcomes unresolved, inquire using the original stable reference, and reconcile. See the [payments workflow](payments-and-payouts.md) and [provider connector](provider.md).
+
 ## Reversal, events, and verification
 
 | ID | Requirement | Go acceptance check |
