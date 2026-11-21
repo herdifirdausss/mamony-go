@@ -84,15 +84,14 @@ func run() error {
 	}
 
 	passed := make(map[string]bool)
-	for _, suite := range []struct {
-		pattern string
-		pkg     string
-	}{
-		{pattern: "^TestPostgres", pkg: "./tools/postgrestest"},
-		{pattern: "^TestIdentity", pkg: "./internal/modules/identity/internal/repository/postgres"},
+	// Commands and package paths are compile-time constants. Never build a
+	// command from a test-supplied repository path or environment variable.
+	for _, cmd := range []*exec.Cmd{
+		exec.Command("go", "test", "-json", "-tags=integration",
+			"-run", "^TestPostgres", "-count=1", "-timeout=3m", "./tools/postgrestest"),
+		exec.Command("go", "test", "-json", "-tags=integration",
+			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 	} {
-		cmd := exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", suite.pattern, "-count=1", "-timeout=3m", suite.pkg)
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
 		var stdout, stderr bytes.Buffer
@@ -104,7 +103,7 @@ func run() error {
 			return parseErr
 		}
 		if err != nil {
-			return fmt.Errorf("go test %s failed: %w (output: %s)", suite.pkg, err, strings.TrimSpace(stderr.String()))
+			return fmt.Errorf("required integration test command failed: %w (output: %s)", err, strings.TrimSpace(stderr.String()))
 		}
 		for k := range observed {
 			passed[k] = true

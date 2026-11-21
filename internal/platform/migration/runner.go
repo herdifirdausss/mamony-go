@@ -128,10 +128,6 @@ func sameFiles(a, b []File) bool {
 	return true
 }
 
-func checkRole(ctx context.Context, conn *pgx.Conn) error {
-	return checkRoleFor(ctx, conn, platformTarget)
-}
-
 func checkRoleFor(ctx context.Context, conn *pgx.Conn, target target) error {
 	var name string
 	var safe bool
