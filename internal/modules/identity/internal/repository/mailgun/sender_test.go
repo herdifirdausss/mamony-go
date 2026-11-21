@@ -75,6 +75,7 @@ func TestMailgunSendsSingleTextOnlyVerificationWithMockHTTP(t *testing.T) {
 		if r.Header.Get("Accept") != "application/json" || !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data;") {
 			t.Error("unexpected request content type")
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 		if err := r.ParseMultipartForm(8192); err != nil {
 			t.Errorf("parse form: %v", err)
 			return
@@ -107,7 +108,7 @@ func TestMailgunSendsSingleTextOnlyVerificationWithMockHTTP(t *testing.T) {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"id":"<fake@mailgun.test>","message":"Queued. Thank you."}`)
+		_, _ = fmt.Fprint(w, `{"id":"<fake@mailgun.test>","message":"Queued. Thank you."}`)
 	})
 	if err := s.SendVerification(context.Background(), sampleChallenge, "alice@example.test", sampleSecret); err != nil {
 		t.Fatal(err)
@@ -180,7 +181,7 @@ func TestMailgunMockProviderStatusClassificationAndSecretsRedaction(t *testing.T
 					w.Header().Set("Location", "https://attacker.example.test/collect")
 				}
 				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
+				_, _ = fmt.Fprint(w, tc.body)
 			})
 			err := s.SendVerification(context.Background(), sampleChallenge, "alice@example.test", sampleSecret)
 			if tc.want == nil && err != nil {

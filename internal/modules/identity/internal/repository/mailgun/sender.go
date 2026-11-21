@@ -194,7 +194,7 @@ func (s *Sender) SendVerification(ctx context.Context, challengeID, recipient, s
 	if err != nil {
 		return usecase.ErrDeliveryUnavailable
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	// Never return provider error bodies or HTTP URL errors: they can contain
 	// submitted verification links or a provider's sensitive diagnostics.
 	if resp.StatusCode != http.StatusOK {

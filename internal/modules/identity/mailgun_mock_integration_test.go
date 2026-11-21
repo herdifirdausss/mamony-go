@@ -164,7 +164,8 @@ func TestIdentityMailgunMockPipeline(t *testing.T) {
 		if !ok || user != "api" || key != "test-mailgun-domain-key" {
 			t.Error("missing Mailgun Basic Auth")
 		}
-		if err := r.ParseMultipartForm(16384); err != nil {
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
+		if err := r.ParseMultipartForm(8192); err != nil {
 			t.Error(err)
 		}
 		if r.FormValue("to") != email || r.FormValue("o:tracking") != "no" ||
@@ -175,9 +176,9 @@ func TestIdentityMailgunMockPipeline(t *testing.T) {
 		status := int(responseCode.Load())
 		w.WriteHeader(status)
 		if status == 200 {
-			fmt.Fprint(w, `{"id":"<mock-id@mailgun.test>","message":"Queued. Thank you."}`)
+			_, _ = fmt.Fprint(w, `{"id":"<mock-id@mailgun.test>","message":"Queued. Thank you."}`)
 		} else {
-			fmt.Fprint(w, `{"message":"synthetic provider rate limit"}`)
+			_, _ = fmt.Fprint(w, `{"message":"synthetic provider rate limit"}`)
 		}
 	}))
 	defer mock.Close()
