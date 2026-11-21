@@ -171,8 +171,8 @@ func TestPostgresRuntimePoolRejectsElevatedRole(t *testing.T) {
 	if pool != nil {
 		pool.Close()
 	}
-	if err == nil {
-		t.Fatal("actual CREATEDB role was accepted as runtime")
+	if err == nil || err.Error() != "PostgreSQL runtime privilege check failed" {
+		t.Fatalf("expected actual PostgreSQL catalog privilege refusal, got %v", err)
 	}
 
 	pool, err = postgres.Open(ctx, postgres.Config{
