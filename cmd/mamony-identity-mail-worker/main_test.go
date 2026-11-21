@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"errors"
 	"os"
 	"path/filepath"
@@ -21,7 +22,7 @@ func fixtureFiles(t *testing.T) map[string]string {
 	}
 	keys := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x31}, 32))
 	return map[string]string{
-		"MAMONY_IDENTITY_DELIVERY_DSN_FILE":  write("dsn", []byte("***db.example.test:5432/mamony_staging?sslmode=verify-full\n")),
+		"MAMONY_IDENTITY_DELIVERY_DSN_FILE":  write("dsn", []byte(fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s\n", "mamony_identity_delivery_runtime", "synthetic", "db.example.test:5432", "mamony_staging", "verify-full"))),
 		"MAMONY_IDENTITY_MAILGUN_KEY_FILE":   write("key", []byte("synthetic-domain-sending-key\n")),
 		"MAMONY_IDENTITY_ENVELOPE_KEYS_FILE": write("envelopes", []byte(`{"active":"key1","keys":{"key1":"`+keys+`"}}`)),
 		"MAMONY_IDENTITY_MAIL_LIVE_APPROVAL": liveApproval,
@@ -94,7 +95,7 @@ func TestMailWorkerRejectsUnsafeSecretFileAndDisposableDBForLiveMode(t *testing.
 			}
 		}},
 		{"test database", func(t *testing.T, env map[string]string) {
-			if err := os.WriteFile(env["MAMONY_IDENTITY_DELIVERY_DSN_FILE"], []byte("***localhost:5432/mamony_test_fixture?sslmode=disable"), 0600); err != nil {
+			if err := os.WriteFile(env["MAMONY_IDENTITY_DELIVERY_DSN_FILE"], []byte(fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s", "mamony_identity_delivery_runtime", "synthetic", "localhost:5432", "mamony_test_fixture", "disable")), 0600); err != nil {
 				t.Fatal(err)
 			}
 		}},
