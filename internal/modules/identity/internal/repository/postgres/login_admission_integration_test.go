@@ -5,6 +5,8 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -157,16 +159,28 @@ func TestIdentityLoginAdmission(t *testing.T) {
 		if winners < 80 || winners > 85 {
 			t.Fatalf("global budget result is outside fixed-window bounds: %d", winners)
 		}
-		var maxHits, minBytes, invalid int
-		err = admin.QueryRow(ctx, `SELECT max(hits)::int,
-			min(octet_length(key_digest))::int,
+		// Bind the query to the independent global test key. Fixed
+		// windows may legitimately cross a minute boundary under a
+		// loaded CI runner; enforce the cap PER bin and exact total
+		// admitted, without assuming one wall-clock minute.
+		mac := hmac.New(sha256.New, bytes.Repeat([]byte{0xe7}, 32))
+		_, _ = mac.Write([]byte("mamony:identity:login-admission:v1\\x00GLOBAL\\x00all"))
+		globalDigest := mac.Sum(nil)
+		var windows, totalHits, maxHits, minBytes, invalid int
+		err = admin.QueryRow(ctx, `SELECT count(*)::int,
+			coalesce(sum(hits), 0)::int,
+			coalesce(max(hits), 0)::int,
+			coalesce(min(octet_length(key_digest)), 0)::int,
 			count(*) FILTER (WHERE octet_length(key_digest)<>32)::int
 			FROM mamony_identity.anonymous_admission_buckets
-			WHERE action='LOGIN' AND scope='GLOBAL_MINUTE'`).
-			Scan(&maxHits, &minBytes, &invalid)
-		if err != nil || maxHits != 80 || minBytes != 32 || invalid != 0 {
-			t.Fatalf("global limit or privacy violated: hits=%d digestBytes=%d invalid=%d err=%v",
-				maxHits, minBytes, invalid, err)
+			WHERE action='LOGIN' AND scope='GLOBAL_MINUTE'
+			  AND key_digest=$1`, globalDigest).
+			Scan(&windows, &totalHits, &maxHits, &minBytes, &invalid)
+		if err != nil || windows < 1 || windows > 2 || totalHits != winners ||
+			maxHits > 80 || minBytes != 32 || invalid != 0 ||
+			(windows == 1 && (maxHits != 80 || winners != 80)) {
+			t.Fatalf("global limit or privacy violated: bins=%d total=%d allowed=%d max=%d bytes=%d invalid=%d err=%v",
+				windows, totalHits, winners, maxHits, minBytes, invalid, err)
 		}
 		// Only the migrating role can change action and scope policy; LOGIN
 		// storage must accept no arbitrary caller-defined quota vectors.
