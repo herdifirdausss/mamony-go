@@ -1,8 +1,9 @@
-// Command doccheck verifies local links from the small repository entry documents.
+// Command doccheck verifies local links in repository documentation.
 package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,46 +13,35 @@ import (
 var link = regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
 
 func main() {
-	for _, path := range []string{
-		"README.md",
-		"AGENTS.md",
-		"docs/index.md",
-		"docs/product.md",
-		"docs/architecture.md",
-		"docs/adr/README.md",
-		"docs/adr/0001-go-modular-monolith.md",
-		"docs/adr/0002-ledger-and-data-ownership.md",
-		"docs/adr/0003-public-http-contract.md",
-		"docs/contracts/ledger-gate-a.md",
-		"docs/contracts/postgresql.md",
-		"docs/delivery/00-platform.md",
-		"docs/delivery/02-identity.md",
-		"docs/delivery/03-screening-onboarding.md",
-		"docs/delivery/04-fees-limits-accounts.md",
-		"docs/delivery/05-provider.md",
-		"docs/delivery/06-fx.md",
-		"docs/delivery/07-money-flows.md",
-		"docs/delivery/08-operations-events.md",
-		"docs/delivery/09-risk-monitoring.md",
-		"docs/delivery/10-settlement-accounting.md",
-		"docs/delivery/11-disputes-developer.md",
-		"docs/delivery/12-platform-expansion.md",
-		"docs/delivery/README.md",
-		"docs/delivery/decisions.md",
-		"docs/delivery/recovery.md",
-		"docs/delivery/validation.md",
-		"docs/evidence/template.md",
-	} {
-		//nolint:gosec // G304: path comes only from the fixed local documentation allowlist above.
-		b, err := os.ReadFile(path)
-		if err != nil {
-			fatal(fmt.Errorf("read %s: %w", path, err))
+	repo := os.DirFS(".")
+	for _, name := range []string{"README.md", "AGENTS.md", ".github/pull_request_template.md"} {
+		if err := checkFile(repo, name); err != nil {
+			fatal(err)
 		}
-		if err := check(path, string(b)); err != nil {
+	}
+	for _, dir := range []string{"docs", ".agents/skills"} {
+		err := fs.WalkDir(repo, dir, func(name string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.Type().IsRegular() && filepath.Ext(name) == ".md" {
+				return checkFile(repo, name)
+			}
+			return nil
+		})
+		if err != nil {
 			fatal(err)
 		}
 	}
 	fmt.Println("local documentation links: PASS")
+}
+
+func checkFile(repo fs.FS, name string) error {
+	doc, err := fs.ReadFile(repo, name)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", name, err)
+	}
+	return check(name, string(doc))
 }
 
 func check(path, contents string) error {
@@ -89,7 +79,6 @@ func check(path, contents string) error {
 		if err != nil || !filepath.IsLocal(rel) {
 			return fmt.Errorf("%s: local link escapes repo via symlink: %s", path, target)
 		}
-		//nolint:gosec // G703: the resolved path is checked against the physical repo root using filepath.Rel and IsLocal.
 		if _, err := os.Stat(resolved); err != nil {
 			return fmt.Errorf("%s: broken local link %s: %w", path, target, err)
 		}

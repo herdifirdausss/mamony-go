@@ -14,10 +14,7 @@ NAMES = (
 )
 FILES = (
     ".go-arch-lint.yml", ".github/workflows/engineering-tools.yml",
-    "scripts/check-openapi-compat.sh", "docs/tooling/shortlist.md",
-    "docs/tooling/third-party-security.md", "docs/tooling/token-economics.md",
-    "docs/tooling/gopls-mcp.md", "docs/tooling/openapi-compat.md",
-    "docs/tooling/structural-search.md",
+    "scripts/check-openapi-compat.sh", "docs/tooling.md",
 )
 
 
@@ -29,10 +26,10 @@ def check(root: Path) -> list[str]:
     if problems:
         return problems
 
-    doc = (root / "docs/tooling/shortlist.md").read_text(encoding="utf-8")
+    doc = (root / "docs/tooling.md").read_text(encoding="utf-8")
     for name in NAMES:
         if not re.search(r"^\| \[{}\]\(".format(re.escape(name)), doc, re.MULTILINE):
-            problems.append(f"missing shortlist entry: {name}")
+            problems.append(f"missing tool entry: {name}")
 
     ci = (root / ".github/workflows/engineering-tools.yml").read_text(encoding="utf-8")
     for marker in (
@@ -52,8 +49,7 @@ def check(root: Path) -> list[str]:
         if marker not in api:
             problems.append(f"OpenAPI script missing: {marker}")
 
-    security = (root / "docs/tooling/third-party-security.md").read_text(encoding="utf-8")
-    if "NOT RUN" not in security or "--no-llm" not in security:
+    if "NOT RUN" not in doc or "--no-llm" not in doc:
         problems.append("skill preflight documentation lacks exact scan mode/status")
     return problems
 

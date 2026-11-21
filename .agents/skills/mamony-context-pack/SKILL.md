@@ -1,6 +1,6 @@
 ---
 name: mamony-context-pack
-description: Use before implementing a Mamony Go issue when the agent needs precise PRD/ADR/TD requirements and a small task context. Do not run for generic unrelated questions.
+description: Use before implementing a Mamony Go issue when the agent needs precise requirements and decisions and a small task context. Do not run for generic unrelated questions.
 ---
 # Mamony context pack
 

@@ -21,7 +21,7 @@ Require an `Idempotency-Key` for requests that change money or state. Scope the 
 | Same key and different payload | Return `422` without a write. |
 | Same key while the first request is running | Return `409`. |
 
-Set the key lifetime in the route contract. A request after expiry is new. The internal [C01 journal key](../contracts/ledger-gate-a.md#posting-and-replay) has its own lifetime.
+Set the key lifetime in the route contract. A request after expiry is new. The internal [ledger journal key](../contracts/ledger.md#posting-and-replay) has its own lifetime.
 
 ## Open decision on wire amounts
 
@@ -32,4 +32,4 @@ Send exact minor units with a currency code. Two wire formats are under consider
 | JSON integer | Use the interoperable safe integer range, up to `2^53 - 1` in magnitude. |
 | JSON string of digits | Can carry the full positive signed 64-bit range when the route validates it. Define whether the route accepts a sign or zero. |
 
-Choose the JSON type and range before publishing the first amount-bearing route. Record the choice here and in OpenAPI. Test the wire range and the [internal ledger range](../contracts/ledger-gate-a.md#posting-and-replay) independently.
+Choose the JSON type and range before publishing the first amount-bearing route. Record the choice here and in OpenAPI. Test the wire range and the [internal ledger range](../contracts/ledger.md#posting-and-replay) independently.
