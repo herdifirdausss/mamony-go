@@ -39,4 +39,7 @@ export TEST_DATABASE_URL="postgres://mamony_test_runtime:local-test-runtime@127.
 export TEST_PLATFORM_MIGRATION_URL="postgres://mamony_platform_migrator:local-test-platform-migrator@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_PLATFORM_RUNTIME_URL="postgres://mamony_platform_runtime:local-test-platform-runtime@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 
+export TEST_IDENTITY_MIGRATION_URL="postgres://mamony_identity_migrator:local-test-identity-migrator@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_IDENTITY_RUNTIME_URL="postgres://mamony_identity_runtime:local-test-identity-runtime@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+
 make integration
