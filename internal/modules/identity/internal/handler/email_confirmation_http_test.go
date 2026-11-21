@@ -4,12 +4,15 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"fmt"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"strings"
 	"testing"
+
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 )
 
 type confirmationGateFake struct {
@@ -77,7 +80,7 @@ func TestEmailConfirmationHTTPAcceptedAndFailures(t *testing.T) {
 		t.Fatal("valid confirmation failed or produced a token-bearing response")
 	}
 	var genericFailure string
-	for _, err := range []error{errors.New("expired proof"), errors.New("replayed proof"), errors.New("raw sensitive SQL error")} {
+	for _, err := range []error{usecase.ErrEmailProofInvalid, fmt.Errorf("expired: %w", usecase.ErrEmailProofInvalid)} {
 		work.err = err
 		w = httptest.NewRecorder()
 		h.ServeHTTP(w, confirmationRequest(confirmEmailPath, body))
@@ -89,6 +92,28 @@ func TestEmailConfirmationHTTPAcceptedAndFailures(t *testing.T) {
 			t.Fatal("invalid/expired/replayed responses differ")
 		}
 		genericFailure = w.Body.String()
+	}
+	var genericOutage string
+	for _, failure := range []error{
+		usecase.ErrEmailProofUnavailable,
+		errors.New("secret SQL DSN with password"),
+	} {
+		work.err = failure
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, confirmationRequest(confirmEmailPath, body))
+		if w.Code != http.StatusServiceUnavailable ||
+			strings.Contains(w.Body.String(), "secret") ||
+			strings.Contains(w.Body.String(), confirmationToken()) ||
+			w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("verifier fault must return a redacted non-cacheable 503")
+		}
+		if genericOutage != "" && genericOutage != w.Body.String() {
+			t.Fatal("unexpected infrastructure faults had distinguishable HTTP bodies")
+		}
+		genericOutage = w.Body.String()
+	}
+	if genericFailure == genericOutage {
+		t.Fatal("invalid proof and unavailable authority must not be conflated")
 	}
 	work.err = nil
 	gate.allowed = false
