@@ -12,6 +12,7 @@ import (
 
 // Page assets are embedded at build time, never fetched from a CDN.
 // The only script and stylesheet are pinned to their own response CSP hashes.
+//
 //go:embed email_verification_page.js email_verification_page.css
 var verificationPageAssets embed.FS
 
