@@ -20,6 +20,32 @@ func NewProofStore(db Transactor) (*ProofStore, error) {
 	return &ProofStore{db: db}, nil
 }
 
+// FindUnverifiedSubject accepts a canonical email, and returns a server-owned
+// subject only for an eligible unverified alias. No HTTP caller may supply a
+// subject ID. Missing/active/verified aliases return ("", nil); SQL errors
+// are redacted. The verifier role has SELECT-only authority for this lookup.
+func (s *ProofStore) FindUnverifiedSubject(ctx context.Context, email string) (string, error) {
+	if s == nil || s.db == nil || !isCanonicalEmail(email) {
+		return "", ErrStorageUnavailable
+	}
+	var subject string
+	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT s.subject_id
+			FROM mamony_identity.email_aliases a
+			JOIN mamony_identity.subjects s ON s.subject_id=a.subject_id
+			WHERE a.canonical_email=$1 AND a.verified_at IS NULL
+			  AND a.contact_version=1 AND s.status='UNVERIFIED'`, email).
+			Scan(&subject)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", ErrStorageUnavailable
+	}
+	return subject, nil
+}
+
 // Issue checks the authoritative current contact, revokes earlier live
 // challenges, inserts the digest and commits a security event atomically.
 // It does not send email or persist the plaintext verification bearer.
