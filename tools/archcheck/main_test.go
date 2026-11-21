@@ -58,3 +58,31 @@ func TestProductionImportPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestCapabilityPackageLayout(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, path string
+		allowed    bool
+	}{
+		{"facade", "internal/modules/ledger", true},
+		{"domain", "internal/modules/ledger/internal/domain", true},
+		{"domain feature", "internal/modules/ledger/internal/domain/posting", true},
+		{"usecase feature", "internal/modules/ledger/internal/usecase/posting", true},
+		{"postgres adapter", "internal/modules/ledger/internal/repository/postgres", true},
+		{"http handler", "internal/modules/ledger/internal/handler/httpapi", true},
+		{"non module tool", "tools/archcheck", true},
+		{"public adapter bypass", "internal/modules/ledger/repository/postgres", false},
+		{"unknown layer bypass", "internal/modules/ledger/internal/features/posting", false},
+		{"unknown service layer", "internal/modules/ledger/internal/service", false},
+		{"missing layer", "internal/modules/ledger/internal", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := packagePathViolation(module + "/" + tc.path)
+			if (got == "") != tc.allowed {
+				t.Fatalf("packagePathViolation(%q)=%q allowed=%v", tc.path, got, tc.allowed)
+			}
+		})
+	}
+}
