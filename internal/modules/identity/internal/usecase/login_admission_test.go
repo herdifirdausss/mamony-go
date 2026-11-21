@@ -23,9 +23,9 @@ func TestLoginAdmissionHMACPrivacyAndIndependentBudgets(t *testing.T) {
 			t.Fatalf("valid login admission was rejected: %t %v", ok, err)
 		}
 		wants := []struct {
-			scope string
+			scope  string
 			window int64
-			limit int32
+			limit  int32
 		}{
 			{"GLOBAL_MINUTE", 60, 80},
 			{"CLIENT_MINUTE", 60, 8},
@@ -95,7 +95,7 @@ func TestLoginAdmissionInvalidFailClosedAndRedacted(t *testing.T) {
 	g, _ := NewLoginAdmission(s, bytes.Repeat([]byte{0xbb}, 32))
 	for _, tc := range []struct {
 		email string
-		peer netip.Addr
+		peer  netip.Addr
 	}{
 		{"nope", netip.MustParseAddr("198.51.100.2")},
 		{"alice@example.test", netip.Addr{}},
