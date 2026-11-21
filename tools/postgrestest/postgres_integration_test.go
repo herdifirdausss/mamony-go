@@ -66,7 +66,9 @@ func invokePSQL(urlEnv string, args ...string) (string, error) {
 	// rejects erroring SQL; verbose output exposes SQLSTATE for negative tests.
 	base := []string{"-X", "-w", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose", "-d", os.Getenv(urlEnv)}
 	cmd := exec.Command("psql", append(base, args...)...)
-	cmd.Env = append(os.Environ(), "PGCONNECT_TIMEOUT=5", "PGOPTIONS=-c statement_timeout=5000 -c lock_timeout=1000")
+	// libpq environment variables (notably PGHOSTADDR and PGSERVICE) can
+	// override/redirect a URL target. Ignore all inherited PG* values.
+	cmd.Env = sanitizedPSQLEnv(os.Environ())
 	b, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(b)), err
 }
@@ -130,5 +132,30 @@ func TestPostgresTenantContext(t *testing.T) {
 		"SET ROLE mamony_test_owner; SELECT COUNT(*) FROM mamony_test_fixture.records; RESET ROLE;")
 	if err != nil || owner != "0" {
 		t.Fatalf("FORCE RLS should apply to table owner: owner=%q err=%v", owner, err)
+	}
+}
+
+func sanitizedPSQLEnv(env []string) []string {
+	out := make([]string, 0, len(env)+2)
+	for _, entry := range env {
+		name, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(name, "PG") {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return append(out, "PGCONNECT_TIMEOUT=5", "PGOPTIONS=-c statement_timeout=5000 -c lock_timeout=1000")
+}
+
+func TestPostgresPSQLEnvIsolation(t *testing.T) {
+	env := sanitizedPSQLEnv([]string{
+		"PATH=/usr/bin", "PGHOSTADDR=10.1.2.3", "PGSERVICE=production",
+		"PGDATABASE=payments", "PGPASSWORD=real-secret",
+	})
+	for _, entry := range env {
+		if strings.HasPrefix(entry, "PGHOSTADDR=") || strings.HasPrefix(entry, "PGSERVICE=") ||
+			strings.HasPrefix(entry, "PGDATABASE=") || strings.HasPrefix(entry, "PGPASSWORD=") {
+			t.Fatalf("libpq override leaked into fixture: %q", entry)
+		}
 	}
 }
