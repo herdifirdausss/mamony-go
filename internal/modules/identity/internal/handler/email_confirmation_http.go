@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 )
 
 const (
@@ -142,10 +144,16 @@ func (h *EmailConfirmationHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 	// Confirm rechecks purpose, token digest, current contact version,
 	// status, revocation and expiry in the owning verifier transaction.
-	// It never issues a login session. All failed proofs have one public
-	// outcome, regardless of whether invalid, expired or already consumed.
+	// It never issues a login session. Known invalid/expired/replayed proofs
+	// share 400; unexpected authority faults return a redacted 503 instead
+	// of misleading a user into believing their valid proof was rejected.
 	if err := h.confirmer.Confirm(r.Context(), token); err != nil {
-		writeConfirmationProblem(w, http.StatusBadRequest, "INVALID_OR_EXPIRED_PROOF")
+		if errors.Is(err, usecase.ErrEmailProofInvalid) {
+			writeConfirmationProblem(w, http.StatusBadRequest, "INVALID_OR_EXPIRED_PROOF")
+			return
+		}
+		// Unknown errors are NOT trusted as proof-invalid. Fail closed.
+		writeConfirmationProblem(w, http.StatusServiceUnavailable, "UNAVAILABLE")
 		return
 	}
 	setConfirmationHeaders(w)
