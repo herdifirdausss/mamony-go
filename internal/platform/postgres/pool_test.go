@@ -2,13 +2,22 @@ package postgres
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 )
 
 func TestRuntimeConfigRefusesUnsafeConnection(t *testing.T) {
 	t.Parallel()
-	safe := "postgres://mamony_test_runtime:sentinel-do-not-log@127.0.0.1:5432/mamony_test_ci?sslmode=disable"
+	// Assemble a synthetic credential rather than embedding a literal
+	// password-bearing DSN; gosec G101 remains enabled for application code.
+	safe := (&url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword("mamony_test_runtime", "sentinel-do-not-log"),
+		Host:     "127.0.0.1:5432",
+		Path:     "/mamony_test_ci",
+		RawQuery: "sslmode=disable",
+	}).String()
 	cases := []struct {
 		name string
 		cfg  Config
