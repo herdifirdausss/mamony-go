@@ -47,7 +47,9 @@ Run targeted tests while implementing, then required CI gates. For critical chan
 
 The first fixture-only gate is implemented by `tools/postgrestest` and the `PostgreSQL integration / postgresql` CI job. It tests synthetic owner/runtime privileges and `FORCE ROW LEVEL SECURITY`, including tenant-context expiry on one PostgreSQL connection. Both the Go gate and the tagged suite reject unsafe test URLs. See the [foundation proposal](proposals/postgresql-foundation.md) for scope and limitations.
 
-**Still NOT RUN:** production schema migrations, applied-file checksums and upgrades, a Go connection pool, end-to-end tenant authorization, ledger locks/idempotency/reversal, outbox, restore and true concurrent SQL execution. The fixture tests do not use or validate an actual application repository.
+**Implemented and executed on disposable PostgreSQL:** platform migration v1 with applied-file SHA-256 fingerprints, altered/missing-history rejection, synthetic upgrade, rollback on failing SQL and dirty-state detection (PR #17). The `TestPostgresRuntimePool*` cases verify a real, bounded Go `pgxpool` under synthetic tenant RLS, including physical session reuse, rollback and cancellation; these are implemented as part of the runtime-pool PR and must show actual CI PASS before a completion claim.
+
+**Still NOT RUN:** full production schema upgrade/restore and secret provisioning, tenant authorization by Identity/usecase, a real module repository, HTTP database readiness, ledger locks/idempotency/reversal, outbox, backup restore and deterministic concurrent financial SQL execution. A green RLS/pgxpool test is **not** a financial or user-authorization guarantee.
 
 Next, after DEC-01 is accepted:
 1. Choose the supported PostgreSQL version, Go driver and migration tool, with explicit immutable migration evidence and scoped owner/runtime credentials.

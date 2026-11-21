@@ -37,3 +37,9 @@ This creates an ephemeral PostgreSQL 18.7 container bound to a random **loopback
 Accepted DEC-01 uses PostgreSQL 18.7, native pgx v5, and golang-migrate v4 with a **database-committed SHA-256 fingerprint per applied migration**. The executable is `cmd/mamony-migrate` and must be invoked **outside the HTTP process** with separate migration credentials. The public HTTP binary never receives migration credentials.
 
 The dedicated [platform migration runbook](docs/runbooks/platform-migrations.md) describes bootstrap grants, startup, integrity evidence, and dirty-state recovery. `make migrations-check` checks committed migration files without accessing PostgreSQL. `make integration-local` runs the disposable PostgreSQL integration suite, including negative migration tests, when Docker and `psql` are installed. Ledger, tenant runtime adapters, and restore remain future work.
+
+## Runtime PostgreSQL primitive (not yet connected to HTTP)
+
+`internal/platform/postgres` provides an optional bounded native `pgxpool` wrapper that checks the real runtime DB role, requires verified TLS outside isolated loopback test databases, and uses **transaction-local** tenant context for an already-authorized tenant ID. No application/handler is wired to this pool yet. The authority to grant access to a tenant must come from a future Identity/owning usecase, **never from a client-supplied tenant string or from RLS alone**.
+
+The disposable `make integration-local` suite now also verifies connection reuse, negative tenant reads/writes, rollback, cancellation and elevated-role refusal against PostgreSQL itself. This does not require a production database or credentials.
