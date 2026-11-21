@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Start with a problem, not a proposed framework. Follow the [change lifecycle](../../docs/development-workflow.md). Sensitive money, identity, authorization, recovery, or cross-boundary changes use the Critical path until reviewed. Do not include secrets or real customer data.
+        Start with a problem, not a proposed framework. Follow the [change lifecycle](https://github.com/herdifirdausss/mamony-go/blob/main/docs/development-workflow.md). Sensitive money, identity, authorization, recovery, or cross-boundary changes use the Critical path until reviewed. Do not include secrets or real customer data.
   - type: textarea
     id: problem
     attributes:
