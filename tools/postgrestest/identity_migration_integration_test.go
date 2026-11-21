@@ -58,6 +58,14 @@ func TestPostgresIdentityMigration(t *testing.T) {
 			t.Fatalf("identity runtime role must fail SQLSTATE 42501: query=%q err=%v output=%q", stmt, err, output)
 		}
 	}
+	// Even an INSERT-capable runtime cannot manufacture an already active or
+	// verified account before the separate verification migration is accepted.
+	activeID := "sub_AAAAAAAAAAAAAAAAAAAAAA"
+	output, err := invokePSQL("TEST_IDENTITY_RUNTIME_URL", "-c",
+		"INSERT INTO mamony_identity.subjects (subject_id, status, created_at) VALUES ('"+activeID+"','ACTIVE',now())")
+	if err == nil || !strings.Contains(output, "23514") {
+		t.Fatalf("direct ACTIVE insert must fail the migration constraint: %q %v", output, err)
+	}
 	for _, stmt := range []string{
 		"SELECT * FROM mamony_identity.subjects",
 		"SELECT * FROM mamony_identity.email_aliases",

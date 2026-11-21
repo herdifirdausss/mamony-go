@@ -8,15 +8,15 @@ CREATE TABLE mamony_identity.migration_fingerprints (
 
 CREATE TABLE mamony_identity.subjects (
     subject_id text PRIMARY KEY CHECK (subject_id ~ '^sub_[A-Za-z0-9_-]{22}$'),
-    status text NOT NULL CHECK (status IN ('UNVERIFIED', 'ACTIVE', 'SUSPENDED', 'FROZEN', 'DELETED')),
+    status text NOT NULL CHECK (status = 'UNVERIFIED'),
     created_at timestamptz NOT NULL
 );
 
 CREATE TABLE mamony_identity.email_aliases (
     canonical_email text PRIMARY KEY CHECK (length(canonical_email) BETWEEN 3 AND 254 AND canonical_email = lower(canonical_email)),
     subject_id text NOT NULL UNIQUE REFERENCES mamony_identity.subjects(subject_id),
-    contact_version bigint NOT NULL DEFAULT 1 CHECK (contact_version > 0),
-    verified_at timestamptz NULL,
+    contact_version bigint NOT NULL DEFAULT 1 CHECK (contact_version = 1),
+    verified_at timestamptz NULL CHECK (verified_at IS NULL),
     created_at timestamptz NOT NULL
 );
 
@@ -47,4 +47,4 @@ GRANT INSERT ON mamony_identity.subjects,
     mamony_identity.security_outbox TO mamony_identity_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (1, 'b8c877cd3db626e73c0747ffa495cc30fe2475271b0094afdb06dcf455c6fc51');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (1, 'd5dd2d2a68f3ad3fa01c6cf0ed8243f2b023e840b94cf8c09df215e26388f4e1');

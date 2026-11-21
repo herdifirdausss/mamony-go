@@ -114,12 +114,16 @@ func TestIdentityRegistrationPersistence(t *testing.T) {
 		const attempts = 8
 		var wg sync.WaitGroup
 		results := make(chan error, attempts)
-		for i := 0; i < attempts; i++ {
+		candidates := make([]usecase.PendingRegistration, attempts)
+		for i := range candidates {
+			candidates[i] = syntheticPending(t, email)
+		}
+		for _, candidate := range candidates {
 			wg.Add(1)
-			go func() {
+			go func(r usecase.PendingRegistration) {
 				defer wg.Done()
-				results <- store.CreatePendingWithObligation(ctx, syntheticPending(t, email))
-			}()
+				results <- store.CreatePendingWithObligation(ctx, r)
+			}(candidate)
 		}
 		wg.Wait()
 		close(results)
