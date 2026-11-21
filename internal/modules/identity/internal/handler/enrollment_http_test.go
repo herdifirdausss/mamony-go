@@ -153,7 +153,7 @@ func TestIdentityEnrollmentHTTPRejectsUnsafeRequests(t *testing.T) {
 				strings.Contains(strings.ToLower(w.Body.String()), "secret") {
 				t.Fatalf("untrusted request escaped: status=%d want=%d body=%q", w.Code, tc.want, w.Body.String())
 			}
-			if gate.called != (tc.name == "missing client peer") {
+			if gate.called {
 				t.Fatal("rejected request unexpectedly reached anonymous admission")
 			}
 		})

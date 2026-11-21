@@ -1,6 +1,6 @@
 # Identity enrollment: first implementation slice
 
-**Status:** DRAFT / stacked PRs #22–#30; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Status:** DRAFT / stacked PRs #22–#31; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
 The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Real provider delivery, running worker and public HTTP activation are still disabled.
 
@@ -85,3 +85,7 @@ Add internal `AnonymousAdmission` (HMAC-email and peer-IP/privacy-keyed budget) 
 ## Draft retention slice — stacked PR #30
 
 Additive Identity migration v6, a dedicated maintenance role, two bounded SQL erasure functions, and an opt-in single-run command. Email ciphertext is NULLed only after expiration +24h without active lease, while delivery/security evidence survives; HMAC anonymous admission counters older than 48h from window start are deleted. No endpoint or live provider is enabled. Backup/replica/WAL disposal, legal holds and retention approval remain blockers.
+
+## HTTP orchestration candidate — stacked Draft PR #31
+
+A non-mounted first-party `POST /v1/identity/register` / `POST /v1/identity/resend-verification` handler now verifies TLS, exact trusted Origin/Host and same-origin Fetch Metadata, denies cookies/auth headers, accepts strict <=2KB JSON with duplicate-key/unknown-field rejection, runs the HMAC admission gate, and returns uniform 202 receipts for eligible/existing/missing/throttled outcomes. The server looks up UNVERIFIED subjects by canonical email with the verifier role, never by an anonymous caller-supplied `subjectID`. New pending registration can trigger the encrypted proof outbox, but the two operations commit separately; a crash between them remains an explicit reconciliation/monitoring release gate. This is **internal-only test wiring**, not a public route. Real PostgreSQL/AEAD tests plus unchanged router negative tests are mandatory. Timing equivalence, production Argon2id measured capacity, blocklist, trusted proxy TLS identity, provider quota, legitimate resend recovery and operational alerting remain unapproved.
