@@ -2,9 +2,10 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
-	"net"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -17,7 +18,7 @@ func TestRunRejectsUnsafeAddresses(t *testing.T) {
 		{PublicAddr: "127.0.0.1:8080", PrivateAddr: "0.0.0.0:8081"},
 		{PublicAddr: "", PrivateAddr: "127.0.0.1:8081"},
 	} {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		err := Run(ctx, logger, tc)
 		cancel()
 		if err == nil {
@@ -26,30 +27,76 @@ func TestRunRejectsUnsafeAddresses(t *testing.T) {
 	}
 }
 
-func TestRunStartsAndStops(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	// Dynamically selected ports avoid colliding with default local listeners.
-	addr1 := availableAddr(t)
-	addr2 := availableAddr(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	errCh := make(chan error, 1)
-	go func() { errCh <- Run(ctx, logger, Config{PublicAddr: addr1, PrivateAddr: addr2}) }()
-	defer cancel()
-	// The app may take a small amount of time to bind both listeners.
-	deadline := time.After(3 * time.Second)
-	for {
-		conn, err := net.DialTimeout("tcp", addr2, 50*time.Millisecond)
-		if err == nil {
-			_ = conn.Close()
-			break
-		}
+type listenerAddresses struct {
+	Public  string `json:"public"`
+	Private string `json:"private"`
+}
+
+// startLogWriter records bound addresses from the startup message. Both
+// listeners are bound on port zero, so the test never releases and reclaims a
+// preselected port.
+type startLogWriter struct {
+	started chan<- listenerAddresses
+}
+
+func (w startLogWriter) Write(p []byte) (int, error) {
+	var entry struct {
+		Msg string `json:"msg"`
+		listenerAddresses
+	}
+	if json.Unmarshal(p, &entry) == nil && entry.Msg == "mamony simulator HTTP foundation started" {
 		select {
-		case <-deadline:
-			t.Fatal("private listener did not start")
+		case w.started <- entry.listenerAddresses:
 		default:
-			time.Sleep(10 * time.Millisecond)
 		}
 	}
+	return len(p), nil
+}
+
+func TestRunStartsAndStops(t *testing.T) {
+	started := make(chan listenerAddresses, 1)
+	logger := slog.New(slog.NewJSONHandler(startLogWriter{started: started}, nil))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Run(ctx, logger, Config{
+			PublicAddr:  "127.0.0.1:0",
+			PrivateAddr: "localhost:0",
+		})
+	}()
+
+	var addresses listenerAddresses
+	select {
+	case addresses = <-started:
+	case err := <-errCh:
+		t.Fatalf("server stopped before startup: %v", err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("listeners did not start")
+	}
+
+	client := &http.Client{Timeout: time.Second}
+	for _, tc := range []struct {
+		name string
+		url  string
+		code int
+	}{
+		{"private readiness", "http://" + addresses.Private + "/readyz", http.StatusOK},
+		{"readiness not public", "http://" + addresses.Public + "/readyz", http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := client.Get(tc.url)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.code {
+				t.Fatalf("status=%d want=%d", resp.StatusCode, tc.code)
+			}
+		})
+	}
+
 	cancel()
 	select {
 	case err := <-errCh:
@@ -59,17 +106,4 @@ func TestRunStartsAndStops(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("shutdown timed out")
 	}
-}
-
-func availableAddr(t *testing.T) string {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := ln.Addr().String()
-	if err := ln.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return addr
 }
