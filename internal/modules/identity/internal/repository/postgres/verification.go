@@ -149,9 +149,18 @@ func (s *ProofStore) Issue(ctx context.Context, r usecase.EmailProofRequest) (us
 // current alias BEFORE consuming a challenge, so a concurrent resend cannot
 // make a previously revoked token valid. All state changes and mandatory
 // outbox evidence commit or roll back together.
+//
+// ErrEmailProofInvalid is returned ONLY for an authoritative negative proof
+// decision: nonexistent token/subject, wrong contact or status, expired,
+// revoked or already-consumed challenge. All SQL/commit/transport failures
+// return the distinct, sanitized ErrEmailProofUnavailable. No raw pgx error,
+// token digest, subject ID or email is returned to the HTTP boundary.
 func (s *ProofStore) Consume(ctx context.Context, tokenDigest []byte, eventID string) error {
-	if s == nil || s.db == nil || len(tokenDigest) != 32 || len(eventID) != 26 {
+	if len(tokenDigest) != 32 || len(eventID) != 26 {
 		return usecase.ErrEmailProofInvalid
+	}
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil {
+		return usecase.ErrEmailProofUnavailable
 	}
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
 		var subject, email string
@@ -160,7 +169,7 @@ func (s *ProofStore) Consume(ctx context.Context, tokenDigest []byte, eventID st
 			FROM mamony_identity.email_verification_challenges
 			WHERE token_digest = $1 AND purpose = 'EMAIL_VERIFY'`, tokenDigest).
 			Scan(&subject, &email, &version); err != nil {
-			return usecase.ErrEmailProofInvalid
+			return confirmationScanError(err)
 		}
 		var currentEmail, status string
 		var currentVersion int64
@@ -170,7 +179,7 @@ func (s *ProofStore) Consume(ctx context.Context, tokenDigest []byte, eventID st
 			JOIN mamony_identity.email_aliases a ON a.subject_id = s.subject_id
 			WHERE s.subject_id = $1 FOR UPDATE OF s, a`, subject).
 			Scan(&status, &currentEmail, &currentVersion, &verifiedAt); err != nil {
-			return usecase.ErrEmailProofInvalid
+			return confirmationScanError(err)
 		}
 		if status != "UNVERIFIED" || verifiedAt != nil ||
 			currentEmail != email || currentVersion != version {
@@ -185,30 +194,50 @@ func (s *ProofStore) Consume(ctx context.Context, tokenDigest []byte, eventID st
 			  AND expires_at > clock_timestamp()
 			RETURNING challenge_id`, tokenDigest, subject, email, version).
 			Scan(&challengeID); err != nil {
-			return usecase.ErrEmailProofInvalid
+			return confirmationScanError(err)
 		}
 		tag, err := tx.Exec(ctx, `UPDATE mamony_identity.email_aliases
 			SET verified_at = clock_timestamp()
 			WHERE subject_id = $1 AND canonical_email = $2 AND contact_version = $3
 			  AND verified_at IS NULL`, subject, email, version)
-		if err != nil || tag.RowsAffected() != 1 {
+		if err != nil {
+			return usecase.ErrEmailProofUnavailable
+		}
+		if tag.RowsAffected() != 1 {
 			return usecase.ErrEmailProofInvalid
 		}
 		tag, err = tx.Exec(ctx, `UPDATE mamony_identity.subjects SET status = 'ACTIVE'
 			WHERE subject_id = $1 AND status = 'UNVERIFIED'`, subject)
-		if err != nil || tag.RowsAffected() != 1 {
-			return usecase.ErrEmailProofInvalid
-		}
-		_, err = tx.Exec(ctx, `INSERT INTO mamony_identity.security_outbox
-			(event_id, subject_id, event_type, occurred_at)
-			VALUES ($1, $2, 'CONTACT_VERIFIED', clock_timestamp())`, eventID, subject)
-		return err
-	})
-	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		if err != nil {
 			return usecase.ErrEmailProofUnavailable
 		}
+		if tag.RowsAffected() != 1 {
+			return usecase.ErrEmailProofInvalid
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO mamony_identity.security_outbox
+			(event_id, subject_id, event_type, occurred_at)
+			VALUES ($1, $2, 'CONTACT_VERIFIED', clock_timestamp())`, eventID, subject); err != nil {
+			return usecase.ErrEmailProofUnavailable
+		}
+		return nil
+	})
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, usecase.ErrEmailProofInvalid) {
 		return usecase.ErrEmailProofInvalid
 	}
-	return nil
+	// Includes failed BEGIN/COMMIT, aborted transactions, canceled requests
+	// and unexpected driver faults. Never report those as a bad token.
+	return usecase.ErrEmailProofUnavailable
+}
+
+// pgx.ErrNoRows is an authoritative negative proof result at the three
+// SELECT/UPDATE RETURNING steps; other driver failures are infrastructure
+// errors. Keep this decision private to the owning PostgreSQL adapter.
+func confirmationScanError(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return usecase.ErrEmailProofInvalid
+	}
+	return usecase.ErrEmailProofUnavailable
 }
