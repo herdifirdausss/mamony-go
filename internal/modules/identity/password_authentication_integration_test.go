@@ -6,8 +6,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"net/url"
 	"net/netip"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -207,7 +207,7 @@ func TestIdentityPasswordAuthentication(t *testing.T) {
 
 // Count real Argon2id invocations without creating any session capability.
 type countedPasswordAuthenticator struct {
-	real *usecase.PasswordAuthentication
+	real  *usecase.PasswordAuthentication
 	calls int
 }
 
