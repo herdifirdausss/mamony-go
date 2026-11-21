@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -76,11 +77,29 @@ func TestMailgunSendsSingleTextOnlyVerificationWithMockHTTP(t *testing.T) {
 			t.Error("unexpected request content type")
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
-		if err := r.ParseMultipartForm(8192); err != nil {
-			t.Errorf("parse form: %v", err)
+		reader, err := r.MultipartReader()
+		if err != nil {
+			t.Errorf("open multipart reader: %v", err)
 			return
 		}
-		form := r.MultipartForm.Value
+		form := make(map[string][]string)
+		for {
+			part, err := reader.NextPart()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				t.Errorf("read multipart part: %v", err)
+				return
+			}
+			value, readErr := io.ReadAll(io.LimitReader(part, 4097))
+			_ = part.Close()
+			if readErr != nil || len(value) > 4096 {
+				t.Error("oversized or invalid multipart field")
+				return
+			}
+			form[part.FormName()] = append(form[part.FormName()], string(value))
+		}
 		want := map[string]string{
 			"from":              "Mamony Security <security@mg.example.test>",
 			"to":                "alice@example.test",
