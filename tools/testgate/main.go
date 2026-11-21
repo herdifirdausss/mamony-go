@@ -45,6 +45,7 @@ var requiredTests = []string{
 	"TestIdentityResendAdmission",
 	"TestIdentityAnonymousAdmission",
 	"TestIdentityConfirmationAdmission",
+	"TestIdentityLoginAdmission",
 	"TestIdentityRetentionPurge",
 }
 
