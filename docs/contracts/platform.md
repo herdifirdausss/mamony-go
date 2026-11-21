@@ -12,17 +12,6 @@ The current binary reads listener addresses at startup and shuts down on cancell
 | FND-04 | Use structured logs with a correlation ID. Record the actor, action, target, outcome, time, and capability for controlled changes. | Follow one request across a job and a consumer. Check redaction and trace continuity. |
 | FND-05 | Provide one local startup command once PostgreSQL joins the application. Give the process bounded startup and shutdown. | Start from a clean clone with synthetic fixtures. Cancel the process during a job. Check that work can resume. |
 
-## Security operations and evidence
-
-| ID | Requirement | Acceptance check |
-|---|---|---|
-| FND-09 | Give build automation, application runtime, migration tooling and cross-tenant jobs separate least-privilege credentials and permissions. Limit cryptographic operations by caller, purpose and key version. | Check actual workflow-token privileges, DB role grants, runtime access to migration secrets and an unauthorized signing/decryption request. |
-| FND-10 | Keep credentials, secrets, token bodies, password verifiers and sensitive identity payloads out of logs, tracing, error responses, analytics and committed fixtures. Have a documented rotation/revocation path for enabled secrets. | Exercise application errors and request tracing with synthetic sentinel secrets; verify no disclosure, and review revocation of a compromised test credential. |
-| FND-11 | Define resource budgets for public requests and expensive authentication operations; enforce trustworthy proxy headers and an egress policy where external calls exist. Keep health listeners' network exposure independent of future payment routes. | Test oversized input, concurrency exhaustion, spoofed forwarding headers, forbidden outbound address and the deployed public/private route inventory. |
-| FND-12 | Keep security-event obligations durable with their state changes and audit evidence restricted from ordinary business writers. Choose and test recovery checkpoints before claiming rollback or tamper resistance. | Fail event/outbox write and worker dispatch, deny unauthorized audit modification, restore a stale snapshot, and detect revoked-session/approval resurrection. |
-
-Passing lint, `gosec` or `govulncheck` proves only the checks run on that commit. It does **not** prove authorization, RLS isolation, ledger concurrency, event durability, cryptographic trust boundaries or regulatory compliance. See the [engineering verification matrix](../engineering.md#security-verification).
-
 ## Local transactions
 
 - Each write has one owner. Use the owner role only for migrations. Use a limited runtime role for the application.
@@ -39,3 +28,15 @@ Passing lint, `gosec` or `govulncheck` proves only the checks run on that commit
 | FND-08 | Create backups on a schedule. Restore them in a fresh environment. Check data, migrations, grants, and the ledger verifier. | Recover a committed journal and its outbox row. Record elapsed time and the recovery point. |
 
 Run `make check` for each PR. It covers the current Go and documentation foundation. Add database and recovery commands when their fixtures exist. Keep those checks in the CI evidence for each later gate.
+
+## Security operations and evidence
+
+| ID | Requirement | Acceptance check |
+|---|---|---|
+| FND-09 | Give build automation, application runtime, migration tooling and cross-tenant jobs separate least-privilege credentials and permissions. Limit cryptographic operations by caller, purpose and key version. | Check actual workflow-token privileges, DB role grants, runtime access to migration secrets and an unauthorized signing/decryption request. |
+| FND-10 | Keep credentials, secrets, token bodies, password verifiers and sensitive identity payloads out of logs, tracing, error responses, analytics and committed fixtures. Have a documented rotation/revocation path for enabled secrets. | Exercise application errors and request tracing with synthetic sentinel secrets; verify no disclosure, and review revocation of a compromised test credential. |
+| FND-11 | Define resource budgets for public requests and expensive authentication operations; enforce trustworthy proxy headers and an egress policy where external calls exist. Keep health listeners' network exposure independent of future payment routes. | Test oversized input, concurrency exhaustion, spoofed forwarding headers, forbidden outbound address and the deployed public/private route inventory. |
+| FND-12 | Keep security-event obligations durable with their state changes and audit evidence restricted from ordinary business writers. Choose and test recovery checkpoints before claiming rollback or tamper resistance. | Fail event/outbox write and worker dispatch, deny unauthorized audit modification, restore a stale snapshot, and detect revoked-session/approval resurrection. |
+
+Passing lint, `gosec` or `govulncheck` proves only the checks run on that commit. It does **not** prove authorization, RLS isolation, ledger concurrency, event durability, cryptographic trust boundaries or regulatory compliance. See the [engineering verification matrix](../engineering.md#security-verification).
+

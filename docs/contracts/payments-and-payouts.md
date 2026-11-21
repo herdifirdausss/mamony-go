@@ -4,17 +4,6 @@ Build one vertical flow at a time. Both use [account mappings and policy](fees-l
 
 The intent or payout owns business state. The provider connector owns the provider result. The ledger owns the money movement. Store their references together for reconciliation. Each accepted state change writes its event in the same local transaction. Use stable expected-state checks when two transitions compete.
 
-## Transaction authorization boundary
-
-A login session, API key or generic second-factor success is **not** permission to move money. The owning payment or payout use case must authorize the current subject/capability, operation, tenant, resource and account ownership and enforce the required assurance and policy. Where user-specific transaction approval is required, bind the challenge/receipt to immutable amount, currency, recipient, tenant, operation and intent version. Store and consume it at a documented consistency point with expiry, single-use behavior, revocation/freeze handling and no approval of changed content.
-
-| ID | Requirement | Acceptance check |
-|---|---|---|
-| PAY-05 | For actions requiring approval, associate a canonical, immutable approved intent with exactly one executable operation. Reauthorize and fail closed if current subject, tenant, beneficiary or approval binding is invalid. | Reuse or change an approval; swap recipient, amount or currency; race revocation and two confirms; stop after consumption and retry. |
-| OUT-05 | Dispatch an authorized payout only for the immutable verified recipient and current account owner, with a stable provider reference and applicable approval. A changed recipient requires a new authorization decision. | Try cross-tenant destination substitution, beneficiary replacement after confirmation, expired/frozen authority, duplicated dispatch and unknown external result. |
-
-Record which operations are service-initiated and do not need a user's transaction approval; their service permission and business policy must still be explicit. Independent approval/execution trust domains are an advanced option, not an assumed property of the initial monolith. See [identity](identity.md#security-state-and-recovery-threat-controls) and [ledger](ledger.md#financial-authority-before-posting).
-
 ## Payments
 
 1. Create an intent with the tenant, exact amount, method, corridor, and merchant reference. Use an HTTP idempotency key.
@@ -54,3 +43,15 @@ Use durable jobs with claims, expiry, and bounded retry intervals. A restarted w
 ## Pilot evidence
 
 Exercise a successful payment and payout on the chosen corridor. Exercise refusal before dispatch, a lost response after dispatch, a lost response after ledger commit, and duplicate provider results. Reconcile the resulting journal, usage, fee, and provider records.
+
+## Transaction authorization boundary
+
+A login session, API key or generic second-factor success is **not** permission to move money. The owning payment or payout use case must authorize the current subject/capability, operation, tenant, resource and account ownership and enforce the required assurance and policy. Where user-specific transaction approval is required, bind the challenge/receipt to immutable amount, currency, recipient, tenant, operation and intent version. Store and consume it at a documented consistency point with expiry, single-use behavior, revocation/freeze handling and no approval of changed content.
+
+| ID | Requirement | Acceptance check |
+|---|---|---|
+| PAY-05 | For actions requiring approval, associate a canonical, immutable approved intent with exactly one executable operation. Reauthorize and fail closed if current subject, tenant, beneficiary or approval binding is invalid. | Reuse or change an approval; swap recipient, amount or currency; race revocation and two confirms; stop after consumption and retry. |
+| OUT-05 | Dispatch an authorized payout only for the immutable verified recipient and current account owner, with a stable provider reference and applicable approval. A changed recipient requires a new authorization decision. | Try cross-tenant destination substitution, beneficiary replacement after confirmation, expired/frozen authority, duplicated dispatch and unknown external result. |
+
+Record which operations are service-initiated and do not need a user's transaction approval; their service permission and business policy must still be explicit. Independent approval/execution trust domains are an advanced option, not an assumed property of the initial monolith. See [identity](identity.md#security-state-and-recovery-threat-controls) and [ledger](ledger.md#financial-authority-before-posting).
+
