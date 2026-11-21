@@ -15,12 +15,13 @@ Security is integrated into the owning capability's contract rather than a separ
 
 Use the [security verification matrix](engineering.md#security-verification) and report unimplemented controls as `NOT RUN`. Defer the independent-authority and multi-region profiles until their risk and operating assumptions justify them.
 
-## Foundation and ledger
+## Foundation, Identity, and ledger
 
 | Order | Contract | Prerequisites and outcome |
 |---:|---|---|
 | 1 | [Platform foundation](contracts/platform.md) | Synthetic PostgreSQL role/RLS fixture is verified; [DEC-01 database design](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) was accepted on 2026-11-21. Real migration and platform runtime integration still require independent verification. Implement and verify real migrations, configuration, audit, and event relay before the ledger. |
-| 2 | [Ledger](contracts/ledger.md) | Use PostgreSQL to prove durable posting, replay, reversal, delivery, and restore. |
+| 2 | [Identity Phase 1](contracts/identity.md) | First-party Profile A enrollment, email proof, login/session authority and explicit resource authorization. Implement in guarded slices, prove real PostgreSQL transactions and permissions, and do not enable public routes before relevant verification gates pass. The first primitive PR does not satisfy this milestone. |
+| 3 | [Ledger](contracts/ledger.md) | Use PostgreSQL to prove durable posting, replay, reversal, delivery, and restore, with independently enforced posting authorization. |
 
 Pass the ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
 
@@ -28,7 +29,6 @@ Pass the ledger gate before building pilot money flows. Extend the catalog and o
 
 | Order | Contract | Prerequisites and outcome |
 |---:|---|---|
-| 3 | [Identity and access](contracts/identity.md) | Use PostgreSQL runtime roles and tenant transaction boundaries. |
 | 4 | [Screening and onboarding](contracts/screening-and-onboarding.md) | Use identity and approval. Implement screening before onboarding. |
 | 5 | [Fees, limits, and accounts](contracts/fees-limits-and-accounts.md) | Use the ledger, identity, and onboarding. Implement policy before account activation. |
 | 6 | [Provider connector](contracts/provider.md) | Use configuration, durable jobs, and event delivery. This can run in parallel with identity, screening, and policy work. |
