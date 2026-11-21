@@ -17,7 +17,7 @@ import (
 const marker = "\n-- mamony:integrity:v1\n"
 
 var (
-	fileNamePattern = regexp.MustCompile(`^([0-9]{6})_[a-z][a-z0-9-]*\.up\.sql$`)
+	fileNamePattern     = regexp.MustCompile(`^([0-9]{6})_[a-z][a-z0-9-]*\.up\.sql$`)
 	explicitTransaction = regexp.MustCompile(`(?im)^\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\s*(;|$)`)
 )
 

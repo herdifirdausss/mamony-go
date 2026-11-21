@@ -43,7 +43,9 @@ func TestPostgresPlatformMigration(t *testing.T) {
 	}
 
 	dir, err := filepath.Abs("../../db/migrations/platform")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// The runtime and bootstrap admin cannot silently become the migrator.
 	runPlatformMigration(t, dir, runtimeURL, false)
@@ -70,7 +72,9 @@ func TestPostgresPlatformMigration(t *testing.T) {
 	// Modified SQL with the original trailer must fail before DB writes.
 	temp := t.TempDir()
 	firstSQL, err := os.ReadFile(filepath.Join(dir, "000001_initialize.up.sql"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(temp, "000001_initialize.up.sql"), firstSQL, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +90,9 @@ func TestPostgresPlatformMigration(t *testing.T) {
 	// Rename to the exact applied version name; the test file and original
 	// deliberately share a version and Load must reject this as duplicate.
 	runPlatformMigration(t, temp, migratorURL, false)
-	if err := os.Remove(filepath.Join(temp, "000001_initialize.up.sql")); err != nil { t.Fatal(err) }
+	if err := os.Remove(filepath.Join(temp, "000001_initialize.up.sql")); err != nil {
+		t.Fatal(err)
+	}
 	runPlatformMigration(t, temp, migratorURL, false)
 
 	// Missing applied-history row is a hard failure, not an auto-repair.
@@ -101,8 +107,12 @@ func TestPostgresPlatformMigration(t *testing.T) {
 	}
 
 	// Verify a valid upgrade using the same versioned migration runner.
-	if err := os.WriteFile(filepath.Join(temp, "000001_initialize.up.sql"), firstSQL, 0600); err != nil { t.Fatal(err) }
-	if err := os.Remove(filepath.Join(temp, "000001_test.up.sql")); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(temp, "000001_initialize.up.sql"), firstSQL, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(temp, "000001_test.up.sql")); err != nil {
+		t.Fatal(err)
+	}
 	signMigration(t, temp, 2, "CREATE TABLE mamony_platform.upgrade_canary (id int PRIMARY KEY);\n")
 	runPlatformMigration(t, temp, migratorURL, true)
 	owner, err = invokePSQL("TEST_PLATFORM_MIGRATION_URL", "-c",
