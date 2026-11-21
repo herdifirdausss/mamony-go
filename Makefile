@@ -6,7 +6,6 @@ fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 vet:
-	-@go mod tidy -diff
 	go vet ./...
 
 unit:
