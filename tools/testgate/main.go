@@ -22,6 +22,8 @@ var requiredTests = []string{
 	"TestPostgresTenantIsolation",
 	"TestPostgresTenantContext",
 	"TestPostgresPlatformMigration",
+	"TestPostgresRuntimePoolIsolation",
+	"TestPostgresRuntimePoolRejectsElevatedRole",
 }
 
 type testEvent struct {

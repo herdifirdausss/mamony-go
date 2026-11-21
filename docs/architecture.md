@@ -7,6 +7,8 @@
 | `cmd/mamony` | Read listener addresses and handle process signals. |
 | `internal/app` | Start and stop the two HTTP listeners. |
 | `internal/platform/httpedge` | Serve liveness and readiness. |
+| `internal/platform/migration` | Standalone versioned platform migration verification; never invoked by HTTP startup. |
+| `internal/platform/postgres` | Bounded runtime-only pgxpool and tenant transaction primitives; not wired to an HTTP capability. |
 
 | Listener | Default | Routes |
 |---|---|---|

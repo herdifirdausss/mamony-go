@@ -1,6 +1,6 @@
 # PostgreSQL contract
 
-**Implementation status:** DEC-01 architecture accepted; the application binary still runs without a database. Platform migration tooling is under implementation and requires actual CI evidence. Full production schema/ledger/recovery remains pending. A separate [synthetic PostgreSQL test harness](../proposals/postgresql-foundation.md) exercises disposable owner/runtime roles and RLS primitives; it is **not** a migration implementation, application connection, or proof that the rest of this contract passes.
+**Implementation status:** DEC-01 is accepted and the platform migration runner (PR #17) passed disposable PostgreSQL CI. The HTTP application still has no database connection or payment/ledger runtime. A bounded runtime [pgxpool primitive](../../internal/platform/postgres/pool.go) is being verified with the existing synthetic RLS fixture; it is **not** tenant authorization, an owned business repository, or a production deployment. Restore and ledger behavior remain NOT RUN.
 
 ## Schemas and roles
 

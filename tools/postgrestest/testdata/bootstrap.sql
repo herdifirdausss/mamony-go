@@ -10,10 +10,16 @@ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'mamony_test_runtime') THEN
     CREATE ROLE mamony_test_runtime LOGIN PASSWORD 'local-test-runtime';
   END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'mamony_test_elevated_runtime') THEN
+    CREATE ROLE mamony_test_elevated_runtime LOGIN PASSWORD 'local-test-elevated';
+  END IF;
 END
 $$;
 ALTER ROLE mamony_test_owner LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-owner';
 ALTER ROLE mamony_test_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-runtime';
+-- Deliberately privileged negative fixture: expected runtime pool refusal.
+-- Never grant this account schema privileges or expose it outside tests.
+ALTER ROLE mamony_test_elevated_runtime LOGIN NOSUPERUSER CREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-elevated';
 
 DROP SCHEMA IF EXISTS mamony_test_fixture CASCADE;
 CREATE SCHEMA mamony_test_fixture AUTHORIZATION mamony_test_owner;
