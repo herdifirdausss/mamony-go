@@ -1,7 +1,7 @@
 # PostgreSQL foundation: research and first verifiable slice
 
 **Status:** Proposed — requires repository owner/technical acceptance for DEC-01 before production database choices.  
-**Initiating issue:** [Issue #14](../../issues/14) (GitHub issue; the text below is self-contained).  
+**Initiating issue:** [Issue #14](https://github.com/herdifirdausss/mamony-go/issues/14) (GitHub issue; the text below is self-contained).  
 **Research checked:** 2026-11-21.  
 **Risk path:** Critical.  
 **Active contracts:** [PostgreSQL](../contracts/postgresql.md), [platform FND-03/FND-09](../contracts/platform.md), [ledger](../contracts/ledger.md); no supersession.
