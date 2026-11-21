@@ -47,6 +47,7 @@ func safeFixture() error {
 		{"TEST_IDENTITY_MIGRATION_URL", "mamony_identity_migrator"},
 		{"TEST_IDENTITY_RUNTIME_URL", "mamony_identity_runtime"},
 		{"TEST_IDENTITY_VERIFIER_URL", "mamony_identity_verifier_runtime"},
+		{"TEST_IDENTITY_DELIVERY_URL", "mamony_identity_delivery_runtime"},
 	} {
 		raw := os.Getenv(pair.key)
 		u, err := url.Parse(raw)

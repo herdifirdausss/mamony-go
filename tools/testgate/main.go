@@ -27,8 +27,10 @@ var requiredTests = []string{
 	"TestPostgresRuntimePoolRejectsElevatedRole",
 	"TestPostgresIdentityMigration",
 	"TestPostgresIdentityVerifierRole",
+	"TestPostgresIdentityDeliveryRole",
 	"TestIdentityRegistrationPersistence",
 	"TestIdentityEmailVerification",
+	"TestIdentityProofDeliveryOutbox",
 }
 
 type testEvent struct {
@@ -53,6 +55,7 @@ func run() error {
 	identityMigratorDSN := os.Getenv("TEST_IDENTITY_MIGRATION_URL")
 	identityRuntimeDSN := os.Getenv("TEST_IDENTITY_RUNTIME_URL")
 	identityVerifierDSN := os.Getenv("TEST_IDENTITY_VERIFIER_URL")
+	identityDeliveryDSN := os.Getenv("TEST_IDENTITY_DELIVERY_URL")
 	if err := validateDSN(runtimeDSN, "mamony_test_runtime"); err != nil {
 		return fmt.Errorf("runtime fixture: %w", err)
 	}
@@ -74,6 +77,9 @@ func run() error {
 	if err := validateDSN(identityVerifierDSN, "mamony_identity_verifier_runtime"); err != nil {
 		return fmt.Errorf("identity verifier fixture: %w", err)
 	}
+	if err := validateDSN(identityDeliveryDSN, "mamony_identity_delivery_runtime"); err != nil {
+		return fmt.Errorf("identity delivery fixture: %w", err)
+	}
 	runtimeURL, _ := url.Parse(runtimeDSN)
 	adminURL, _ := url.Parse(adminDSN)
 	migratorURL, _ := url.Parse(platformMigratorDSN)
@@ -81,7 +87,8 @@ func run() error {
 	identityMigratorURL, _ := url.Parse(identityMigratorDSN)
 	identityRuntimeURL, _ := url.Parse(identityRuntimeDSN)
 	identityVerifierURL, _ := url.Parse(identityVerifierDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL} {
+	identityDeliveryURL, _ := url.Parse(identityDeliveryDSN)
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityDeliveryURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}

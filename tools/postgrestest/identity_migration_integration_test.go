@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "2:false" {
+	if err != nil || out != "3:false" {
 		t.Fatalf("identity migration should be at clean version 1: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "2" {
+	if err != nil || out != "3" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -98,6 +98,27 @@ func TestPostgresIdentityVerifierRole(t *testing.T) {
 		output, err := invokePSQL("TEST_IDENTITY_VERIFIER_URL", "-c", stmt)
 		if err == nil || !strings.Contains(output, "42501") {
 			t.Fatalf("verifier runtime must deny %q: %q err=%v", stmt, output, err)
+		}
+	}
+}
+
+func TestPostgresIdentityDeliveryRole(t *testing.T) {
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.delivery_attack (id integer)",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"SELECT * FROM mamony_identity.schema_migrations",
+		"INSERT INTO mamony_identity.email_verification_challenges (challenge_id) VALUES ('bad')",
+		"UPDATE mamony_identity.subjects SET status='ACTIVE'",
+		"UPDATE mamony_identity.email_aliases SET verified_at=clock_timestamp()",
+		"DELETE FROM mamony_identity.email_proof_deliveries",
+		"UPDATE mamony_identity.email_proof_deliveries SET sealed_token='\\x00'::bytea",
+		"SELECT token_digest FROM mamony_identity.email_verification_challenges",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		output, err := invokePSQL("TEST_IDENTITY_DELIVERY_URL", "-c", stmt)
+		if err == nil || !strings.Contains(output, "42501") {
+			t.Fatalf("delivery worker role must deny %q: %q err=%v", stmt, output, err)
 		}
 	}
 }
