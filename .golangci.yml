@@ -1,0 +1,24 @@
+version: "2"
+run:
+  tests: true
+linters:
+  default: none
+  enable:
+    - errcheck
+    - gosec
+    - govet
+    - ineffassign
+    - nolintlint
+    - staticcheck
+    - unused
+  settings:
+    staticcheck:
+      checks:
+        - "SA*"
+    nolintlint:
+      allow-unused: false
+      require-explanation: true
+      require-specific: true
+formatters:
+  enable:
+    - gofmt
