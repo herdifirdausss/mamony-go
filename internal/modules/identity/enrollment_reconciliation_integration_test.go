@@ -18,6 +18,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type staleRepairFinder struct{ subject string }
+
+func (f staleRepairFinder) FindUnissuedPending(context.Context, int) ([]string, error) {
+	return []string{f.subject}, nil
+}
+
 // TestIdentityZEnrollmentReconciliationDB exercises the actual verifier role,
 // encrypted proof obligation and real PostgreSQL. No real provider is used.
 func TestIdentityZEnrollmentReconciliationDB(t *testing.T) {
@@ -99,6 +105,7 @@ func TestIdentityZEnrollmentReconciliationDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	tooFresh := newPending(time.Now().UTC())
+	tooOld := newPending(time.Now().UTC().Add(-25 * time.Hour))
 	// Use the same verifier role and real AES-GCM sealer that the existing
 	// registration/worker pipeline uses; no Mailgun API or browser routes.
 	result, err := ReconcileEnrollmentOnce(ctx, EnrollmentReconciliationConfig{
@@ -120,8 +127,20 @@ func TestIdentityZEnrollmentReconciliationDB(t *testing.T) {
 		}
 		return count
 	}
-	if proofsFor(gap) != 1 || proofsFor(withProof) != 1 || proofsFor(tooFresh) != 0 {
+	if proofsFor(gap) != 1 || proofsFor(withProof) != 1 || proofsFor(tooFresh) != 0 || proofsFor(tooOld) != 0 {
 		t.Fatal("repair reissued existing proof or selected too-recent registration")
+	}
+	// Simulate a stale finder that observed a missing first proof just before
+	// another legitimate issuer committed. The conditional check must repeat
+	// under the same subject lock and refuse all proof rotation.
+	stale, err := usecase.NewEnrollmentReconciler(staleRepairFinder{subject: withProof}, issuer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleResult, err := stale.ReconcileOnce(ctx)
+	if err != nil || staleResult.Skipped != 1 || staleResult.Issued != 0 ||
+		proofsFor(withProof) != 1 {
+		t.Fatalf("stale candidate rotated a previously committed challenge: %+v %v", staleResult, err)
 	}
 	// The repaired subject has exactly one durable issuance event and the
 	// encrypted delivery obligation, not an authenticated session.
