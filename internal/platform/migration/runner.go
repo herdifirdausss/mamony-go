@@ -64,8 +64,8 @@ func Run(ctx context.Context, dsn, dir string) error {
 	db.SetMaxOpenConns(2)
 	db.SetConnMaxLifetime(2 * time.Minute)
 	driver, err := migratepgx.WithInstance(db, &migratepgx.Config{
-		SchemaName:      "mamony_platform",
-		MigrationsTable: "schema_migrations",
+		SchemaName:       "mamony_platform",
+		MigrationsTable:  "schema_migrations",
 		StatementTimeout: 45 * time.Second,
 		// False ensures each SQL file is executed in one server-side
 		// batch. PostgreSQL treats its statements as one implicit
