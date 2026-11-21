@@ -1,6 +1,6 @@
 # Identity enrollment: first implementation slice
 
-**Status:** DRAFT / stacked PRs #22–#26; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed provider credentials/worker process, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Status:** DRAFT / stacked PRs #22–#27; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
 The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Real provider delivery, running worker and public HTTP activation are still disabled.
 
@@ -65,3 +65,7 @@ Do not enable public registration until a real provider adapter, configured exec
 `internal/modules/identity/internal/repository/mailgun` supplies a region-pinned, HTTPS-only Mailgun Messages API adapter for the existing `EmailSender` usecase port. Its HTTP integration seam accepts a **test-provided mock transport**; production does not accept arbitrary Mailgun URLs. Mailgun Domain Sending Keys, `From` domain and HTTPS frontend origin are validated and never exposed in errors. The text-only email embeds the short-lived proof in a URL **fragment** (requiring a future safe browser handler), disables Mailgun open/click tracking, and requests TLS and a bounded provider delivery window.
 
 All outgoing HTTP tests use local `httptest` mocks. A separate tagged real-PostgreSQL integration test exercises the persisted encrypted delivery → mock 429 → retry → mock 200 → activation path. Production provider credentials, live outbound mail, worker startup, delivery webhooks, rate admission and login/HTTP endpoints remain disabled.
+
+## Dedicated worker runtime (stacked Draft PR #27)
+
+A public Identity facade owns the bounded `RunDelivery` wiring: nonprivileged PostgreSQL delivery pool, AES-GCM envelope keyring, Mailgun sender and a serialized polling runner. The separate `cmd/mamony-identity-mail-worker` binary requires dual opt-in, private secret files and TLS-verified non-fixture database credentials. It has no HTTP handler and is not started by `cmd/mamony`. Unit tests cover deny-by-default; tagged integration tests execute the facade against disposable real PostgreSQL and a loopback-only HTTP Mailgun mock. There is **no live provider access or production deployment**. See [delivery runbook](../runbooks/identity-delivery.md).
