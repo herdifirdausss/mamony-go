@@ -65,4 +65,3 @@ func (a *ConfirmationAdmission) Admit(ctx context.Context, client netip.Addr) (b
 var _ interface {
 	Admit(context.Context, netip.Addr) (bool, error)
 } = (*ConfirmationAdmission)(nil)
-
