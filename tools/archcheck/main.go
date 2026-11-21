@@ -43,6 +43,10 @@ func main() {
 		if p.Error != nil {
 			fatal(fmt.Errorf("go list %s: %s", p.ImportPath, p.Error.Err))
 		}
+		if msg := packagePathViolation(p.ImportPath); msg != "" {
+			fmt.Fprintf(os.Stderr, "ARCH VIOLATION: %s: %s\n", p.ImportPath, msg)
+			count++
+		}
 		for _, dep := range p.Imports {
 			if msg := productionViolation(p.ImportPath, dep); msg != "" {
 				fmt.Fprintf(os.Stderr, "ARCH VIOLATION: %s -> %s: %s\n", p.ImportPath, dep, msg)
@@ -76,6 +80,28 @@ func localPath(path string) string {
 		return strings.TrimPrefix(path, prefix)
 	}
 	return ""
+}
+
+// packagePathViolation prevents a capability from evading layer rules by
+// inventing new package roots. Feature subpackages belong inside known layers.
+func packagePathViolation(importPath string) string {
+	path := localPath(importPath)
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 || parts[0] != "internal" || parts[1] != "modules" {
+		return ""
+	}
+	if len(parts) == 3 {
+		return "" // public capability facade
+	}
+	if parts[3] != "internal" || len(parts) < 5 {
+		return "capability implementation packages must be under internal/<layer>"
+	}
+	switch parts[4] {
+	case "domain", "usecase", "repository", "handler":
+		return ""
+	default:
+		return "unknown capability layer: use domain, usecase, repository or handler"
+	}
 }
 
 func capLayer(path string) (capName, layer string) {
