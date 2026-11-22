@@ -123,6 +123,15 @@ async function change(page, account, token, body) {
   });
 }
 
+async function populatePage(page, account) {
+  await page.goto(origin + "/account/change-password", {waitUntil: "load"});
+  await page.waitForSelector("#change-form:not([hidden])");
+  await page.locator("#email").fill(account.email);
+  await page.locator("#current").fill(account.old);
+  await page.locator("#replacement").fill(account.next);
+  await page.locator("#confirmation").fill(account.next);
+}
+
 async function run() {
   const browser = await chromium.launch({headless: true});
   const contexts = [];
@@ -145,7 +154,8 @@ async function run() {
         return;
       }
       const allowed = url.origin === origin && url.search === "" && url.hash === "" &&
-        ["/__test__/password-browser", "/v1/identity/login",
+        ["/__test__/password-browser", "/account/change-password",
+          "/v1/identity/login",
           "/v1/identity/session", "/v1/identity/csrf",
           "/v1/identity/change-password", "/v1/identity/logout"].includes(url.pathname);
       if (!allowed) {
@@ -195,6 +205,13 @@ async function run() {
     const first = await createContext("127.0.0.2");
     const second = await createContext("127.0.0.2");
     const other = await createContext("127.0.0.3");
+
+    // The embedded client page never displays a mutation form to guests.
+    await other.page.goto(origin + "/account/change-password", {waitUntil: "load"});
+    await other.page.waitForFunction(() =>
+      document.getElementById("status").textContent.includes("session is not active"));
+    assert.equal(await other.page.locator("#change-form").isHidden(), true);
+    await other.page.goto(origin + "/__test__/password-browser");
 
     // Same user, two genuinely separate browser cookie jars.
     await login(first.page, a, a.old, 204);
@@ -257,10 +274,22 @@ async function run() {
 
     // The certain success deletes only the current browser cookie, while
     // PostgreSQL epoch invalidation also revokes the OTHER browser's bearer.
-    r = await change(first.page, a, token);
-    assert.equal(r.status, 204);
-    assert.equal(r.body, "");
-    assert.equal(r.cookieVisible, null);
+    await populatePage(first.page, a);
+    const countBeforeSuccess = counters.changes;
+    await first.page.locator("#confirmation").fill(a.next + "-mismatch");
+    await first.page.locator("#change").click();
+    assert.ok((await first.page.locator("#status").textContent()).includes("do not match"));
+    assert.equal(counters.changes, countBeforeSuccess, "mismatching confirmation issued a mutation");
+    await first.page.locator("#confirmation").fill(a.next);
+    await first.page.locator("#change").click();
+    await first.page.waitForFunction(() =>
+      document.getElementById("status").textContent.includes("Your password has been changed"));
+    assert.equal(counters.changes, countBeforeSuccess + 1,
+      "a successful browser action must issue exactly one POST");
+    assert.equal(await first.page.locator("#change-form").isHidden(), true);
+    assert.equal(await first.page.locator("#current").inputValue(), "");
+    assert.equal(await first.page.locator("#replacement").inputValue(), "");
+    assert.equal(await first.page.locator("#confirmation").inputValue(), "");
     assert.equal((await first.context.cookies(origin)).length, 0);
     assert.equal((await first.page.evaluate(() => document.cookie)), "");
     assert.equal((await perform(second.page, "/v1/identity/session")).status, 401);
@@ -277,18 +306,19 @@ async function run() {
     // cookie, but PostgreSQL has already atomically invalidated that session.
     await login(other.page, b, b.old, 204);
     secureCookie(await other.context.cookies(origin));
-    const otherCSRF = await csrf(other.page);
+    await populatePage(other.page, b);
+    const countBeforeLost = counters.changes;
     dropNextChange = true;
-    const lost = await other.page.evaluate(async ({body, token}) => {
-      try {
-        await fetch("/v1/identity/change-password", {
-          method: "POST", headers: {"Content-Type": "application/json",
-            "X-Mamony-CSRF": token}, body,
-        });
-        return false;
-      } catch { return true; }
-    }, {body: form(b), token: otherCSRF});
-    assert.equal(lost, true, "lost response must be uncertain in the browser");
+    await other.page.locator("#change").click();
+    await other.page.waitForFunction(() =>
+      document.getElementById("status").textContent.includes("could not confirm the result"));
+    assert.equal(await other.page.locator("#change-form").isHidden(), true);
+    assert.equal(await other.page.locator("#change").isDisabled(), true);
+    assert.equal(await other.page.locator("#current").inputValue(), "");
+    assert.equal(await other.page.locator("#replacement").inputValue(), "");
+    assert.equal(await other.page.locator("#confirmation").inputValue(), "");
+    assert.equal(counters.changes, countBeforeLost + 1,
+      "uncertain outcome must not cause automatic mutation retry");
     assert.equal(counters.dropped, 1, "exactly one response was lost");
     secureCookie(await other.context.cookies(origin));
     assert.equal((await perform(other.page, "/v1/identity/session")).status, 401);
