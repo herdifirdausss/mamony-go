@@ -3,7 +3,6 @@ package handler
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -30,9 +29,9 @@ func (h *browserChangeHasher) Hash(_ context.Context, _ string) (domain.Password
 }
 
 type browserChangeStore struct {
-	calls int
-	allowed bool
-	err error
+	calls    int
+	allowed  bool
+	err      error
 	sessions *browserSessionStore
 }
 
@@ -241,9 +240,5 @@ func TestBrowserPasswordChangeCandidateConstructorAndPayload(t *testing.T) {
 	email, old, next, err := decodePasswordChangeJSON(strings.NewReader(browserChangeBody()))
 	if err != nil || email != "alice@example.test" || old != browserOldPassword || next != browserNewPassword {
 		t.Fatal("valid strict password change JSON did not decode")
-	}
-	var response map[string]any
-	if err := json.Unmarshal([]byte(`{"status":204}`), &response); err != nil {
-		t.Fatal(err)
 	}
 }
