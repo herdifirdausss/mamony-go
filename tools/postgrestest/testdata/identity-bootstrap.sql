@@ -17,6 +17,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_auth_grant_runtime') THEN
         CREATE ROLE mamony_identity_auth_grant_runtime LOGIN PASSWORD 'local-test-identity-auth-grant';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_issuer_runtime') THEN
+        CREATE ROLE mamony_identity_recovery_issuer_runtime LOGIN PASSWORD 'local-test-identity-recovery-issuer';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_password_change_runtime') THEN
         CREATE ROLE mamony_identity_password_change_runtime LOGIN PASSWORD 'local-test-identity-password-change';
     END IF;
@@ -45,6 +48,7 @@ ALTER ROLE mamony_identity_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOI
 ALTER ROLE mamony_identity_verifier_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-verifier';
 ALTER ROLE mamony_identity_authenticator_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-authenticator';
 ALTER ROLE mamony_identity_auth_grant_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-auth-grant';
+ALTER ROLE mamony_identity_recovery_issuer_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-issuer';
 ALTER ROLE mamony_identity_password_change_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-password-change';
 ALTER ROLE mamony_identity_session_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-session';
 ALTER ROLE mamony_identity_notice_monitor_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-notice-monitor';
