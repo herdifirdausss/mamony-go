@@ -66,6 +66,7 @@ func TestPasswordAuthenticationDecisionMatrix(t *testing.T) {
 				found: tc.found,
 				record: AuthenticationCredential{
 					SubjectID:     "sub_AAAAAAAAAAAAAAAAAAAAAA",
+					SessionEpoch: 3,
 					Status:        tc.status,
 					EmailVerified: tc.verified,
 					Verifier:      real,
@@ -106,6 +107,7 @@ func TestPasswordAuthenticationUnavailableAndInputPolicy(t *testing.T) {
 		found: true,
 		record: AuthenticationCredential{
 			SubjectID:     "sub_AAAAAAAAAAAAAAAAAAAAAA",
+					SessionEpoch: 3,
 			Status:        "ACTIVE",
 			EmailVerified: true,
 			Verifier:      dummyAuthenticationVerifier(),
