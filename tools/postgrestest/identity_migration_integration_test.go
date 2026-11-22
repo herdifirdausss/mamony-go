@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "16:false" {
-		t.Fatalf("identity migration should be at clean version 16: %q err=%v", out, err)
+	if err != nil || out != "17:false" {
+		t.Fatalf("identity migration should be at clean version 17: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "16" {
+	if err != nil || out != "17" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -405,7 +405,7 @@ func TestPostgresIdentityZPasswordChangeRole(t *testing.T) {
 
 func TestPostgresIdentityZSecurityNoticeRole(t *testing.T) {
 	const claim = "SELECT * FROM mamony_identity.claim_password_change_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')"
-	const finalize = "SELECT mamony_identity.finalize_password_change_notice('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','ACCEPTED')"
+	const finalize = "SELECT mamony_identity.finalize_password_change_notice_v2('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','ACCEPTED',decode(repeat('11',32),'hex'))"
 	out, err := invokePSQL("TEST_IDENTITY_SECURITY_NOTICE_URL", "-c", claim)
 	if err != nil || out != "" {
 		t.Fatalf("notice worker could not execute safe empty claim: %q %v", out, err)
