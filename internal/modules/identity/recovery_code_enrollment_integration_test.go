@@ -227,3 +227,192 @@ func TestIdentityZRecoveryCodeEnrollmentRotation(t *testing.T) {
 			t.Fatal("committed saved code missing its digest-only row")
 		}
 	}
+	var approvalConsumed bool
+	if err := admin.QueryRow(ctx, `SELECT consumed_at IS NOT NULL
+		FROM mamony_identity.password_recovery_code_enrollment_approvals
+		WHERE subject_id=$1`, subject).Scan(&approvalConsumed); err != nil || !approvalConsumed {
+		t.Fatal("successful enrollment failed to consume independent approval")
+	}
+	// The encrypted recovery request and any associated grant must be
+	// revoked when an authenticated user rotates the offline set.
+	challenge := randomSyntheticID(t, "rcv_")
+	recoveryDigest := sha256.Sum256([]byte("synthetic pending email recovery before rotation " + subject))
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_challenges
+		(challenge_id,subject_id,canonical_email,contact_version,subject_epoch,
+		 token_digest,requested_at,expires_at)
+		VALUES($1,$2,$3,1,$4,$5,clock_timestamp(),clock_timestamp()+interval '15 minutes')`,
+		challenge, subject, email, epoch, recoveryDigest[:]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_deliveries
+		(challenge_id,key_id,sealed_token) VALUES($1,'testcode', $2)`,
+		challenge, bytes.Repeat([]byte{0x51}, 71)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_assurance_grants
+		(subject_id,subject_epoch,challenge_id,approved_at,expires_at)
+		VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '4 minutes')`,
+		subject, epoch, challenge); err != nil {
+		t.Fatal(err)
+	}
+	// Wrong code must NOT rotate the set, consume a real older code, or
+	// revoke pending recovery challenges/approvals.
+	other, err := usecase.NewOfflineRecoveryCode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if denied, err := manager.Rotate(ctx, bearer, email, currentPassword, other.TrustedOfflineDisplay(), peer);
+		!errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) || denied.ForTrustedDisplay()[0] != "" {
+		t.Fatal("wrong saved recovery code rotated account codes")
+	}
+	var challengeRevoked bool
+	if err := admin.QueryRow(ctx, `SELECT revoked_at IS NOT NULL
+		FROM mamony_identity.password_recovery_challenges WHERE challenge_id=$1`,
+		challenge).Scan(&challengeRevoked); err != nil || challengeRevoked {
+		t.Fatal("failed rotation revoked a valid recovery challenge")
+	}
+	rotated, err := manager.Rotate(ctx, bearer, email, currentPassword, issued[0], peer)
+	if err != nil {
+		t.Fatalf("valid password+session+saved-code rotation denied: %v", err)
+	}
+	fresh := rotated.ForTrustedDisplay()
+	if len(fresh) != 5 || fresh[0] == "" {
+		t.Fatal("committed rotation withheld new saved codes")
+	}
+	d0, err := usecase.OfflineRecoveryCodeDigest(issued[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_recovery_offline_codes
+		WHERE subject_id=$1 AND code_digest=$2`, subject, d0[:]).Scan(&count); err != nil || count != 0 {
+		t.Fatal("rotated-out code remains usable or stored")
+	}
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_recovery_offline_codes
+		WHERE subject_id=$1 AND consumed_at IS NULL`, subject).Scan(&count); err != nil || count != 5 {
+		t.Fatal("rotation did not replace full set atomically")
+	}
+	if err := admin.QueryRow(ctx, `SELECT revoked_at IS NOT NULL
+		FROM mamony_identity.password_recovery_challenges WHERE challenge_id=$1`,
+		challenge).Scan(&challengeRevoked); err != nil || !challengeRevoked {
+		t.Fatal("rotated recovery codes did not revoke outstanding emailed proof")
+	}
+	var deliveryState string
+	if err := admin.QueryRow(ctx, "SELECT status FROM mamony_identity.password_recovery_deliveries WHERE challenge_id=$1",
+		challenge).Scan(&deliveryState); err != nil || deliveryState != "DEAD" {
+		t.Fatal("old recovery-link mail not quarantined after code rotation")
+	}
+	var priorApprovalConsumed bool
+	if err := admin.QueryRow(ctx, `SELECT consumed_at IS NOT NULL
+		FROM mamony_identity.password_recovery_assurance_grants WHERE subject_id=$1`,
+		subject).Scan(&priorApprovalConsumed); err != nil || !priorApprovalConsumed {
+		t.Fatal("old password-recovery approval survived new offline code set")
+	}
+	var enrolled, rotatedEvents, notices int
+	if err := admin.QueryRow(ctx, `SELECT
+			(SELECT count(*) FROM mamony_identity.security_outbox o WHERE o.subject_id=$1
+				AND o.event_type='RECOVERY_CODES_ENROLLED'),
+			(SELECT count(*) FROM mamony_identity.security_outbox o WHERE o.subject_id=$1
+				AND o.event_type='RECOVERY_CODES_ROTATED'),
+			(SELECT count(*) FROM mamony_identity.password_recovery_code_notices n WHERE n.subject_id=$1
+				AND n.status='PENDING')`, subject).Scan(&enrolled, &rotatedEvents, &notices);
+		err != nil || enrolled != 1 || rotatedEvents != 1 || notices != 2 {
+		t.Fatal("offline code set changes not atomically audited and queued for token-free notification")
+	}
+	// Replay of a prior code is denied even with the correct password;
+	// reused enrollment approval is also denied once a set exists.
+	if _, err := manager.Rotate(ctx, bearer, email, currentPassword, issued[0], peer);
+		!errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) {
+		t.Fatal("burned recovery code authorized a later rotation")
+	}
+	if _, err := manager.Enroll(ctx, bearer, email, currentPassword, approval, peer);
+		!errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) {
+		t.Fatal("used bootstrap approval allowed re-enrollment over existing code set")
+	}
+
+	// Use restricted auth-grant staging for a deterministic SQL rollback
+	// test. This does not bypass the Go reauthentication tested above.
+	grantConn, err := pgx.Connect(ctx, grantDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = grantConn.Close(context.Background()) }()
+	rawSession, err := base64.RawURLEncoding.DecodeString(bearer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionDigest := sha256.Sum256(append([]byte("mamony:identity:session-token:v1\x00"), rawSession...))
+	d1, err := usecase.OfflineRecoveryCodeDigest(fresh[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	newCodeDigests := func(seed string) [5][32]byte {
+		var result [5][32]byte
+		for i := 0; i < 5; i++ {
+			result[i] = sha256.Sum256([]byte(seed + string(rune('a'+i)) + subject))
+		}
+		return result
+	}
+	stage := func(label string) [32]byte {
+		t.Helper()
+		digest := sha256.Sum256([]byte("synthetic stage recovery code change " + label + subject))
+		var allowed bool
+		if err := grantConn.QueryRow(ctx,
+			"SELECT mamony_identity.stage_recovery_code_rotation_grant($1,$2,$3)",
+			subject, epoch, digest[:]).Scan(&allowed); err != nil || !allowed {
+			t.Fatalf("trusted fixture could not stage recovery-specific reauth grant: %v", err)
+		}
+		return digest
+	}
+	rollbackGrant := stage("rollback")
+	collision := randomSyntheticID(t, "evt_")
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.security_outbox
+		(event_id,subject_id,event_type,occurred_at)
+		VALUES($1,$2,'ENROLLMENT_PENDING',clock_timestamp())`,
+		collision, subject); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := managerStore.Replace(ctx, sessionDigest, rollbackGrant, d1,
+		newCodeDigests("rollback"), collision); ok || err == nil {
+		t.Fatal("duplicate audit event committed offline code replacement")
+	}
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_recovery_offline_codes
+		WHERE subject_id=$1 AND code_digest=$2 AND consumed_at IS NULL`,
+		subject, d1[:]).Scan(&count); err != nil || count != 1 {
+		t.Fatal("failed audit write removed previously saved offline code")
+	}
+	var rollbackConsumed bool
+	if err := admin.QueryRow(ctx, `SELECT consumed_at IS NOT NULL
+		FROM mamony_identity.password_login_grants WHERE grant_digest=$1`,
+		rollbackGrant[:]).Scan(&rollbackConsumed); err != nil || rollbackConsumed {
+		t.Fatal("failed enrollment audit committed a consumed reauthentication grant")
+	}
+
+	// Two concurrent rotations with identical grant and old code have one
+	// transaction winner. Durable session/reauth proof never succeeds twice.
+	racingGrant := stage("race")
+	results := make(chan bool, 2)
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			ok, err := managerStore.Replace(ctx, sessionDigest, racingGrant, d1,
+				newCodeDigests("concurrent "+string(rune('a'+index))), randomSyntheticID(t, "evt_"))
+			results <- ok && err == nil
+		}(i)
+	}
+	wg.Wait()
+	close(results)
+	winners := 0
+	for ok := range results {
+		if ok {
+			winners++
+		}
+	}
+	if winners != 1 {
+		t.Fatal("concurrent recovery code replacement succeeded more than once")
+	}
+	if who, err := sessions.Resolve(ctx, bearer); err != nil || who != subject {
+		t.Fatal("offline code rotation unexpectedly invalidated healthy session epoch")
+	}
+}
