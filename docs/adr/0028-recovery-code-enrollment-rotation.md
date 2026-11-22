@@ -1,0 +1,40 @@
+# ADR 0028 — Unmounted offline recovery-code enrollment and rotation (Identity v25)
+
+Status: **PROPOSED / stacked Draft PR #65** on top of Draft #64. Not merged, not deployed, not mounted. This is a candidate for an authenticated recovery-code lifecycle, **not a production MFA or self-service enrollment implementation**.
+
+## Decision: distinguish fresh reauthentication from independent possession
+
+The verified existing session plus current password, even when rechecked with Argon2id, are **not automatically independent MFA** and cannot be the sole authority for first provisioning recovery codes. A compromised session together with a captured current password must not be sufficient to create a long-lived account-recovery fallback.
+
+Identity v25 therefore defines two narrowly separated ceremonies:
+
+1. **Bootstrap**: active subject, verified current contact, live session, fresh current-password verification via the existing durable pre-KDF login admission, a fresh dedicated `RECOVERY_CODE_ROTATION` 30-second one-use grant, **plus a distinct independent approval**. The approval is represented by a separate 256-bit domain-separated digest, subject/epoch-bound, valid at most 5 minutes and consumed once. **No production role can INSERT an approval and no approval issuer is implemented**; real bootstrap remains default-DENY. Only disposable test ADMIN fixtures issue a synthetic approval.
+2. **Reissuance/rotation**: the same live-session and fresh-password rules **plus possession of one unused existing saved recovery code from the current subject/contact/epoch**. This previous code is burned by replacing the entire set atomically. A user who has consumed/lost all saved codes cannot use a regular session/password alone to re-enroll. No API endpoint is mounted.
+
+The trusted Go coordinator reuses `OpaqueSessionAuthority.Resolve` plus `PasswordLoginFlow.AuthenticateWithEpoch` (durable admission before real Argon2id), checks that both identities match and stages a new purpose-specific grant through `mamony_identity_auth_grant_runtime`. Existing PASSWORD_CHANGE and PASSWORD_LOGIN_SESSION grants are **not reusable** for code changes; likewise the new grant cannot be used to change a password or mint a session. The Go code generates a batch of **five independent 256-bit secrets** (existing v24 offline code purpose/domain) and commits only their five 32-byte digests via an isolated runtime role. Raw codes are returned via an intentionally explicit `RecoveryCodeSet.ForTrustedDisplay` only after an acknowledged commit. Standard logging, formatting and JSON/text serialization redact or deny disclosure. An ambiguous commit or unexpected error discards the codes and cannot be automatically retried; a future trusted UI must specifically handle the resulting recovery uncertainty.
+
+## Database transaction and isolation
+
+New `mamony_identity_recovery_code_manager_runtime` has schema USAGE and EXECUTE on **only** `replace_password_recovery_offline_codes(session_digest,reauth_grant_digest,independent_proof_digest,new_code_digests,event_id)`. It has no table privileges and cannot issue independent approvals, mint sessions, reset passwords or read secrets. The SECURITY DEFINER SQL function checks the original `session_user` and performs all gates under PostgreSQL clock after locks: a purpose-specific unconsumed grant, authoritative session subject match, ACTIVE subject, current verified contact, subject epoch, nonrevoked session with absolute expiry and 30-minute inactivity limit, unexpired 30-second grant, five unique fixed-size digests, then either unused pre-enrolled offline code or independent single-use bootstrap approval. The grant is consumed atomically with the approval (if bootstrap), previous code set deletion, new digest-only set insertion and identifier-only security event.
+
+Lock order follows existing authenticated password change: `reauth grant -> subject/alias -> session -> independent evidence`; this prevents an expired/suspended session or stale contact from ever authorizing a replacement. An existing account with **any** historical offline-code row (including consumed) is in rotation mode; never silently bypass to bootstrap just because no unused codes remain.
+
+Every successful enrollment/rotation **revokes outstanding, unconsumed email recovery challenges**, quarantines pending encrypted proof mail delivery and consumes any outstanding recovery assurance grant. This stops a previously issued email recovery token/approval from resetting the account after new backup codes are provisioned. It does not retroactively unsend mail already accepted by a provider; stale token redemption remains denied. An immutable `RECOVERY_CODES_ENROLLED` or `RECOVERY_CODES_ROTATED` event and a **separate token-free security notice obligation** for the current verified contact are inserted in the same transaction. A failed audit/notice or duplicate digest rolls back all changes. The notice outbox currently has **NO delivery worker or provider adapter**; the transaction records an obligation, not a delivered alert. Future work must add recipient-check/fenced retry, provider signed callback, retention, monitoring and suppression handling without piggybacking on PASSWORD_CHANGED or PASSWORD_RECOVERED sender content.
+
+## Security review / nonclaims
+
+- **First use requires an external independent proof authority** and an owner-approved factor-enrollment policy. No production principal has INSERT on the approval table. Provisioning the five codes with only current-password reauth is blocked.
+- **Code rotation requires one existing offline code**. There is no emergency bypass, backdoor issuance, or administrative reset in ordinary Identity runtimes. Lost-all-codes cases require a separate, explicitly reviewed assisted recovery policy.
+- **Potential same-device compromise** of a password, session and saved codes remains a threat. Password-manager/device storage recommendations and AAL/MFA assertions require independent policy.
+- **Profile A database owner** can read/write tables or forge approval and offline-code digests, so least-privilege runtime isolation does **not** establish independence from full database compromise.
+- **No browser/API route, React/HTML page, secure one-time display transport, production signing key, rate-limited enrollment endpoint, offline-code lifecycle audit operator, or notification worker** is added. No user-facing code set or email is delivered.
+- Generation of five raw codes before the DB transaction is safe only because the Go layer withholds them until known COMMIT; neither raw codes nor approval token are passed to SQL (only separated SHA-256 digests). Crash after COMMIT but before display loses the new set, which needs an approved recovery handling policy.
+- Reauthentication during a password change changes account epoch and invalidates previous saved code set; replacing it demands a newly authenticated enrollment authority, not opportunistically bypassing the epoch check.
+
+## Required verification
+
+- Disposable PostgreSQL role matrix denies all direct table privileges and execution by any cross-purpose role; only the auth-grant role stages the dedicated purpose.
+- Real end-to-end tests: session/Argon2id/admission, bootstrap default deny, synthetic independent approval single use, exactly five saved digest-only codes, raw code disclosure only after commit, rotation with an existing saved code, wrong/replayed codes, challenge/proof-delivery/assurance revocation, token-free notification outbox, failed audit rollback preserving old set/grant, and concurrent double rotation exactly one success.
+- All five GitHub workflows must succeed against the **exact final PR head SHA**. A green build on an earlier commit is not approval.
+
+The most immediate next steps are a genuinely independent enrollment approval issuer/strong-authenticator policy and a token-free recovery-code security notice delivery worker. Do not enable public account recovery until both are reviewed.
