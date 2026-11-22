@@ -30,10 +30,10 @@ type OpaqueSession struct {
 }
 
 func (s OpaqueSession) ForTrustedTransport() string { return s.secret }
-func (OpaqueSession) String() string                 { return "[opaque session redacted]" }
-func (OpaqueSession) GoString() string               { return "[opaque session redacted]" }
-func (OpaqueSession) MarshalJSON() ([]byte, error)   { return nil, ErrSessionUnavailable }
-func (OpaqueSession) MarshalText() ([]byte, error)   { return nil, ErrSessionUnavailable }
+func (OpaqueSession) String() string                { return "[opaque session redacted]" }
+func (OpaqueSession) GoString() string              { return "[opaque session redacted]" }
+func (OpaqueSession) MarshalJSON() ([]byte, error)  { return nil, ErrSessionUnavailable }
+func (OpaqueSession) MarshalText() ([]byte, error)  { return nil, ErrSessionUnavailable }
 
 // SessionAuthorityStore MUST atomically recheck ACTIVE, verified contact and
 // account session epoch under SQL row locks when issuing. This interface is
