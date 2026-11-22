@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"net/netip"
+	"regexp"
 )
 
 var (
