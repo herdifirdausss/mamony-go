@@ -187,8 +187,8 @@ func TestPasswordAuthenticationCarriesVerifierSnapshotEpoch(t *testing.T) {
 		t.Fatal("one bounded lookup must precede one KDF")
 	}
 	reader.record.SessionEpoch = 0
-	if result, err := auth.AuthenticateWithEpoch(context.Background(), "alice@example.test", "password phrase");
-		result.SubjectID != "" || !errors.Is(err, ErrPasswordAuthenticationDenied) {
+	result, err := auth.AuthenticateWithEpoch(context.Background(), "alice@example.test", "password phrase")
+	if result.SubjectID != "" || !errors.Is(err, ErrPasswordAuthenticationDenied) {
 		t.Fatal("missing epoch cannot become a trusted login candidate")
 	}
 }
