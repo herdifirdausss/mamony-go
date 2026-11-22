@@ -13,10 +13,8 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 )
 
-const (
-	syntheticCurrentPhrase = "an old synthetic very strong password"
-	syntheticReplacementPhrase = "a fresh synthetic very strong password"
-)
+const syntheticCurrentPhrase = "an old synthetic very strong password"
+const syntheticReplacementPhrase = "a fresh synthetic very strong password"
 
 type browserChangeHasher struct{ calls int }
 
