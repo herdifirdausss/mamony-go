@@ -20,7 +20,6 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	platformpg "github.com/herdifirdausss/mamony-go/internal/platform/postgres"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // TestIdentityZRecoveryCodeEnrollmentRotation uses current-password Argon2id,
@@ -263,51 +262,8 @@ func TestIdentityZRecoveryCodeEnrollmentRotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if denied, err := manager.Rotate(ctx, bearer, email, currentPassword, other.TrustedOfflineDisplay(), peer); !errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) || denied.ForTrustedDisplay()[0] != "" {
-		var proofCount int
-		if qerr := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_login_grants
-			WHERE subject_id=$1 AND purpose='RECOVERY_CODE_ROTATION'`, subject).Scan(&proofCount); qerr != nil {
-			t.Fatal(qerr)
-		}
-		who, sessionErr := sessions.Resolve(ctx, bearer)
-		var recentDigest []byte
-		if qerr := admin.QueryRow(ctx, `SELECT grant_digest
-			FROM mamony_identity.password_login_grants WHERE subject_id=$1
-			AND purpose='RECOVERY_CODE_ROTATION' AND consumed_at IS NULL
-			ORDER BY issued_at DESC LIMIT 1`, subject).Scan(&recentDigest); qerr != nil {
-			t.Fatal(qerr)
-		}
-		sessionRaw, decodeErr := base64.RawURLEncoding.DecodeString(bearer)
-		if decodeErr != nil {
-			t.Fatal(decodeErr)
-		}
-		sessionProof := sha256.Sum256(append([]byte("mamony:identity:session-token:v1\x00"), sessionRaw...))
-		wrongProof := other.Digest()
-		syntheticCodes := make([][]byte, 5)
-		for i := range syntheticCodes {
-			d := sha256.Sum256([]byte("diagnostic:unissued:" + string(rune('a'+i)) + subject))
-			syntheticCodes[i] = d[:]
-		}
-		managerConn, connectionErr := pgx.Connect(ctx, managerDSN)
-		if connectionErr != nil {
-			t.Fatal(connectionErr)
-		}
-		var syntheticAllowed bool
-		directErr := managerConn.QueryRow(ctx,
-			"SELECT mamony_identity.replace_password_recovery_offline_codes($1,$2,$3,$4,$5)",
-			sessionProof[:], recentDigest, wrongProof[:], syntheticCodes,
-			randomSyntheticID(t, "evt_")).Scan(&syntheticAllowed)
-		_ = managerConn.Close(context.Background())
-		sqlErrorCode := "none"
-		if directErr != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(directErr, &pgErr) {
-				sqlErrorCode = pgErr.Code + ":" + pgErr.Routine + ":" + pgErr.Message
-			} else {
-				sqlErrorCode = "non-postgres:" + directErr.Error()
-			}
-		}
-		t.Fatalf("wrong saved recovery code outcome: err=%v rawReturned=%t reauthGrants=%d sessionStillValid=%t sessionErr=%v directSQLCode=%s directAllowed=%t",
-			err, denied.ForTrustedDisplay()[0] != "", proofCount, who == subject, sessionErr, sqlErrorCode, syntheticAllowed)
+		t.Fatalf("wrong saved recovery code was not generically denied: err=%v rawReturned=%t",
+			err, denied.ForTrustedDisplay()[0] != "")
 	}
 	var challengeRevoked bool
 	if err := admin.QueryRow(ctx, `SELECT revoked_at IS NOT NULL
