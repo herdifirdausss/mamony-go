@@ -177,11 +177,11 @@ func TestIdentityMailgunMockSecurityNoticePipeline(t *testing.T) {
 	}
 	cfg := SecurityNoticeDeliveryConfig{
 		DSN: noticeDSN, Region: "US", Domain: "mg.example.test",
-		From: "Mamony Security <security@mg.example.test>",
-		MailgunKey: "synthetic-security-sending-key",
+		From:         "Mamony Security <security@mg.example.test>",
+		MailgunKey:   "synthetic-security-sending-key",
 		PollInterval: 100 * time.Millisecond,
 		HTTPClient: &http.Client{
-			Timeout: 2 * time.Second,
+			Timeout:   2 * time.Second,
 			Transport: mockMailgunTransport{origin: mockOrigin},
 		},
 	}
