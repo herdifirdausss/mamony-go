@@ -212,6 +212,27 @@ func TestIdentityZAuthMaterialEpochFence(t *testing.T) {
 		t.Fatal("new contact cannot have new-epoch session")
 	}
 
+	// The verifier or login alias must never be silently reattached to
+	// another identity without a separately reviewed ownership transfer.
+	otherSubject := randomSyntheticID(t, "sub_")
+	if _, err := admin.Exec(ctx,
+		"INSERT INTO mamony_identity.subjects (subject_id,created_at) VALUES ($1,clock_timestamp())",
+		otherSubject); err != nil {
+		t.Fatal(err)
+	}
+	beforeRebind := epoch()
+	for _, statement := range []string{
+		"UPDATE mamony_identity.password_verifiers SET subject_id=$1 WHERE subject_id=$2",
+		"UPDATE mamony_identity.email_aliases SET subject_id=$1 WHERE subject_id=$2",
+	} {
+		if _, err := admin.Exec(ctx, statement, otherSubject, subject); err == nil {
+			t.Fatal("authentication ownership rebind bypassed epoch fence")
+		}
+	}
+	if epoch() != beforeRebind || resolve(afterAlias) != subject {
+		t.Fatal("rejected ownership rebind changed account state or valid bearer")
+	}
+
 	// Deterministic TOCTOU proof: a password update holds the subject lock.
 	// Grant stage using an already-compared old epoch must wait, then DENY
 	// after password mutation commits (not silently use the new epoch).
