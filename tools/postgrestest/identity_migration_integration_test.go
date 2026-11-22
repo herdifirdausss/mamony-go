@@ -652,3 +652,56 @@ func TestPostgresIdentityZRecoveryDeliveryRole(t *testing.T) {
 		}
 	}
 }
+
+// TestPostgresIdentityZRecoveryRedeemerRole proves the v21 credential can
+// only EXECUTE the owner-controlled recovery transaction. It has no table
+// access, no proof/assurance grant issuance and no session minting.
+func TestPostgresIdentityZRecoveryRedeemerRole(t *testing.T) {
+	const redeem = "SELECT mamony_identity.redeem_password_recovery(" +
+		"decode(repeat('11',32),'hex'),'missing@example.test'," +
+		"decode(repeat('22',16),'hex'),decode(repeat('33',32),'hex')," +
+		"'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_RECOVERY_REDEEMER_URL", "-c", redeem)
+	if err != nil || out != "f" {
+		t.Fatalf("recovery redemption function unavailable: out=%s err=%v", out, err)
+	}
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.recovery_redemption_escape(id integer)",
+		"SELECT * FROM mamony_identity.password_recovery_challenges",
+		"SELECT * FROM mamony_identity.password_recovery_deliveries",
+		"SELECT * FROM mamony_identity.password_recovery_assurance_grants",
+		"SELECT * FROM mamony_identity.password_recovery_notices",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.password_change_notices",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"UPDATE mamony_identity.password_verifiers SET digest=decode(repeat('11',32),'hex')",
+		"DELETE FROM mamony_identity.password_recovery_challenges",
+		"INSERT INTO mamony_identity.password_recovery_assurance_grants(subject_id,subject_epoch,approved_at,expires_at) VALUES ('sub_AAAAAAAAAAAAAAAAAAAAAA',1,clock_timestamp(),clock_timestamp()+interval '5 minutes')",
+		"SELECT mamony_identity.issue_password_recovery('missing@example.test','rcv_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'),'test-key',decode(repeat('22',71),'hex'))",
+		"SELECT * FROM mamony_identity.claim_password_recovery_delivery('lse_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_REDEEMER_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("recovery redeemer exceeded EXECUTE-only boundary: %s out=%s err=%v", stmt, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_PASSWORD_CHANGE_URL",
+		"TEST_IDENTITY_RECOVERY_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_DELIVERY_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL", "TEST_IDENTITY_SESSION_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", redeem)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unapproved role gained recovery redemption: %s out=%s err=%v", role, out, err)
+		}
+	}
+}
