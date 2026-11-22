@@ -123,7 +123,7 @@ CREATE OR REPLACE FUNCTION mamony_identity.password_recovery_notice_health()
 RETURNS TABLE(pending_due bigint,dead bigint,submitted_unconfirmed bigint,
               retrying bigint,expired_pending bigint)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF session_user<>'mamony_identity_recovery_notice_monitor_runtime' THEN
         RAISE EXCEPTION 'recovery notice monitoring origin denied'
             USING ERRCODE='42501';
@@ -149,7 +149,7 @@ $$;
 CREATE FUNCTION mamony_identity.password_recovery_notice_delivery_health()
 RETURNS TABLE(delivered bigint,provider_failures bigint,unmatched_events bigint)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF session_user<>'mamony_identity_recovery_notice_monitor_runtime' THEN
         RAISE EXCEPTION 'recovery delivery monitoring origin denied'
             USING ERRCODE='42501';
@@ -178,7 +178,7 @@ CREATE FUNCTION mamony_identity.purge_old_recovery_notice_mailgun_receipts()
 RETURNS integer LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,pg_temp AS $$
 DECLARE purged_count integer;
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF session_user<>'mamony_identity_maintenance_runtime' THEN
         RAISE EXCEPTION 'recovery receipt purge origin denied'
             USING ERRCODE='42501';
@@ -205,4 +205,4 @@ GRANT EXECUTE ON FUNCTION
 TO mamony_identity_maintenance_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (23, 'abb3b3e727a10e45f84748728b26aeafef05f0a65e0833b1028cd6a9f018e124');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (23, '__REPLACE_SHA256__');
