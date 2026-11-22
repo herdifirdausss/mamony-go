@@ -24,8 +24,8 @@ func testRecoverySender(t *testing.T, handler http.HandlerFunc) *RecoveryMailSen
 	}
 	sender, err := NewRecoveryMailSender(RecoveryConfig{
 		Region: RegionUS, Domain: "mg.example.test",
-		From: "Mamony Security <security@mg.example.test>",
-		APIKey: "synthetic-recovery-mailgun",
+		From:        "Mamony Security <security@mg.example.test>",
+		APIKey:      "synthetic-recovery-mailgun",
 		RecoveryURL: "https://app.example.test/account/recover-password",
 	}, &http.Client{
 		Timeout:   1 * time.Second,
