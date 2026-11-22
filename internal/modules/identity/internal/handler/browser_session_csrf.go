@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -39,7 +40,11 @@ func (c *sessionCSRF) issue(session string) string {
 	}
 	var token [40]byte
 	now := c.clock().UTC()
-	binary.BigEndian.PutUint64(token[:8], uint64(now.Add(csrfValidity).Unix()))
+	// Encode a signed Unix timestamp directly: no unchecked int64-to-uint64
+	// conversion. The 8-byte buffer uses the standard big-endian wire form.
+	if err := binary.Write(bytes.NewBuffer(token[:0]), binary.BigEndian, now.Add(csrfValidity).Unix()); err != nil {
+		return ""
+	}
 	mac := c.signature(token[:8], session)
 	copy(token[8:], mac[:])
 	return base64.RawURLEncoding.EncodeToString(token[:])
@@ -56,8 +61,11 @@ func (c *sessionCSRF) verify(session, presented string) bool {
 		return false
 	}
 	now := c.clock().UTC().Unix()
-	expires := binary.BigEndian.Uint64(decoded[:8])
-	if expires <= uint64(now) || expires > uint64(now+int64(csrfValidity/time.Second)) {
+	var expires int64
+	if err := binary.Read(bytes.NewReader(decoded[:8]), binary.BigEndian, &expires); err != nil {
+		return false
+	}
+	if expires <= now || expires > now+int64(csrfValidity/time.Second) {
 		return false
 	}
 	expected := c.signature(decoded[:8], session)
