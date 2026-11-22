@@ -244,7 +244,9 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZConfirmationAdmissionHTTPDB") ||
 						strings.HasPrefix(ev.Test, "TestIdentityPasswordAuthentication") ||
 						strings.HasPrefix(ev.Test, "TestIdentityOpaqueSessions") ||
-						strings.HasPrefix(ev.Test, "TestIdentityZSessionFreezeIssueInterleavings"))) {
+						strings.HasPrefix(ev.Test, "TestIdentityZSessionFreezeIssueInterleavings") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZDirectSessionMintThreatFixture") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZAuthenticationGrants"))) {
 				passed[ev.Test] = true
 			}
 
