@@ -12,10 +12,8 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 )
 
-const (
-	browserRotatePath  = "/v1/identity/change-password"
-	browserChangePasswordBytes = 4096
-)
+const browserRotatePath = "/v1/identity/change-password"
+const browserChangePasswordBytes = 4096
 
 // BrowserPasswordChangeHTTP is an explicitly constructed, UNMOUNTED first-party
 // candidate. It shares the exact origin, TLS, trusted-peer and session-bound
