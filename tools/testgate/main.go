@@ -269,6 +269,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 				(ev.Package == identityPackage && strings.HasPrefix(ev.Test, "TestIdentity")) ||
 				(ev.Package == identityIntegrationPackage &&
 					(strings.HasPrefix(ev.Test, "TestIdentityMailgunMock") ||
+						strings.HasPrefix(ev.Test, "TestIdentityMailgunNoticeMonitorRole") ||
 						strings.HasPrefix(ev.Test, "TestIdentityHTTPEnrollmentDB") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZEnrollmentReconciliationDB") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZEnrollmentBacklogDB") ||
