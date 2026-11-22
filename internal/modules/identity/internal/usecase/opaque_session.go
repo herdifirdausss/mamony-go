@@ -35,12 +35,12 @@ func (OpaqueSession) GoString() string              { return "[opaque session re
 func (OpaqueSession) MarshalJSON() ([]byte, error)  { return nil, ErrSessionUnavailable }
 func (OpaqueSession) MarshalText() ([]byte, error)  { return nil, ErrSessionUnavailable }
 
-// SessionAuthorityStore MUST atomically recheck ACTIVE, verified contact and
-// account session epoch under SQL row locks when issuing. This interface is
-// intentionally narrower than an account reader and does not grant session
-// creation based solely on the stale result of a password KDF.
+// SessionAuthorityStore consumes ONLY a restricted, one-use authentication
+// grant digest and a random session digest. It no longer accepts a caller-
+// selected subject; PostgreSQL resolves the subject from its grant authority.
+// A compromised grant issuer runtime still defeats this Profile A boundary.
 type SessionAuthorityStore interface {
-	Issue(context.Context, string, []byte, string) (bool, error)
+	Issue(context.Context, []byte, []byte, string) (bool, error)
 	Resolve(context.Context, []byte) (string, error)
 	Revoke(context.Context, []byte, string) error
 }
@@ -75,11 +75,12 @@ func sessionTokenDigest(secret string) ([32]byte, error) {
 	return digest, nil
 }
 
-func (a *OpaqueSessionAuthority) Issue(ctx context.Context, subject string) (OpaqueSession, error) {
+func (a *OpaqueSessionAuthority) Issue(ctx context.Context, grant AuthenticationGrant) (OpaqueSession, error) {
 	if a == nil || a.store == nil || a.random == nil || ctx == nil || ctx.Err() != nil {
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
-	if !validSessionSubject.MatchString(subject) {
+	grantDigest, err := authenticationGrantDigest(grant.secret)
+	if err != nil {
 		return OpaqueSession{}, ErrSessionDenied
 	}
 	var token [32]byte
@@ -92,7 +93,7 @@ func (a *OpaqueSessionAuthority) Issue(ctx context.Context, subject string) (Opa
 	}
 	secret := base64.RawURLEncoding.EncodeToString(token[:])
 	digest, _ := sessionTokenDigest(secret)
-	allowed, err := a.store.Issue(ctx, subject, digest[:], "evt_"+base64.RawURLEncoding.EncodeToString(event[:]))
+	allowed, err := a.store.Issue(ctx, grantDigest[:], digest[:], "evt_"+base64.RawURLEncoding.EncodeToString(event[:]))
 	if err != nil {
 		// Including ambiguous commit: the bearer is deliberately discarded;
 		// NEVER reissue/replay automatically or leak token through an error.
@@ -142,28 +143,29 @@ func (a *OpaqueSessionAuthority) Revoke(ctx context.Context, secret string) erro
 }
 
 // SessionLogin may be wired only inside the Identity composition root.
-// It chains the PR #40 pre-KDF gate + password comparison and then asks
-// the separate session authority to RECHECK eligibility atomically.
+// It chains durable pre-KDF admission -> Argon2id -> grant staging -> atomic
+// grant consumption/session issuance; no public route invokes raw grant stage.
 type SessionLogin struct {
 	candidate *PasswordLoginFlow
+	grant     *AuthenticationGrantAuthority
 	issuer    SessionIssuer
 }
 
 // SessionIssuer is the only independently injected authority; the candidate
 // must be the concrete, mandatory-admission PasswordLoginFlow from PR #40.
 type SessionIssuer interface {
-	Issue(context.Context, string) (OpaqueSession, error)
+	Issue(context.Context, AuthenticationGrant) (OpaqueSession, error)
 }
 
-func NewSessionLogin(candidate *PasswordLoginFlow, issuer SessionIssuer) (*SessionLogin, error) {
-	if candidate == nil || issuer == nil {
+func NewSessionLogin(candidate *PasswordLoginFlow, grant *AuthenticationGrantAuthority, issuer SessionIssuer) (*SessionLogin, error) {
+	if candidate == nil || grant == nil || issuer == nil {
 		return nil, ErrSessionUnavailable
 	}
-	return &SessionLogin{candidate: candidate, issuer: issuer}, nil
+	return &SessionLogin{candidate: candidate, grant: grant, issuer: issuer}, nil
 }
 
 func (s *SessionLogin) Authenticate(ctx context.Context, email, password string, peer netip.Addr) (OpaqueSession, error) {
-	if s == nil || s.candidate == nil || s.issuer == nil || ctx == nil || ctx.Err() != nil {
+	if s == nil || s.candidate == nil || s.grant == nil || s.issuer == nil || ctx == nil || ctx.Err() != nil {
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
 	subject, err := s.candidate.Authenticate(ctx, email, password, peer)
@@ -179,7 +181,14 @@ func (s *SessionLogin) Authenticate(ctx context.Context, email, password string,
 	if !validSessionSubject.MatchString(subject) {
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
-	session, err := s.issuer.Issue(ctx, subject)
+	proof, err := s.grant.Issue(ctx, subject)
+	if errors.Is(err, ErrSessionDenied) {
+		return OpaqueSession{}, ErrPasswordAuthenticationDenied
+	}
+	if err != nil {
+		return OpaqueSession{}, ErrSessionUnavailable
+	}
+	session, err := s.issuer.Issue(ctx, proof)
 	if errors.Is(err, ErrSessionDenied) {
 		return OpaqueSession{}, ErrPasswordAuthenticationDenied
 	}
