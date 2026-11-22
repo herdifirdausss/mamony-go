@@ -145,6 +145,10 @@ func TestIdentityZBrowserPasswordChangeE2E(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pageHandler, err := handler.NewPasswordChangePage(browser)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	accounts := []browserRotationAccount{
 		{subject: randomSyntheticID(t, "sub_"),
@@ -212,6 +216,7 @@ func TestIdentityZBrowserPasswordChangeE2E(t *testing.T) {
 	mux.Handle("GET /v1/identity/csrf", browser)
 	mux.Handle("POST /v1/identity/logout", browser)
 	mux.Handle("POST /v1/identity/change-password", browserChange)
+	mux.Handle("GET /account/change-password", pageHandler)
 	mux.HandleFunc("GET /__test__/password-browser", func(w http.ResponseWriter, r *http.Request) {
 		if r.TLS == nil || r.Host != "app.example.test" {
 			http.Error(w, "wrong test origin", http.StatusForbidden)
