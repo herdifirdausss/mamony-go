@@ -20,6 +20,14 @@ func TestListenerRouteIsolation(t *testing.T) {
 		{"private readiness", PrivateHandler(), "/readyz", 200, "http-ready"},
 		{"private not public", PublicHandler(), "/readyz", 404, ""},
 		{"no fictional financial route", PublicHandler(), "/v1/payments", 404, ""},
+		{"login remains unmounted", PublicHandler(), "/v1/identity/login", 404, ""},
+		{"session remains unmounted", PublicHandler(), "/v1/identity/session", 404, ""},
+		{"csrf remains unmounted", PublicHandler(), "/v1/identity/csrf", 404, ""},
+		{"logout remains unmounted", PublicHandler(), "/v1/identity/logout", 404, ""},
+		{"login not on private listener", PrivateHandler(), "/v1/identity/login", 404, ""},
+		{"session not on private listener", PrivateHandler(), "/v1/identity/session", 404, ""},
+		{"csrf not on private listener", PrivateHandler(), "/v1/identity/csrf", 404, ""},
+		{"logout not on private listener", PrivateHandler(), "/v1/identity/logout", 404, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
