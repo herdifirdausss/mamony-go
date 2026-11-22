@@ -27,6 +27,7 @@ func (AuthenticationGrant) MarshalText() ([]byte, error) { return nil, ErrSessio
 // it must not be treated as a password verifier or independent security root.
 type AuthenticationGrantStore interface {
 	Stage(context.Context, string, int64, []byte) (bool, error)
+	StageChange(context.Context, string, int64, []byte) (bool, error)
 }
 
 type AuthenticationGrantAuthority struct {
@@ -59,7 +60,17 @@ func authenticationGrantDigest(secret string) ([32]byte, error) {
 // Issue may be invoked ONLY after PasswordLoginFlow successfully consumes
 // admission and verifies the password. Profile A relies on this trusted
 // composition, NOT on a cryptographically independent SQL password check.
+// IssueChange is a separate purpose-bound assertion after current-password
+// Argon2id. A PASSWORD_CHANGE grant cannot be used by the session issuer.
+func (a *AuthenticationGrantAuthority) IssueChange(ctx context.Context, subject string, expectedEpoch int64) (AuthenticationGrant, error) {
+	return a.issue(ctx, subject, expectedEpoch, true)
+}
+
 func (a *AuthenticationGrantAuthority) Issue(ctx context.Context, subject string, expectedEpoch int64) (AuthenticationGrant, error) {
+	return a.issue(ctx, subject, expectedEpoch, false)
+}
+
+func (a *AuthenticationGrantAuthority) issue(ctx context.Context, subject string, expectedEpoch int64, change bool) (AuthenticationGrant, error) {
 	if a == nil || a.store == nil || a.random == nil || ctx == nil || ctx.Err() != nil {
 		return AuthenticationGrant{}, ErrSessionUnavailable
 	}
@@ -75,7 +86,12 @@ func (a *AuthenticationGrantAuthority) Issue(ctx context.Context, subject string
 	if err != nil {
 		return AuthenticationGrant{}, ErrSessionUnavailable
 	}
-	allowed, err := a.store.Stage(ctx, subject, expectedEpoch, digest[:])
+	var allowed bool
+	if change {
+		allowed, err = a.store.StageChange(ctx, subject, expectedEpoch, digest[:])
+	} else {
+		allowed, err = a.store.Stage(ctx, subject, expectedEpoch, digest[:])
+	}
 	if err != nil {
 		// Including an ambiguous commit: no raw grant may be returned or retried.
 		return AuthenticationGrant{}, ErrSessionUnavailable
