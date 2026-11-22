@@ -60,7 +60,7 @@ func (s RecoveryCodeSet) ForTrustedDisplay() []string {
 
 const recoveryCodeSetRedaction = "[REDACTED offline recovery code set]"
 
-func (RecoveryCodeSet) String() string { return recoveryCodeSetRedaction }
+func (RecoveryCodeSet) String() string   { return recoveryCodeSetRedaction }
 func (RecoveryCodeSet) GoString() string { return recoveryCodeSetRedaction }
 func (RecoveryCodeSet) Format(s fmt.State, _ rune) {
 	_, _ = io.WriteString(s, recoveryCodeSetRedaction)
