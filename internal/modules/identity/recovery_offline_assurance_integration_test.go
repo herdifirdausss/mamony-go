@@ -215,6 +215,23 @@ func TestIdentityZRecoveryOfflineAssurance(t *testing.T) {
 	offline1 := enroll(f)
 	offline2 := enroll(f)
 	f = issue(f)
+	// A code provisioned only AFTER the email challenge exists must not
+	// become a new independent trust root for that same recovery attempt.
+	lateCode, err := usecase.NewOfflineRecoveryCode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lateDigest := lateCode.Digest()
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_offline_codes
+		(code_digest,subject_id,enrolled_epoch,contact_version,enrolled_at)
+		VALUES($1,$2,$3,1,clock_timestamp())`,
+		lateDigest[:], f.subject, f.epoch); err != nil {
+		t.Fatal(err)
+	}
+	if err := assurer.Approve(ctx, f.token.ForTrustedDelivery(), lateCode.TrustedOfflineDisplay());
+		!errors.Is(err, usecase.ErrRecoveryAssuranceDenied) || usedCode(lateCode) {
+		t.Fatal("post-challenge offline code enrollment bypassed prior-possession fence")
+	}
 	if err := assurer.Approve(ctx, f.token.ForTrustedDelivery(), "bad"); !errors.Is(err, usecase.ErrRecoveryAssuranceDenied) {
 		t.Fatal("invalid code approved")
 	}
@@ -305,6 +322,18 @@ func TestIdentityZRecoveryOfflineAssurance(t *testing.T) {
 	}
 	if err := assurer.Approve(ctx, other.token.ForTrustedDelivery(), otherCode.TrustedOfflineDisplay()); err != nil {
 		t.Fatalf("other verified account could not approve own code: %v", err)
+	}
+	// Approval is short-lived independently of the still-live email token.
+	// Use a privileged synthetic clock shift to avoid a five-minute sleep.
+	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_recovery_assurance_grants
+		SET approved_at=clock_timestamp()-interval '6 minutes',
+		    expires_at=clock_timestamp()-interval '1 minute'
+		WHERE subject_id=$1`, other.subject); err != nil {
+		t.Fatal(err)
+	}
+	if err := reset.Redeem(ctx, other.token.ForTrustedDelivery(), other.email,
+		"synthetic attempt with expired offline assurance"); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
+		t.Fatal("expired assurance grant bypassed DB-clock fence")
 	}
 
 	// Concurrent approvers on the SAME code and bearer: exactly one wins.
