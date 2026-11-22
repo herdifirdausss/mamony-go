@@ -1,6 +1,6 @@
 # ADR 0007 — First-party browser session HTTP contract (Draft PR #42)
 
-Status: **Proposed contract only. No HTTP handlers, cookie issuance, mounted routes, OpenAPI publication or production credentials are implemented by this ADR.**
+Status: **Proposed contract. Draft PR #43 now provides a manually constructed, unmounted candidate handler; no public/private routing, OpenAPI publication or production credential provisioning.** See [ADR-0008](0008-unmounted-browser-session-http-candidate.md) for implementation and test limits.
 
 ## Context
 
@@ -58,3 +58,7 @@ Before mounting any new endpoint: approve session-role direct-mint risk and depl
 Standards consulted as design context, not a claim of certification: NIST SP 800-63B-4 session guidance (2025), OWASP CSRF Prevention Cheat Sheet, and MDN HTTP Set-Cookie prefix/attribute behavior. The contract and project-owned code/tests in this repository remain the actual source of requirements.
 
 **Do not publish this candidate in released OpenAPI or enable it in the default public/private router.**
+
+## Candidate implementation progress — stacked Draft PR #43
+
+[ADR-0008](0008-unmounted-browser-session-http-candidate.md) describes a new **unmounted** `BrowserSessionHTTP` candidate. It implements the login/session/csrf/logout call chain in `internal/modules/identity/internal/handler`, with direct TLS Host/Origin enforcement, bounded strict JSON login, `__Host-mamony_sid` host-only Secure/HttpOnly/SameSite=Strict cookie, separate HMAC-SHA256 session-bound 15-minute CSRF, and fail-closed DB/session error mapping. Unit/httptest covers abuse and lifecycle; explicit router inventory tests keep all four routes at **404** in public/private listeners. This is **not** a Chromium session UI test, production launch, server registration or resolution of the session database role's direct-mint privilege. The table of endpoints above is no longer merely hypothetical *handler code*, but all entries remain **not mounted or production-approved**.
