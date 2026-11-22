@@ -201,8 +201,7 @@ func TestIdentityZAuthenticatedPasswordChange(t *testing.T) {
 	}
 	// The wrong password can never create a rotation grant or change DB
 	// verifier, while still charging the durable pre-KDF admission budget.
-	if err := changer.Change(ctx, bearer, email, oldPassword+"wrong", nextPassword, peer);
-		!errors.Is(err, usecase.ErrPasswordChangeDenied) {
+	if err := changer.Change(ctx, bearer, email, oldPassword+"wrong", nextPassword, peer); !errors.Is(err, usecase.ErrPasswordChangeDenied) {
 		t.Fatalf("wrong old password accepted for change: %v", err)
 	}
 	if epoch() != before || eventCount() != 0 {
