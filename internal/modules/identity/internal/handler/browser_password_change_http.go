@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	browserChangePasswordPath = "/v1/identity/change-password"
+	browserChangePasswordPath  = "/v1/identity/change-password"
 	browserChangePasswordBytes = 4096
 )
 
