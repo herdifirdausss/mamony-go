@@ -256,7 +256,7 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 	newFixture := func(t *testing.T, seed byte) (string, string, string, [32]byte, int64) {
 		t.Helper()
 		s, alias := randomSyntheticID(t, "sub_"),
-			strings.ToLower(randomSyntheticID(t, "race_")) + "@example.test"
+			strings.ToLower(randomSyntheticID(t, "race_"))+"@example.test"
 		initial, err := hasher.Hash(ctx, "synthetic baseline for recovery concurrency")
 		if err != nil {
 			t.Fatal(err)
