@@ -156,3 +156,9 @@ The proposed ADR-0007 four-operation browser contract has a **candidate but unmo
 ## Draft PR #46 — candidate implementation of DEC-19
 
 Identity migration v11, Go grant staging/consumption, and a dedicated synthetic `mamony_identity_auth_grant_runtime` role are now **code candidates** in Draft PR #46. The old subject-only issuer is dropped; SQL session minting takes a one-use grant reference, not a freely selected subject. The #45 direct-mint fixture is changed into a deny regression and separate tests exercise expiry, replay, rollback and concurrent consume. This does not constitute owner acceptance of DEC-19, evidence of independent runtime isolation, or permission to publish login; see [ADR-0009](adr/0009-authentication-to-session-issuance-boundary.md).
+
+## Draft #47 — server-side session inactivity timeout (proposed, not approved)
+
+Identity v12 introduces a **candidate 30-minute server-side idle timeout** while keeping the v11 12-hour absolute lifetime and grant-issuance security boundary unchanged. A successful session resolution updates `opaque_sessions.last_seen_at` inside the PostgreSQL transaction; expired, revoked, frozen and stale-epoch sessions cannot refresh or resurrect. Backfilling `last_seen_at=issued_at` intentionally causes old sessions that have already been inactive for 30 minutes to fail closed on migration. A new required disposable-PostgreSQL integration test covers refresh, idle denial and absolute expiry. See [ADR-0010](adr/0010-server-side-session-idle-expiry.md).
+
+**Unresolved:** owner acceptance of 30-minute policy, traffic/load and subject-lock contention, compromised-workload isolation under DEC-19, browser UX, key lifecycle, MFA/recovery and financial resource/tenant authorization. A `GET` used as a heartbeat would count as server activity, but cannot exceed the absolute 12-hour cutoff. The candidate browser routes remain 404 in application routers; this PR cannot be merged or deployed solely from green CI.
