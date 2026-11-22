@@ -77,7 +77,9 @@ func (s *RecoverySecurityNoticeSender) SendPasswordRecovered(ctx context.Context
 		}
 		return "", usecase.ErrPermanentDelivery
 	}
-	var ack struct { ID string `json:"id"` }
+	var ack struct {
+		ID string `json:"id"`
+	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&ack); err != nil {
 		return "", usecase.ErrDeliveryUnavailable
 	}
