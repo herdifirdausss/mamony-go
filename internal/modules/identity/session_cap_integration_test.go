@@ -244,8 +244,32 @@ func TestIdentityZMaxActiveSessions(t *testing.T) {
 			proofB, token("parallel-b"), evB).Scan(&ok)
 		results <- result{ok, err}
 	}()
-	waitForSessionLock(t, ctx, admin, pidA, blockerPID)
-	waitForSessionLock(t, ctx, admin, pidB, blockerPID)
+	// A waiting issuer can become the immediate pg_blocking_pids()
+	// blocker of the next queued issuer. Require actual server-visible
+	// Lock waits for BOTH backends, not a particular queue ordering.
+	pollCtx, stopPoll := context.WithTimeout(ctx, 5*time.Second)
+	defer stopPoll()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var waiting int
+		err := admin.QueryRow(pollCtx, `SELECT count(*)
+			FROM pg_catalog.pg_stat_activity a
+			WHERE a.pid IN ($1,$2) AND a.wait_event_type='Lock'
+			AND cardinality(pg_catalog.pg_blocking_pids(a.pid)) > 0`,
+			pidA, pidB).Scan(&waiting)
+		if err != nil {
+			t.Fatalf("cannot observe concurrent login lock queue: %v", err)
+		}
+		if waiting == 2 {
+			break
+		}
+		select {
+		case <-pollCtx.Done():
+			t.Fatalf("two issuing backends never both entered a PostgreSQL lock queue: %v", pollCtx.Err())
+		case <-ticker.C:
+		}
+	}
 	if err := block.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
