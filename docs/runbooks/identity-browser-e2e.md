@@ -81,3 +81,7 @@ Required isolated PostgreSQL `TestIdentityZSecurityNoticeOutbox` checks v15 pass
 ## Draft #52 — independent Mailgun security-notice delivery evidence
 
 The mandatory `TestIdentityMailgunMockSecurityNoticePipeline` drives a real v15 SQL password change → v16 PENDING notice → security-notice runtime facade → **local HTTP Mailgun mock** 429/200 → persisted ACCEPTED, with a separate SQL credential and no public route. Provider ACCEPTED is not inbox delivery, and no real Mailgun network is contacted. The prior actual Chromium tests still cover only unmounted login/CSRF/logout and verification; there is no password-change browser handler or live email notification. See [ADR-0015](../adr/0015-mailgun-password-change-notice-worker.md).
+
+## Draft #53 — unmounted Mailgun provider callback verification
+
+Required `TestIdentityMailgunMockWebhookReconciliation` uses real role-separated PostgreSQL, locally signed HMAC test callbacks and an **unmounted** handler to prove provider message correlation, replay suppression, delivery-before-ack recovery and failure status precedence. These tests are not an external webhook call and do not mount a production ingress. The real Chromium E2E workflow remains unchanged for login/verification candidate pages. See [ADR-0016](../adr/0016-mailgun-security-notice-webhook-reconciliation.md).
