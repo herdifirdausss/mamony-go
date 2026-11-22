@@ -99,4 +99,4 @@ GRANT EXECUTE ON FUNCTION
     TO mamony_identity_recovery_delivery_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (20, '__REPLACE_SHA256__');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (20, 'b24ab51adfbd7e53de045590ce1bb35b0927a75dbf2dc7942e559fd445f16052');
