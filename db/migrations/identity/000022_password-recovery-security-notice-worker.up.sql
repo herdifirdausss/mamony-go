@@ -157,4 +157,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.purge_old_password_recovery_notices()
     TO mamony_identity_maintenance_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (22, '__REPLACE_SHA256__');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (22, '1ae5690ebf565a8a5dc7a3d54cd7a7ff998c21423adf60ab47e34fb2ebfadbb6');
