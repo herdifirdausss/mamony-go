@@ -780,7 +780,6 @@ func TestPostgresIdentityZRecoverySecurityNoticeRoles(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZRecoveryNoticeWebhookRole proves that signed recovery
 // receipts have a separate, EXECUTE-only SQL principal. Password-change
 // sender/webhook and v22 recovery sender/monitor must never inherit it.
