@@ -39,7 +39,9 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 	connect := func(dsn string) *pgx.Conn {
 		t.Helper()
 		conn, err := pgx.Connect(ctx, dsn)
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		t.Cleanup(func() { _ = conn.Close(context.Background()) })
 		return conn
 	}
@@ -47,49 +49,74 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 	pool := func(dsn, role string) *platformpg.Pool {
 		t.Helper()
 		p, err := platformpg.Open(ctx, platformpg.Config{DSN: dsn, RuntimeRole: role, MaxConns: 4})
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		t.Cleanup(p.Close)
 		return p
 	}
 	issuer, err := identitypg.NewRecoveryIssuerStore(pool(issuerDSN, "mamony_identity_recovery_issuer_runtime"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	store, err := identitypg.NewRecoveryRedemptionStore(pool(redeemerDSN, "mamony_identity_recovery_redeemer_runtime"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	hasher, err := credential.NewPasswordHasher(2)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	policy := domain.PasswordPolicy{IsBlocked: func(value, email string) bool {
 		return value == "synthetic breached password not acceptable" || strings.Contains(value, email)
 	}}
 	redeemer, err := usecase.NewPasswordRecoveryRedemption(store, hasher, policy)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	subject := randomSyntheticID(t, "sub_")
 	email := strings.ToLower(randomSyntheticID(t, "reset_")) + "@example.test"
 	old, err := hasher.Hash(ctx, "synthetic initial password for recovery")
-	if err != nil { t.Fatal(err) }
-	if _, err := admin.Exec(ctx, "INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", subject); err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, "INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", subject); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.email_aliases
 	(canonical_email,subject_id,verified_at,created_at)
 	VALUES($1,$2,clock_timestamp(),clock_timestamp())`, email, subject); err != nil { t.Fatal(err) }
 	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_verifiers
 	(subject_id,kdf_version,memory_kib,iterations,parallelism,salt,digest,created_at)
 	VALUES($1,1,65536,3,1,$2,$3,clock_timestamp())`, subject, old.Salt, old.Digest); err != nil { t.Fatal(err) }
-	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", subject); err != nil { t.Fatal(err) }
+	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", subject); err != nil {
+		t.Fatal(err)
+	}
 	var epoch int64
-	if err := admin.QueryRow(ctx, "SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", subject).Scan(&epoch); err != nil { t.Fatal(err) }
+	if err := admin.QueryRow(ctx, "SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", subject).Scan(&epoch); err != nil {
+		t.Fatal(err)
+	}
 	proof, err := usecase.NewPasswordRecoveryProof()
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	challenge := randomSyntheticID(t, "rcv_")
 	issued, err := issuer.Issue(ctx, usecase.RecoveryIssue{
 		CanonicalEmail: email, ChallengeID: challenge, TokenDigest: proof.Digest(),
 		KeyID: "synthetic-recovery", SealedToken: bytes.Repeat([]byte{0x4c}, 71),
 	})
-	if err != nil || !issued { t.Fatalf("recovery challenge issue failed: %v %t", err, issued) }
+	if err != nil || !issued {
+		t.Fatalf("recovery challenge issue failed: %v %t", err, issued)
+	}
 	t.Cleanup(func() {
 		cleanupCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
 		defer done()
 		conn, err := pgx.Connect(cleanupCtx, adminDSN)
-		if err != nil { t.Errorf("cleanup: %v", err); return }
+		if err != nil {
+			t.Errorf("cleanup: %v", err)
+			return
+		}
 		defer func() { _ = conn.Close(context.Background()) }()
 		if _, err := conn.Exec(cleanupCtx, `UPDATE mamony_identity.password_recovery_deliveries
 		SET status='DEAD',lease_id=NULL,leased_until=NULL WHERE challenge_id=$1 AND status='PENDING'`,
@@ -144,11 +171,15 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			JOIN mamony_identity.password_recovery_assurance_grants g ON g.subject_id=s.subject_id
 			WHERE s.subject_id=$1 AND c.challenge_id=$2`, subject, challenge).
 			Scan(&current, &tokenUsed, &grantUsed, &notices)
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		return current, tokenUsed, grantUsed, notices
 	}
 	newVerifier, err := hasher.Hash(ctx, next)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	collisionEvent := randomSyntheticID(t, "evt_")
 	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.security_outbox
 	(event_id,subject_id,event_type,occurred_at)
@@ -208,7 +239,9 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		t.Fatal("replayed token performed another recovery")
 	}
 	at, _, _, notices = previous()
-	if at != epoch+1 || notices != 1 { t.Fatal("replay changed epoch or audit") }
+	if at != epoch+1 || notices != 1 {
+		t.Fatal("replay changed epoch or audit")
+	}
 
 	// A second independently verified account exercises simultaneous
 	// redemption on two SQL connections, not an in-memory mutex.
@@ -217,7 +250,9 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		s, alias := randomSyntheticID(t, "sub_"),
 			strings.ToLower(randomSyntheticID(t, "race_")) + "@example.test"
 		initial, err := hasher.Hash(ctx, "synthetic baseline for recovery concurrency")
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		if _, err := admin.Exec(ctx,
 			"INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", s); err != nil {
 			t.Fatal(err)
@@ -239,18 +274,25 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			t.Fatal(err)
 		}
 		fresh, err := usecase.NewPasswordRecoveryProof()
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		id := randomSyntheticID(t, "rcv_")
 		authorized, err := issuer.Issue(ctx, usecase.RecoveryIssue{
 			CanonicalEmail: alias, ChallengeID: id, TokenDigest: fresh.Digest(),
 			KeyID: "synthetic-recovery", SealedToken: bytes.Repeat([]byte{seed}, 71),
 		})
-		if err != nil || !authorized { t.Fatal("fixture recovery issuance failed") }
+		if err != nil || !authorized {
+			t.Fatal("fixture recovery issuance failed")
+		}
 		t.Cleanup(func() {
 			cleanupCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
 			defer done()
 			conn, err := pgx.Connect(cleanupCtx, adminDSN)
-			if err != nil { t.Errorf("recovery cleanup connection: %v", err); return }
+			if err != nil {
+				t.Errorf("recovery cleanup connection: %v", err)
+				return
+			}
 			defer func() { _ = conn.Close(context.Background()) }()
 			if _, err := conn.Exec(cleanupCtx, `UPDATE mamony_identity.password_recovery_deliveries
 				SET status='DEAD',lease_id=NULL,leased_until=NULL
@@ -268,7 +310,9 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 	t.Run("concurrent single winner", func(t *testing.T) {
 		s, alias, _, digest, before := newFixture(t, 0x78)
 		candidate, err := hasher.Hash(ctx, "synthetic concurrent recovery new password")
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		eventA, eventB := randomSyntheticID(t, "evt_"), randomSyntheticID(t, "evt_")
 		results := make(chan bool, 2)
 		var wg sync.WaitGroup
@@ -283,7 +327,11 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		wg.Wait()
 		close(results)
 		winners := 0
-		for success := range results { if success { winners++ } }
+		for success := range results {
+			if success {
+				winners++
+			}
+		}
 		var current int64
 		var eventCount int
 		if err := admin.QueryRow(ctx, `SELECT session_epoch FROM mamony_identity.subjects
@@ -307,7 +355,9 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			"SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", s).Scan(&current); err != nil {
 			t.Fatal(err)
 		}
-		if current != before+1 { t.Fatal("contact update did not advance subject epoch") }
+		if current != before+1 {
+			t.Fatal("contact update did not advance subject epoch")
+		}
 	})
 	t.Run("DB expiry during redemption denies proof", func(t *testing.T) {
 		s, alias, bearer, digest, before := newFixture(t, 0x7a)
@@ -323,6 +373,8 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			"SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", s).Scan(&current); err != nil {
 			t.Fatal(err)
 		}
-		if current != before { t.Fatal("expired token unexpectedly changed account epoch") }
+		if current != before {
+			t.Fatal("expired token unexpectedly changed account epoch")
+		}
 	})
 }
