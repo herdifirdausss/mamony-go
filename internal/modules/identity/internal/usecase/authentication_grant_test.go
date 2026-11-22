@@ -15,8 +15,8 @@ import (
 func TestAuthenticationGrantSecretAndAmbiguousStageFailClosed(t *testing.T) {
 	grant, store := testAuthenticationGrantAuthority(t)
 	subject := "sub_AAAAAAAAAAAAAAAAAAAAAA"
-	issued, err := grant.Issue(context.Background(), subject)
-	if err != nil || store.stages != 1 || store.subject != subject {
+	issued, err := grant.Issue(context.Background(), subject, 1)
+	if err != nil || store.stages != 1 || store.subject != subject || store.epoch != 1 {
 		t.Fatal("valid grant stage failed")
 	}
 	if len(issued.secret) != 43 || len(store.digest) != 32 {
@@ -41,30 +41,30 @@ func TestAuthenticationGrantSecretAndAmbiguousStageFailClosed(t *testing.T) {
 		t.Fatal("malformed proof was accepted")
 	}
 	count := store.stages
-	if _, err := grant.Issue(context.Background(), "not-a-subject"); !errors.Is(err, ErrSessionDenied) ||
+	if _, err := grant.Issue(context.Background(), "not-a-subject", 1); !errors.Is(err, ErrSessionDenied) ||
 		store.stages != count {
 		t.Fatal("invalid subject reached grant stage")
 	}
 	store.allow = false
-	if value, err := grant.Issue(context.Background(), subject); !errors.Is(err, ErrSessionDenied) ||
+	if value, err := grant.Issue(context.Background(), subject, 1); !errors.Is(err, ErrSessionDenied) ||
 		value.secret != "" {
 		t.Fatal("denied grant returned a secret")
 	}
 	store.allow = true
 	store.err = errors.New("ambiguous commit with private DSN")
-	if value, err := grant.Issue(context.Background(), subject); !errors.Is(err, ErrSessionUnavailable) ||
+	if value, err := grant.Issue(context.Background(), subject, 1); !errors.Is(err, ErrSessionUnavailable) ||
 		value.secret != "" || strings.Contains(err.Error(), "DSN") {
 		t.Fatal("ambiguous grant stage leaked proof or DB details")
 	}
 	store.err = nil
 	grant.random = bytes.NewReader([]byte{1, 2, 3})
-	if value, err := grant.Issue(context.Background(), subject); !errors.Is(err, ErrSessionUnavailable) ||
+	if value, err := grant.Issue(context.Background(), subject, 1); !errors.Is(err, ErrSessionUnavailable) ||
 		value.secret != "" {
 		t.Fatal("partial CSPRNG produced grant")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if value, err := grant.Issue(ctx, subject); !errors.Is(err, ErrSessionUnavailable) || value.secret != "" {
+	if value, err := grant.Issue(ctx, subject, 1); !errors.Is(err, ErrSessionUnavailable) || value.secret != "" {
 		t.Fatal("cancelled login minted grant")
 	}
 	var nilAuthority *AuthenticationGrantAuthority
