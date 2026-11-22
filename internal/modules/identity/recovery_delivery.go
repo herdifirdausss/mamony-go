@@ -64,7 +64,12 @@ func RunRecoveryDelivery(ctx context.Context, cfg RecoveryDeliveryConfig) error 
 	if err != nil {
 		return ErrRecoveryDeliveryRuntime
 	}
-	worker, err := usecase.NewRecoveryDeliveryWorker(store, ring, sender)
+	// Make dependency inversion explicit: adapters satisfy consumer-owned ports
+	// at this facade boundary, never import/call the usecase directly.
+	var storePort usecase.RecoveryDeliveryStore = store
+	var openerPort usecase.RecoveryEnvelopeOpener = ring
+	var senderPort usecase.RecoverySender = sender
+	worker, err := usecase.NewRecoveryDeliveryWorker(storePort, openerPort, senderPort)
 	if err != nil {
 		return ErrRecoveryDeliveryRuntime
 	}
