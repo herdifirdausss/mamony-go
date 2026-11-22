@@ -211,7 +211,7 @@ func TestIdentityZAuthenticatedPasswordChange(t *testing.T) {
 	// similarly, a LOGIN-purpose grant cannot authorize a PASSWORD_CHANGE.
 	raw, _ := base64.RawURLEncoding.DecodeString(bearer)
 	sessionDigest := sha256.Sum256(append([]byte("mamony:identity:session-token:v1\x00"), raw...))
-	normalGrant := sha256.Sum256([]byte("synthetic:ordinary-login-grant:"+subject))
+	normalGrant := sha256.Sum256([]byte("synthetic:ordinary-login-grant:" + subject))
 	var stageAllowed bool
 	if err := grantConn.QueryRow(ctx,
 		"SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
@@ -231,7 +231,7 @@ func TestIdentityZAuthenticatedPasswordChange(t *testing.T) {
 	}
 	// A failed audit insert must roll back grant consumption AND verifier
 	// mutation, so an unrelated duplicate event ID cannot revoke sessions.
-	changeDigest := sha256.Sum256([]byte("synthetic:rollback-password-change:"+subject))
+	changeDigest := sha256.Sum256([]byte("synthetic:rollback-password-change:" + subject))
 	if err := grantConn.QueryRow(ctx,
 		"SELECT mamony_identity.stage_password_change_grant($1,$2,$3)",
 		subject, before, changeDigest[:]).Scan(&stageAllowed); err != nil || !stageAllowed {
