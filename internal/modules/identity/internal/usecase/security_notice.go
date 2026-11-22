@@ -66,6 +66,11 @@ func (w *SecurityNoticeWorker) DispatchOnce(ctx context.Context) (bool, error) {
 	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	providerMessageID, sendErr := w.sender.SendPasswordChanged(sendCtx, job.EventID, job.Recipient)
 	cancel()
+	// Never persist or trust a provider message ID alongside a rejected or
+	// ambiguous send, even if a misbehaving adapter returns one with an error.
+	if sendErr != nil {
+		providerMessageID = ""
+	}
 	outcome := DeliveryTemporary
 	if sendErr == nil {
 		if normalized, ok := NormalizeMailgunMessageID(providerMessageID); ok {
