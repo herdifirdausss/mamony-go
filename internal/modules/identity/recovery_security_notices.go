@@ -46,23 +46,48 @@ func RunRecoverySecurityNotices(ctx context.Context, cfg RecoverySecurityNoticeC
 		return ErrRecoverySecurityNoticeRuntime
 	}
 	defer pool.Close()
+	store, err := identitypg.NewRecoverySecurityNoticeStore(pool)
+	if err != nil {
+		return ErrRecoverySecurityNoticeRuntime
+	}
+	var storePort usecase.RecoverySecurityNoticeStore = store
+	var senderPort usecase.RecoverySecurityNoticeSender = sender
+	worker, err := usecase.NewRecoverySecurityNoticeWorker(storePort, senderPort)
+	if err != nil {
+		return ErrRecoverySecurityNoticeRuntime
+	}
+	runner, err := usecase.NewDeliveryRunner(worker, cfg.PollInterval)
+	if err != nil {
+		return ErrRecoverySecurityNoticeRuntime
+	}
+	if err := runner.Run(ctx); err != nil {
+		return ErrRecoverySecurityNoticeRuntime
+	}
 	return nil
 }
 
 // ReadRecoverySecurityNoticeHealth exposes counts only, not account,
 // recipient, provider ID or event identity. Uses a DIFFERENT DB credential
 // from the sender and from the existing password-change monitor.
-func ReadRecoverySecurityNoticeHealth(ctx context.Context,dsn string) (identitypg.RecoverySecurityNoticeHealth,error) {
+func ReadRecoverySecurityNoticeHealth(ctx context.Context, dsn string) (identitypg.RecoverySecurityNoticeHealth, error) {
 	var zero identitypg.RecoverySecurityNoticeHealth
-	if ctx==nil || ctx.Err()!=nil {return zero,ErrRecoverySecurityNoticeRuntime}
-	pool,err:=platformpg.Open(ctx,platformpg.Config{
-		DSN:dsn,RuntimeRole:"mamony_identity_recovery_notice_monitor_runtime",MaxConns:1,
+	if ctx == nil || ctx.Err() != nil {
+		return zero, ErrRecoverySecurityNoticeRuntime
+	}
+	pool, err := platformpg.Open(ctx, platformpg.Config{
+		DSN: dsn, RuntimeRole: "mamony_identity_recovery_notice_monitor_runtime", MaxConns: 1,
 	})
-	if err!=nil {return zero,ErrRecoverySecurityNoticeRuntime}
+	if err != nil {
+		return zero, ErrRecoverySecurityNoticeRuntime
+	}
 	defer pool.Close()
-	store,err:=identitypg.NewRecoverySecurityNoticeHealthStore(pool)
-	if err!=nil {return zero,ErrRecoverySecurityNoticeRuntime}
-	health,err:=store.Read(ctx)
-	if err!=nil {return zero,ErrRecoverySecurityNoticeRuntime}
-	return health,nil
+	store, err := identitypg.NewRecoverySecurityNoticeHealthStore(pool)
+	if err != nil {
+		return zero, ErrRecoverySecurityNoticeRuntime
+	}
+	health, err := store.Read(ctx)
+	if err != nil {
+		return zero, ErrRecoverySecurityNoticeRuntime
+	}
+	return health, nil
 }
