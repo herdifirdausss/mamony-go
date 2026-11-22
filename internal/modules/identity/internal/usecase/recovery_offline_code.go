@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrOfflineRecoveryCodeInvalid = errors.New("offline recovery code invalid")
+	ErrOfflineRecoveryCodeInvalid     = errors.New("offline recovery code invalid")
 	ErrOfflineRecoveryCodeUnavailable = errors.New("offline recovery code unavailable")
 )
 
@@ -80,11 +80,11 @@ func OfflineRecoveryCodeDigest(bearer string) ([32]byte, error) {
 // TrustedOfflineDisplay may be used ONLY by a separately reviewed
 // enrollment ceremony, never by account-recovery requests or logging.
 func (c OfflineRecoveryCode) TrustedOfflineDisplay() string { return c.bearer }
-func (c OfflineRecoveryCode) Digest() [32]byte { return c.digest }
+func (c OfflineRecoveryCode) Digest() [32]byte              { return c.digest }
 
 const offlineRecoveryCodeRedaction = "[REDACTED offline recovery code]"
 
-func (OfflineRecoveryCode) String() string { return offlineRecoveryCodeRedaction }
+func (OfflineRecoveryCode) String() string   { return offlineRecoveryCodeRedaction }
 func (OfflineRecoveryCode) GoString() string { return offlineRecoveryCodeRedaction }
 func (OfflineRecoveryCode) Format(s fmt.State, _ rune) {
 	_, _ = io.WriteString(s, offlineRecoveryCodeRedaction)
