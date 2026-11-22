@@ -11,17 +11,14 @@ import (
 
 var ErrRecoveryRequestUnavailable = errors.New("password recovery request unavailable")
 
-// RecoveryIssuerPort returns an internal-only subject for a currently verified
-// eligible alias. It never grants authentication and is never a public API.
-// Issue rechecks subject/contact status, version/epoch and DB-time quotas
-// under locks before inserting digest and encrypted delivery atomically.
+// RecoveryIssuerPort never returns a subject or account existence bit to
+// the caller. It enforces contact/status/epoch and subject-level quotas under
+// database locks before atomically storing a digest + encrypted envelope.
 type RecoveryIssuerPort interface {
-	FindEligible(context.Context, string) (string, error)
 	Issue(context.Context, RecoveryIssue) (bool, error)
 }
 
 type RecoveryIssue struct {
-	SubjectID      string
 	CanonicalEmail string
 	ChallengeID    string
 	TokenDigest    [32]byte
@@ -31,9 +28,9 @@ type RecoveryIssue struct {
 
 // RecoveryEnvelopeSealer is deliberately distinct from email verification
 // encryption. A production implementation needs an independently scoped
-// AEAD key and AAD binding recovery purpose, subject and challenge.
+// AEAD key and AAD binding recovery purpose, alias and challenge.
 type RecoveryEnvelopeSealer interface {
-	SealRecovery(subjectID, challengeID, bearer string) (keyID string, sealed []byte, err error)
+	SealRecovery(canonicalEmail, challengeID, bearer string) (keyID string, sealed []byte, err error)
 }
 
 // RecoveryRequest orchestrates only admitted internal issuance. No public
@@ -72,13 +69,9 @@ func (r *RecoveryRequest) Request(ctx context.Context, rawEmail string, peer net
 	if !allowed {
 		return nil
 	}
-	subject, err := r.issuer.FindEligible(ctx, email)
-	if err != nil {
-		return ErrRecoveryRequestUnavailable
-	}
-	if subject == "" {
-		return nil
-	}
+	// Always generate and seal on admitted requests, including unknown
+	// accounts. This reduces existence-based timing differences without
+	// claiming a constant-time public HTTP envelope.
 	proof, err := NewPasswordRecoveryProof()
 	if err != nil {
 		return ErrRecoveryRequestUnavailable
@@ -87,13 +80,13 @@ func (r *RecoveryRequest) Request(ctx context.Context, rawEmail string, peer net
 	if err != nil {
 		return ErrRecoveryRequestUnavailable
 	}
-	key, sealed, err := r.sealer.SealRecovery(subject, challengeID, proof.ForTrustedDelivery())
+	key, sealed, err := r.sealer.SealRecovery(email, challengeID, proof.ForTrustedDelivery())
 	if err != nil || len(key) == 0 || len(key) > 32 ||
 		len(sealed) < 60 || len(sealed) > 256 {
 		return ErrRecoveryRequestUnavailable
 	}
 	_, err = r.issuer.Issue(ctx, RecoveryIssue{
-		SubjectID: subject, CanonicalEmail: email, ChallengeID: challengeID,
+		CanonicalEmail: email, ChallengeID: challengeID,
 		TokenDigest: proof.Digest(), KeyID: key, SealedToken: sealed,
 	})
 	if err != nil {
