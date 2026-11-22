@@ -149,12 +149,12 @@ func TestIdentityZBrowserPasswordChangeE2E(t *testing.T) {
 	accounts := []browserRotationAccount{
 		{subject: randomSyntheticID(t, "sub_"),
 			email: strings.ToLower(randomSyntheticID(t, "rotate_a_")) + "@example.test",
-			old: "synthetic original phrase for first Chromium rotation",
-			next: "synthetic updated phrase for first Chromium rotation"},
+			old:   "synthetic original phrase for first Chromium rotation",
+			next:  "synthetic updated phrase for first Chromium rotation"},
 		{subject: randomSyntheticID(t, "sub_"),
 			email: strings.ToLower(randomSyntheticID(t, "rotate_b_")) + "@example.test",
-			old: "synthetic original phrase for lost-response Chromium",
-			next: "synthetic updated phrase for lost-response Chromium"},
+			old:   "synthetic original phrase for lost-response Chromium",
+			next:  "synthetic updated phrase for lost-response Chromium"},
 	}
 	for i := range accounts {
 		account := &accounts[i]
