@@ -228,8 +228,7 @@ func TestIdentityZRecoveryOfflineAssurance(t *testing.T) {
 		lateDigest[:], f.subject, f.epoch); err != nil {
 		t.Fatal(err)
 	}
-	if err := assurer.Approve(ctx, f.token.ForTrustedDelivery(), lateCode.TrustedOfflineDisplay());
-		!errors.Is(err, usecase.ErrRecoveryAssuranceDenied) || usedCode(lateCode) {
+	if err := assurer.Approve(ctx, f.token.ForTrustedDelivery(), lateCode.TrustedOfflineDisplay()); !errors.Is(err, usecase.ErrRecoveryAssuranceDenied) || usedCode(lateCode) {
 		t.Fatal("post-challenge offline code enrollment bypassed prior-possession fence")
 	}
 	if err := assurer.Approve(ctx, f.token.ForTrustedDelivery(), "bad"); !errors.Is(err, usecase.ErrRecoveryAssuranceDenied) {
