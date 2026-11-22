@@ -98,7 +98,7 @@ func TestPasswordRecoveryProofRedactsLoggingAndSerialization(t *testing.T) {
 		p.GoString(),
 		p.LogValue().String(),
 	} {
-		if !strings.Contains(value, redactedPasswordRecoveryProof) ||
+		if !strings.Contains(value, recoveryRedactionLabel) ||
 			strings.Contains(value, raw) {
 			t.Fatal("password recovery proof leaked through ordinary formatting")
 		}
@@ -113,7 +113,7 @@ func TestPasswordRecoveryProofRedactsLoggingAndSerialization(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&record, nil))
 	logger.Info("password recovery", "proof", p)
 	if strings.Contains(record.String(), raw) ||
-		!strings.Contains(record.String(), redactedPasswordRecoveryProof) {
+		!strings.Contains(record.String(), recoveryRedactionLabel) {
 		t.Fatal("structured slog logging leaked the recovery bearer")
 	}
 }
