@@ -30,7 +30,7 @@ type AuthenticationCredential struct {
 // the exact session_epoch read alongside its verifier before Argon2id.
 // It is not a browser session, identity proof or authorization grant.
 type AuthenticatedSubject struct {
-	SubjectID string
+	SubjectID    string
 	SessionEpoch int64
 }
 
