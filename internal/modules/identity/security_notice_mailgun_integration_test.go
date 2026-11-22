@@ -3,7 +3,6 @@
 package identity
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"time"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/credential"
-	platformpg "github.com/herdifirdausss/mamony-go/internal/platform/postgres"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -257,7 +255,4 @@ func TestIdentityMailgunMockSecurityNoticePipeline(t *testing.T) {
 	if err := RunSecurityNoticeDelivery(ctx, badCfg); err == nil {
 		t.Fatal("notice facade accepted an authentication grant database role")
 	}
-	// Network-only unit probes cannot certify provider delivery or SPF/DKIM.
-	_ = platformpg.Config{}
-	_ = bytes.MinRead
 }
