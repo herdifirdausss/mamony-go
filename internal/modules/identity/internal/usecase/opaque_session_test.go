@@ -258,3 +258,7 @@ func TestSessionLoginNeverIssuesWithoutAuthenticatedCandidateOrRecheck(t *testin
 		})
 	}
 }
+
+func (f *fakeAuthenticationGrantStore) StageChange(ctx context.Context, subject string, epoch int64, digest []byte) (bool, error) {
+	return f.Stage(ctx, subject, epoch, digest)
+}
