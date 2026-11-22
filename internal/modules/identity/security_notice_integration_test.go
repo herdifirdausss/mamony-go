@@ -161,10 +161,10 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 	if _, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_")); err != nil || ok {
 		t.Fatal("leased notice was reclaimed before expiry")
 	}
-	if err := notices.Finalize(ctx, first.EventID, randomSyntheticID(t, "lse_"), usecase.DeliveryAccepted); err == nil {
+	if err := notices.Finalize(ctx, first.EventID, randomSyntheticID(t, "lse_"), usecase.DeliveryAccepted, "synthetic-"+event+"@mailgun.test"); err == nil {
 		t.Fatal("wrong lease acknowledged notice")
 	}
-	if err := notices.Finalize(ctx, first.EventID, first.LeaseID, usecase.DeliveryTemporary); err != nil {
+	if err := notices.Finalize(ctx, first.EventID, first.LeaseID, usecase.DeliveryTemporary, ""); err != nil {
 		t.Fatal(err)
 	}
 	var state string
@@ -184,10 +184,10 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 	if err != nil || !ok || second.LeaseID == first.LeaseID || second.EventID != event {
 		t.Fatal("a fresh lease did not recover retryable notice")
 	}
-	if err := notices.Finalize(ctx, first.EventID, first.LeaseID, usecase.DeliveryAccepted); err == nil {
+	if err := notices.Finalize(ctx, first.EventID, first.LeaseID, usecase.DeliveryAccepted, "synthetic-"+event+"@mailgun.test"); err == nil {
 		t.Fatal("stale lease completed current worker claim")
 	}
-	if err := notices.Finalize(ctx, second.EventID, second.LeaseID, usecase.DeliveryAccepted); err != nil {
+	if err := notices.Finalize(ctx, second.EventID, second.LeaseID, usecase.DeliveryAccepted, "synthetic-"+event+"@mailgun.test"); err != nil {
 		t.Fatal(err)
 	}
 	if err := admin.QueryRow(ctx, `SELECT status,attempts FROM mamony_identity.password_change_notices
@@ -223,7 +223,7 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 		if err != nil || !ok || job.EventID != retryEvent {
 			t.Fatalf("retry %d not claimable: %+v %v", i, job, err)
 		}
-		if err := notices.Finalize(ctx, job.EventID, job.LeaseID, usecase.DeliveryTemporary); err != nil {
+		if err := notices.Finalize(ctx, job.EventID, job.LeaseID, usecase.DeliveryTemporary, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
