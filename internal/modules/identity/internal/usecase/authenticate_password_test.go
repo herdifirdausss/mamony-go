@@ -164,3 +164,31 @@ func TestPasswordAuthenticationUnavailableAndInputPolicy(t *testing.T) {
 		t.Fatal("nil Argon2id verifier accepted")
 	}
 }
+
+func TestPasswordAuthenticationCarriesVerifierSnapshotEpoch(t *testing.T) {
+	reader := &passwordCredentialReaderFake{
+		found: true,
+		record: AuthenticationCredential{
+			SubjectID: "sub_AAAAAAAAAAAAAAAAAAAAAA", SessionEpoch: 47,
+			Status: "ACTIVE", EmailVerified: true,
+			Verifier: dummyAuthenticationVerifier(),
+		},
+	}
+	kdf := &passwordVerifierFake{pass: true}
+	auth, err := NewPasswordAuthentication(reader, kdf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := auth.AuthenticateWithEpoch(context.Background(), "alice@example.test", "password phrase")
+	if err != nil || candidate.SubjectID != reader.record.SubjectID || candidate.SessionEpoch != 47 {
+		t.Fatalf("password snapshot lost epoch or subject: %+v %v", candidate, err)
+	}
+	if reader.calls != 1 || kdf.calls != 1 {
+		t.Fatal("one bounded lookup must precede one KDF")
+	}
+	reader.record.SessionEpoch = 0
+	if result, err := auth.AuthenticateWithEpoch(context.Background(), "alice@example.test", "password phrase");
+		result.SubjectID != "" || !errors.Is(err, ErrPasswordAuthenticationDenied) {
+		t.Fatal("missing epoch cannot become a trusted login candidate")
+	}
+}
