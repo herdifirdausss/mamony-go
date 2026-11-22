@@ -1,6 +1,6 @@
 # ADR 0009 — Authentication-to-session issuance trust boundary (Proposed; Draft PR #45)
 
-Status: **PROPOSED — owner/security approval required before any v11 SQL or runtime change**.
+Status: **PROPOSED design; Draft PR #46 implements a synthetic v11 code candidate for adversarial validation. Owner/security acceptance and production workload proof remain outstanding.**
 Parent stack: Draft #45 → #44 → #43 → #42 → #41 → #40. Profile **A**, synthetic first-party browser only.
 No new public routes, migration, DB roles or trusted production workload boundaries are introduced by this ADR.
 
@@ -73,3 +73,9 @@ The v11 implementation PR must add real-PostgreSQL evidence for:
 - OWASP Session Management Cheat Sheet: unpredictable server-generated session identifiers, server-side lifecycle/invalidations, and not treating an identifier alone as proof that the authentication process was completed. https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
 
 These references inform the controls, but **neither guarantees** that a custom SQL proof grant is safe or that credentials sharing one runtime establish an independent trust domain.
+
+## Implementation candidate checkpoint — stacked Draft PR #46
+
+Migration v11 and its Go code have been introduced **as an unapproved Draft candidate**: the old subject-only SQL issuer is removed; a new stage-only DB role writes 30-second password-login grant digests; a different session DB role consumes an issued grant exactly once in the same transaction as the opaque session digest and outbox event. The subject is read from the stored grant rather than request input. These candidate controls are assessed by privilege-matrix, replay, expiry, freeze, rollback, concurrency and real Chromium tests.
+
+The implementation remains inside a single Profile A Identity authority in the synthetic tests. A login-process RCE or grant-role compromise could fabricate successful-authentication assertions. These tests therefore do not justify a Profile B, independently verified authenticator, or full runtime-compromise security claim. Routes stay unmounted; approval and operational role isolation are still open.
