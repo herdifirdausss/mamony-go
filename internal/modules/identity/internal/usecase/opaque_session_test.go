@@ -130,7 +130,7 @@ func TestOpaqueSessionFailClosedAndNeverReturnCommitAmbiguousBearer(t *testing.T
 	if _, err := nilAuthority.Issue(context.Background(), store.subject); !errors.Is(err, ErrSessionUnavailable) {
 		t.Fatal("nil issuer accepted")
 	}
-	for _, bad := range []string{"", "AAAA", strings.Repeat("A", 43)+"x", strings.Repeat("?", 43)} {
+	for _, bad := range []string{"", "AAAA", strings.Repeat("A", 43) + "x", strings.Repeat("?", 43)} {
 		before := store.resolved
 		if subject, err := a.Resolve(context.Background(), bad); subject != "" ||
 			!errors.Is(err, ErrSessionInvalid) || store.resolved != before {
@@ -152,15 +152,18 @@ type sessionCandidateFake struct {
 	err     error
 	calls   int
 }
+
 func (f *sessionCandidateFake) Authenticate(context.Context, string, string, netip.Addr) (string, error) {
 	f.calls++
 	return f.subject, f.err
 }
+
 type sessionIssuerFake struct {
 	token OpaqueSession
 	err   error
 	calls int
 }
+
 func (f *sessionIssuerFake) Issue(context.Context, string) (OpaqueSession, error) {
 	f.calls++
 	return f.token, f.err
