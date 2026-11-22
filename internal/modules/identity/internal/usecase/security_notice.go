@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -19,13 +20,13 @@ type SecurityNoticeJob struct {
 
 type SecurityNoticeStore interface {
 	Claim(context.Context, string) (SecurityNoticeJob, bool, error)
-	Finalize(context.Context, string, string, ProofDeliveryOutcome) error
+	Finalize(context.Context, string, string, ProofDeliveryOutcome, string) error
 }
 
 // SecurityNoticeSender must submit a fixed, token-free password-changed
 // message. An accepted submission is NOT proof of inbox delivery.
 type SecurityNoticeSender interface {
-	SendPasswordChanged(context.Context, string, string) error
+	SendPasswordChanged(context.Context, string, string) (string, error)
 }
 
 // SecurityNoticeWorker reuses the established lease/retry runner contract,
@@ -63,19 +64,54 @@ func (w *SecurityNoticeWorker) DispatchOnce(ctx context.Context) (bool, error) {
 		return true, ErrDeliveryUnavailable
 	}
 	sendCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	sendErr := w.sender.SendPasswordChanged(sendCtx, job.EventID, job.Recipient)
+	providerMessageID, sendErr := w.sender.SendPasswordChanged(sendCtx, job.EventID, job.Recipient)
 	cancel()
 	outcome := DeliveryTemporary
+	if sendErr == nil {
+		if normalized, ok := NormalizeMailgunMessageID(providerMessageID); ok {
+			providerMessageID = normalized
+			outcome = DeliveryAccepted
+		} else {
+			// Invalid/missing acknowledgement cannot be correlated later.
+			providerMessageID = ""
+		}
+	}
 	switch {
-	case sendErr == nil:
-		outcome = DeliveryAccepted
+	case outcome == DeliveryAccepted:
 	case errors.Is(sendErr, ErrPermanentDelivery):
 		outcome = DeliveryPermanent
 	}
-	// Provider error messages are NEVER returned or persisted; a lost response
-	// after provider acceptance may cause at-least-once duplicate submission.
-	if err := w.store.Finalize(ctx, job.EventID, job.LeaseID, outcome); err != nil {
+	// A provider acknowledgement must include an unambiguous message ID;
+	// otherwise the job retries and may submit a duplicate. The DB stores
+	// only its SHA-256 digest, not the raw provider message ID.
+	if err := w.store.Finalize(ctx, job.EventID, job.LeaseID, outcome, providerMessageID); err != nil {
 		return true, ErrDeliveryUnavailable
 	}
 	return true, nil
+}
+
+// NormalizeMailgunMessageID canonicalizes the Mailgun HTTP response ID
+// (<local@domain>) and event-data.message.headers.message-id (local@domain).
+// Never lowercase a message ID: its local part may be case-sensitive.
+func NormalizeMailgunMessageID(raw string) (string, bool) {
+	if len(raw) < 3 || len(raw) > 512 || strings.TrimSpace(raw) != raw {
+		return "", false
+	}
+	if strings.HasPrefix(raw, "<") && strings.HasSuffix(raw, ">") {
+		raw = raw[1 : len(raw)-1]
+	}
+	if len(raw) < 3 || len(raw) > 510 || strings.Count(raw, "@") != 1 {
+		return "", false
+	}
+	left, right, ok := strings.Cut(raw, "@")
+	if !ok || left == "" || right == "" || strings.HasSuffix(right, ".") {
+		return "", false
+	}
+	for _, c := range raw {
+		if c <= 32 || c >= 127 || c == '<' || c == '>' ||
+			c == ',' || c == '/' || c == '\\' {
+			return "", false
+		}
+	}
+	return raw, true
 }
