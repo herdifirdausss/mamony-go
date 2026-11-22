@@ -7,13 +7,13 @@ import (
 )
 
 type fakeNoticeStore struct {
-	job SecurityNoticeJob
-	found bool
-	err error
+	job      SecurityNoticeJob
+	found    bool
+	err      error
 	finalErr error
-	claims int
-	finals int
-	outcome ProofDeliveryOutcome
+	claims   int
+	finals   int
+	outcome  ProofDeliveryOutcome
 }
 
 func (f *fakeNoticeStore) Claim(_ context.Context, lease string) (SecurityNoticeJob, bool, error) {
@@ -39,9 +39,9 @@ func (f *fakeNoticeStore) Finalize(_ context.Context, event, lease string, resul
 }
 
 type fakeNoticeSender struct {
-	err error
-	calls int
-	event string
+	err       error
+	calls     int
+	event     string
 	recipient string
 }
 
@@ -54,10 +54,10 @@ func (f *fakeNoticeSender) SendPasswordChanged(_ context.Context, event, recipie
 
 func TestSecurityNoticeWorkerBoundedDeliveryOutcomes(t *testing.T) {
 	const event = "evt_AAAAAAAAAAAAAAAAAAAAAA"
-	for _, tc := range []struct{
-		label string
+	for _, tc := range []struct {
+		label   string
 		sendErr error
-		want ProofDeliveryOutcome
+		want    ProofDeliveryOutcome
 	}{
 		{label: "accepted only at provider boundary", sendErr: nil, want: DeliveryAccepted},
 		{label: "transient error redacted", sendErr: errors.New("secret provider URL"), want: DeliveryTemporary},
@@ -91,7 +91,7 @@ func TestSecurityNoticeWorkerBoundedDeliveryOutcomes(t *testing.T) {
 	})
 	t.Run("store and finalize errors are never exposed", func(t *testing.T) {
 		store := &fakeNoticeStore{found: true,
-			job: SecurityNoticeJob{EventID: event, Recipient: "alice@example.test"},
+			job:      SecurityNoticeJob{EventID: event, Recipient: "alice@example.test"},
 			finalErr: errors.New("db password leaked"),
 		}
 		sender := &fakeNoticeSender{}
