@@ -97,7 +97,7 @@ DECLARE
     current_epoch bigint;
     token_epoch bigint;
     contact_email text;
-    contact_version bigint;
+    locked_contact_version bigint;
     issued_alias text;
     stamp timestamptz;
 BEGIN -- PL/pgSQL function block; not migration transaction
@@ -122,7 +122,7 @@ BEGIN -- PL/pgSQL function block; not migration transaction
     IF NOT FOUND THEN RETURN false; END IF;
 
     SELECT s.session_epoch,a.canonical_email,a.contact_version
-      INTO current_epoch,contact_email,contact_version
+      INTO current_epoch,contact_email,locked_contact_version
       FROM mamony_identity.subjects s
       JOIN mamony_identity.email_aliases a ON a.subject_id=s.subject_id
      WHERE s.subject_id=candidate_subject AND s.status='ACTIVE'
@@ -135,7 +135,7 @@ BEGIN -- PL/pgSQL function block; not migration transaction
       FROM mamony_identity.password_recovery_challenges c
      WHERE c.subject_id=candidate_subject AND c.token_digest=p_digest
        AND c.consumed_at IS NULL AND c.revoked_at IS NULL
-       AND c.contact_version=contact_version
+       AND c.contact_version=locked_contact_version
      FOR UPDATE OF c;
     IF NOT FOUND OR token_epoch<>current_epoch
        OR issued_alias IS DISTINCT FROM contact_email
@@ -207,4 +207,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.redeem_password_recovery(
     TO mamony_identity_recovery_redeemer_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (21, '81b1d60a961919da15021693daebb796b2d61720241fbc26cc4eec44daa239a5');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (21, '__REPLACE_SHA256__');
