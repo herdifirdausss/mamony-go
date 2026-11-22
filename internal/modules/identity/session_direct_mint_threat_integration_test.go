@@ -86,8 +86,8 @@ func TestIdentityZDirectSessionMintThreatFixture(t *testing.T) {
 
 	// The session role must not be able to fabricate a matching grant.
 	err = session.QueryRow(ctx,
-		"SELECT mamony_identity.stage_password_auth_grant($1,$2)",
-		subject, grantDigest[:]).Scan(&issued)
+		"SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
+		subject, int64(1), grantDigest[:]).Scan(&issued)
 	if err == nil || !errors.As(err, &pgErr) || pgErr.Code != "42501" {
 		t.Fatalf("session SQL role could stage arbitrary authentication: %v", err)
 	}
