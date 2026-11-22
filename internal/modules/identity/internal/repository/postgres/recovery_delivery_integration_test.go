@@ -51,7 +51,7 @@ func TestIdentityRecoveryDelivery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newJob := func(n byte) (string, string, string) {
+	newJob := func(t *testing.T, n byte) (string, string, string) {
 		t.Helper()
 		subject, email := randomID(t, "sub_"), syntheticEmail(t)
 		if _, err := admin.Exec(ctx,
@@ -92,7 +92,7 @@ func TestIdentityRecoveryDelivery(t *testing.T) {
 	}
 
 	t.Run("fenced lease, bounded retry and accepted finalization", func(t *testing.T) {
-		_, email, challenge := newJob(0x31)
+		_, email, challenge := newJob(t, 0x31)
 		lease := randomID(t, "lse_")
 		job, ok, err := delivery.Claim(ctx, lease)
 		if err != nil || !ok || job.ChallengeID != challenge ||
@@ -148,7 +148,7 @@ func TestIdentityRecoveryDelivery(t *testing.T) {
 	})
 
 	t.Run("stale subject and expired challenge are quarantined", func(t *testing.T) {
-		subject, _, challenge := newJob(0x32)
+		subject, _, challenge := newJob(t, 0x32)
 		if _, err := admin.Exec(ctx,
 			"UPDATE mamony_identity.subjects SET status='SUSPENDED' WHERE subject_id=$1",
 			subject); err != nil {
@@ -164,9 +164,10 @@ func TestIdentityRecoveryDelivery(t *testing.T) {
 			challenge).Scan(&state); err != nil || state != "DEAD" {
 			t.Fatalf("stale challenge not quarantined: %s %v", state, err)
 		}
-		_, _, expiring := newJob(0x33)
+		_, _, expiring := newJob(t, 0x33)
 		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_recovery_challenges
-			SET expires_at=clock_timestamp()-interval '1 second'
+			SET requested_at=clock_timestamp()-interval '16 minutes',
+				expires_at=clock_timestamp()-interval '1 second'
 			WHERE challenge_id=$1`, expiring); err != nil {
 			t.Fatal(err)
 		}
