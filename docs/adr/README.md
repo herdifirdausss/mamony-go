@@ -17,5 +17,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0011 — Atomic five-session cap](0011-atomic-five-session-cap.md) | PROPOSED: v13 grant-bound mint atomically evicts oldest live session when five slots are occupied; consistent SQL lock order, no public routing. |
 | [ADR-0012 — Auth material epoch and grant fence](0012-auth-material-epoch-grant-fence.md) | PROPOSED: v14 invalidates sessions on credential/contact change and requires exact pre-KDF epoch for grant staging; no public mutations. |
 | [ADR-0013 — Authenticated password change](0013-authenticated-password-change.md) | PROPOSED: v15 separate purpose-bound password-change grant plus valid session; atomic verifier/epoch/audit update, no public route. |
+| [ADR-0014 — Password-change security notices](0014-password-change-security-notices.md) | PROPOSED: v16 durable event-bound notification queue with original SQL login-role provenance, leases/retry, and recipient retention; mock-only delivery. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
