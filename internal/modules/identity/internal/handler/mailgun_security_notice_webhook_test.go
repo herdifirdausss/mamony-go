@@ -96,21 +96,21 @@ func TestMailgunNoticeWebhookDeniesForgedOrMalformedRequestsBeforeStorage(t *tes
 	otherKey := []byte("synthetic-other-signing-key-not-mailgun-sending-key")
 	now := time.Now().UTC()
 	for _, tc := range []struct {
-		name    string
-		key     []byte
-		kind    string
+		name     string
+		key      []byte
+		kind     string
 		severity string
-		domain  string
-		message string
-		eventID string
-		shift   time.Duration
+		domain   string
+		message  string
+		eventID  string
+		shift    time.Duration
 	}{
 		{name: "wrong signature", key: otherKey, kind: "delivered", domain: "mg.example.test",
 			message: "id@mailgun.test", eventID: "evt-1"},
 		{name: "future signature timestamp", key: key, kind: "delivered", domain: "mg.example.test",
 			message: "id@mailgun.test", eventID: "evt-1", shift: time.Hour},
 		{name: "stale signature timestamp", key: key, kind: "delivered", domain: "mg.example.test",
-			message: "id@mailgun.test", eventID: "evt-1", shift: -10*time.Hour},
+			message: "id@mailgun.test", eventID: "evt-1", shift: -10 * time.Hour},
 		{name: "wrong sending domain", key: key, kind: "delivered", domain: "evil.example.test",
 			message: "id@mailgun.test", eventID: "evt-1"},
 		{name: "malformed provider id", key: key, kind: "delivered", domain: "mg.example.test",
@@ -153,9 +153,9 @@ func TestMailgunNoticeWebhookStrictEnvelopeAndStorageFailures(t *testing.T) {
 		t.Fatal("transient SQL failure must request provider retry")
 	}
 	for _, tc := range []struct {
-		name   string
-		body   []byte
-		method string
+		name       string
+		body       []byte
+		method     string
 		typeHeader string
 	}{
 		{"oversized", bytes.Repeat([]byte("x"), 16385), http.MethodPost, "application/json"},
