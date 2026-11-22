@@ -305,7 +305,7 @@ func TestPostgresIdentityZSessionRole(t *testing.T) {
 func TestPostgresIdentityZAuthenticationGrantRole(t *testing.T) {
 	out, err := invokePSQL("TEST_IDENTITY_AUTH_GRANT_URL", "-c",
 		"SELECT mamony_identity.stage_password_auth_grant('invalid',decode(repeat('11',32),'hex'))")
-	if err != nil || out != "false" {
+	if err != nil || out != "f" {
 		t.Fatalf("dedicated grant role cannot stage approved typed function: %v %s", err, out)
 	}
 	for _, sql := range []string{
