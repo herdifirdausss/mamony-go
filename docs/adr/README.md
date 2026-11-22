@@ -25,5 +25,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0019 — Browser password-change PostgreSQL E2E](0019-browser-password-change-postgres-e2e.md) | PROPOSED: real Chromium cookie/CSRF, Argon2id, PostgreSQL epoch/audit/notice and lost-response behavior under disposable TLS fixture; no live route. |
 | [ADR-0020 — Password-change recovery page](0020-unmounted-password-change-recovery-page.md) | PROPOSED: unmounted strict-CSP one-shot browser page, with explicit uncertainty lock and no automatic retry or recovery claim. |
 | [ADR-0021 — Password recovery authority foundation](0021-password-recovery-authority-foundation.md) | PROPOSED: 256-bit domain-separated recovery proof primitive and threat model; no issuance, SQL authority, public recovery route or password reset. |
+| [ADR-0022 — Password recovery issuance and sealed outbox](0022-password-recovery-issuance-outbox.md) | PROPOSED: Identity v19 dedicated EXECUTE-only issuer, independent HMAC recovery budget and atomic challenge/ciphertext queue; no HTTP, worker or redemption. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
