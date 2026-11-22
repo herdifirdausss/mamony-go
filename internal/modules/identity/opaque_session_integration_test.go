@@ -266,6 +266,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	// Expiry is authoritative DB clock, never the caller's machine clock.
 	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.opaque_sessions SET
 		issued_at=clock_timestamp()-interval '40 hours',
+		last_seen_at=clock_timestamp()-interval '40 hours',
 		expires_at=clock_timestamp()-interval '27 hours'
 		WHERE subject_id=$1`, subject); err != nil {
 		t.Fatal(err)
