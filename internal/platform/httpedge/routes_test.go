@@ -44,6 +44,7 @@ func TestListenerRouteIsolation(t *testing.T) {
 		})
 	}
 }
+
 // TestIdentitySessionCandidateMethodsRemainUnmounted checks the intended
 // HTTP methods, not just GET. A future accidental POST login/logout mount
 // would otherwise evade a GET-only 404 regression test.
