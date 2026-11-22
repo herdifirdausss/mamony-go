@@ -120,7 +120,9 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 		SubjectID: subject, EventID: randomSyntheticID(t, "evt_"),
 		CanonicalEmail: email, Status: "UNVERIFIED", CreatedAt: time.Now().UTC(),
 		PasswordVerifier: verifier,
-	}); err != nil { t.Fatal(err) }
+	}); err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		cleanupCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
 		defer stop()
@@ -134,8 +136,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	network := netip.MustParseAddr("198.51.100.233")
 	// No account with an unverified contact may mint through the composed
 	// login, even with the correct password and an available admission slot.
-	if session, err := sessionLogin.Authenticate(ctx, email, password, network);
-		session.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
+	if session, err := sessionLogin.Authenticate(ctx, email, password, network); session.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
 		t.Fatal("unverified contact was issued a session")
 	}
 	if denied, err := authority.Issue(ctx, subject); denied.ForTrustedTransport() != "" ||
@@ -246,8 +247,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	}
 	var revocations int
 	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.security_outbox
-		WHERE subject_id=$1 AND event_type='SESSION_REVOKED'`, subject).Scan(&revocations);
-		err != nil || revocations != 1 {
+		WHERE subject_id=$1 AND event_type='SESSION_REVOKED'`, subject).Scan(&revocations); err != nil || revocations != 1 {
 		t.Fatal("repeated logout created duplicate revocation events")
 	}
 
@@ -255,7 +255,9 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.opaque_sessions SET
 		issued_at=clock_timestamp()-interval '40 hours',
 		expires_at=clock_timestamp()-interval '27 hours'
-		WHERE subject_id=$1`, subject); err != nil { t.Fatal(err) }
+		WHERE subject_id=$1`, subject); err != nil {
+		t.Fatal(err)
+	}
 	if resolved, err := authority.Resolve(ctx, secret); resolved != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
 		t.Fatal("expired opaque token remained valid")
 	}
