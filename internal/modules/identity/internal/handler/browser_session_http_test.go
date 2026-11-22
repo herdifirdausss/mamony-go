@@ -22,9 +22,9 @@ const validBrowserJSON = "{\"email\":\"alice@example.test\",\"password\":\"stron
 
 type browserLoginGate struct {
 	allowed bool
-	err error
-	calls int
-	peer netip.Addr
+	err     error
+	calls   int
+	peer    netip.Addr
 }
 
 func (f *browserLoginGate) Admit(_ context.Context, _ string, peer netip.Addr) (bool, error) {
@@ -35,8 +35,8 @@ func (f *browserLoginGate) Admit(_ context.Context, _ string, peer netip.Addr) (
 
 type browserPasswordPort struct {
 	subject string
-	err error
-	calls int
+	err     error
+	calls   int
 }
 
 func (f *browserPasswordPort) Authenticate(_ context.Context, _, _ string) (string, error) {
@@ -45,14 +45,14 @@ func (f *browserPasswordPort) Authenticate(_ context.Context, _, _ string) (stri
 }
 
 type browserSessionStore struct {
-	allowed bool
-	issueErr error
+	allowed    bool
+	issueErr   error
 	resolveErr error
-	revokeErr error
-	issues int
-	resolves int
-	revokes int
-	subjects map[string]string
+	revokeErr  error
+	issues     int
+	resolves   int
+	revokes    int
+	subjects   map[string]string
 }
 
 func (f *browserSessionStore) Issue(_ context.Context, subject string, digest []byte, _ string) (bool, error) {
@@ -86,18 +86,28 @@ func (f *browserSessionStore) Revoke(_ context.Context, digest []byte, _ string)
 func browserFixture(t *testing.T) (*BrowserSessionHTTP, *browserLoginGate, *browserPasswordPort, *browserSessionStore) {
 	t.Helper()
 	peer, err := NewClientIPResolver(nil)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	gate := &browserLoginGate{allowed: true}
 	password := &browserPasswordPort{subject: testBrowserSubject}
 	store := &browserSessionStore{allowed: true}
 	passwordFlow, err := usecase.NewPasswordLoginFlow(gate, password)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	authority, err := usecase.NewOpaqueSessionAuthority(store)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	login, err := usecase.NewSessionLogin(passwordFlow, authority)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	h, err := NewBrowserSessionHTTP(peer, login, authority, bytes.Repeat([]byte{0xd3}, 32), "https://app.example.test")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	return h, gate, password, store
 }
 
@@ -107,7 +117,9 @@ func browserRequest(method, path, body string) *http.Request {
 	r.Host = "app.example.test"
 	r.RemoteAddr = "198.51.100.48:33333"
 	r.Header.Set("Sec-Fetch-Site", "same-origin")
-	if method == http.MethodPost { r.Header.Set("Origin", "https://app.example.test") }
+	if method == http.MethodPost {
+		r.Header.Set("Origin", "https://app.example.test")
+	}
 	return r
 }
 
@@ -121,7 +133,9 @@ func browserLogin(t *testing.T, h *BrowserSessionHTTP) *http.Cookie {
 		t.Fatalf("synthetic login failed: %d %q", w.Code, w.Body.String())
 	}
 	cookies := w.Result().Cookies()
-	if len(cookies) != 1 { t.Fatal("login must send exactly one cookie") }
+	if len(cookies) != 1 {
+		t.Fatal("login must send exactly one cookie")
+	}
 	return cookies[0]
 }
 
@@ -159,7 +173,9 @@ func TestBrowserSessionHTTPLoginCheckCSRFLogout(t *testing.T) {
 	bad.Header.Set("Cookie", cookie.String())
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, bad)
-	if w.Code != 403 || store.revokes != 0 { t.Fatal("missing CSRF reached logout") }
+	if w.Code != 403 || store.revokes != 0 {
+		t.Fatal("missing CSRF reached logout")
+	}
 	logout := browserRequest(http.MethodPost, browserLogoutPath, "")
 	logout.Header.Set("Cookie", cookie.String())
 	logout.Header.Set("X-Mamony-CSRF", result["csrfToken"])
@@ -179,7 +195,9 @@ func TestBrowserSessionHTTPLoginCheckCSRFLogout(t *testing.T) {
 	session.Header.Set("Cookie", cookie.String())
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, session)
-	if w.Code != 401 { t.Fatal("revoked session still authenticated") }
+	if w.Code != 401 {
+		t.Fatal("revoked session still authenticated")
+	}
 }
 
 func TestBrowserSessionHTTPDeniedUnknownOutageAndThrottled(t *testing.T) {
@@ -193,17 +211,23 @@ func TestBrowserSessionHTTPDeniedUnknownOutageAndThrottled(t *testing.T) {
 	}
 	password.err = usecase.ErrPasswordAuthenticationDenied
 	denial := send()
-	if denial.Code != 401 || denial.Header().Get("Set-Cookie") != "" { t.Fatal("wrong password minted session") }
+	if denial.Code != 401 || denial.Header().Get("Set-Cookie") != "" {
+		t.Fatal("wrong password minted session")
+	}
 	password.err = errors.New("private SQL DSN")
 	if w := send(); w.Code != 503 || strings.Contains(w.Body.String(), "SQL") || w.Header().Get("Set-Cookie") != "" {
 		t.Fatal("password outage leaked or minted session")
 	}
 	password.err = usecase.ErrPasswordAuthenticationDenied
-	if w := send(); w.Code != 401 || w.Body.String() != denial.Body.String() { t.Fatal("invalid credentials yielded differing body") }
+	if w := send(); w.Code != 401 || w.Body.String() != denial.Body.String() {
+		t.Fatal("invalid credentials yielded differing body")
+	}
 	password.err = nil
 	gate.allowed = false
 	count := password.calls
-	if w := send(); w.Code != 429 || password.calls != count { t.Fatal("admission-denied request reached KDF") }
+	if w := send(); w.Code != 429 || password.calls != count {
+		t.Fatal("admission-denied request reached KDF")
+	}
 	gate.allowed = true
 	gate.err = errors.New("private DB secret")
 	if w := send(); w.Code != 503 || password.calls != count || strings.Contains(w.Body.String(), "secret") {
@@ -239,10 +263,10 @@ func TestBrowserSessionHTTPDeniedUnknownOutageAndThrottled(t *testing.T) {
 func TestBrowserSessionHTTPRejectsUnsafeInputsBeforeAnyIdentityWork(t *testing.T) {
 	h, gate, password, store := browserFixture(t)
 	for _, tc := range []struct {
-		name string
-		body string
+		name   string
+		body   string
 		change func(*http.Request)
-		want int
+		want   int
 	}{
 		{"duplicate email", "{\"email\":\"a@example.test\",\"email\":\"b@example.test\",\"password\":\"pw\"}", nil, 400},
 		{"duplicate password", "{\"email\":\"a@example.test\",\"password\":\"one\",\"password\":\"two\"}", nil, 400},
@@ -250,8 +274,8 @@ func TestBrowserSessionHTTPRejectsUnsafeInputsBeforeAnyIdentityWork(t *testing.T
 		{"invalid email", "{\"email\":\"broken\",\"password\":\"pw\"}", nil, 400},
 		{"missing password", "{\"email\":\"a@example.test\"}", nil, 400},
 		{"nested password", "{\"email\":\"a@example.test\",\"password\":{\"value\":\"pw\"}}", nil, 400},
-		{"multiple JSON", validBrowserJSON+validBrowserJSON, nil, 400},
-		{"oversized", "{\"email\":\"a@example.test\",\"password\":\""+strings.Repeat("x", 3000)+"\"}", nil, 413},
+		{"multiple JSON", validBrowserJSON + validBrowserJSON, nil, 400},
+		{"oversized", "{\"email\":\"a@example.test\",\"password\":\"" + strings.Repeat("x", 3000) + "\"}", nil, 413},
 		{"missing origin", validBrowserJSON, func(r *http.Request) { r.Header.Del("Origin") }, 403},
 		{"cross-site origin", validBrowserJSON, func(r *http.Request) { r.Header.Set("Origin", "https://evil.test") }, 403},
 		{"duplicate origin", validBrowserJSON, func(r *http.Request) { r.Header.Add("Origin", "https://app.example.test") }, 403},
@@ -270,7 +294,9 @@ func TestBrowserSessionHTTPRejectsUnsafeInputsBeforeAnyIdentityWork(t *testing.T
 		t.Run(tc.name, func(t *testing.T) {
 			r := browserRequest(http.MethodPost, browserLoginPath, tc.body)
 			r.Header.Set("Content-Type", "application/json")
-			if tc.change != nil { tc.change(r) }
+			if tc.change != nil {
+				tc.change(r)
+			}
 			beforeGate, beforePassword, beforeIssue := gate.calls, password.calls, store.issues
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, r)
@@ -287,19 +313,21 @@ func TestBrowserSessionHTTPRejectsDuplicateCookiesAndCrossSiteRead(t *testing.T)
 	cookie := browserLogin(t, h)
 	csrf := h.csrf.issue(cookie.Value)
 	for _, tc := range []struct {
-		name string
+		name   string
 		cookie string
-		token string
-		want int
+		token  string
+		want   int
 	}{
-		{"duplicate cookie", cookie.String()+"; "+cookie.String(), csrf, 401},
-		{"wrong cookie", browserCookieName+"="+base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xdd}, 32)), csrf, 403},
+		{"duplicate cookie", cookie.String() + "; " + cookie.String(), csrf, 401},
+		{"wrong cookie", browserCookieName + "=" + base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xdd}, 32)), csrf, 403},
 		{"tampered csrf", cookie.String(), strings.Repeat("A", len(csrf)), 403},
 		{"missing csrf", cookie.String(), "", 403},
 	} {
 		req := browserRequest(http.MethodPost, browserLogoutPath, "")
 		req.Header.Set("Cookie", tc.cookie)
-		if tc.token != "" { req.Header.Set("X-Mamony-CSRF", tc.token) }
+		if tc.token != "" {
+			req.Header.Set("X-Mamony-CSRF", tc.token)
+		}
 		before := store.revokes
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)
@@ -313,11 +341,15 @@ func TestBrowserSessionHTTPRejectsDuplicateCookiesAndCrossSiteRead(t *testing.T)
 	before := store.resolves
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
-	if w.Code != 403 || store.resolves != before { t.Fatal("cross-origin GET accepted") }
+	if w.Code != 403 || store.resolves != before {
+		t.Fatal("cross-origin GET accepted")
+	}
 	req.Header.Del("Origin")
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, req)
-	if w.Code != 200 { t.Fatal("legitimate GET without Origin must work") }
+	if w.Code != 200 {
+		t.Fatal("legitimate GET without Origin must work")
+	}
 }
 
 func TestBrowserSessionHTTPConfigRequiresExactOriginAndSecret(t *testing.T) {
@@ -330,17 +362,19 @@ func TestBrowserSessionHTTPConfigRequiresExactOriginAndSecret(t *testing.T) {
 		}
 	}
 	for _, key := range [][]byte{nil, []byte("weak"), bytes.Repeat([]byte{0xd3}, 31)} {
-		if _, err := NewBrowserSessionHTTP(h.peer, h.login, h.session, key, h.origin);
-			!errors.Is(err, ErrBrowserSessionHTTPConfig) {
+		if _, err := NewBrowserSessionHTTP(h.peer, h.login, h.session, key, h.origin); !errors.Is(err, ErrBrowserSessionHTTPConfig) {
 			t.Fatal("missing strong CSRF key accepted")
 		}
 	}
-	if _, err := NewBrowserSessionHTTP(nil, h.login, h.session, bytes.Repeat([]byte{0xd3}, 32), h.origin);
-		!errors.Is(err, ErrBrowserSessionHTTPConfig) { t.Fatal("nil peer accepted") }
-	if _, err := NewBrowserSessionHTTP(h.peer, nil, h.session, bytes.Repeat([]byte{0xd3}, 32), h.origin);
-		!errors.Is(err, ErrBrowserSessionHTTPConfig) { t.Fatal("nil login accepted") }
-	if _, err := NewBrowserSessionHTTP(h.peer, h.login, nil, bytes.Repeat([]byte{0xd3}, 32), h.origin);
-		!errors.Is(err, ErrBrowserSessionHTTPConfig) { t.Fatal("nil resolver accepted") }
+	if _, err := NewBrowserSessionHTTP(nil, h.login, h.session, bytes.Repeat([]byte{0xd3}, 32), h.origin); !errors.Is(err, ErrBrowserSessionHTTPConfig) {
+		t.Fatal("nil peer accepted")
+	}
+	if _, err := NewBrowserSessionHTTP(h.peer, nil, h.session, bytes.Repeat([]byte{0xd3}, 32), h.origin); !errors.Is(err, ErrBrowserSessionHTTPConfig) {
+		t.Fatal("nil login accepted")
+	}
+	if _, err := NewBrowserSessionHTTP(h.peer, h.login, nil, bytes.Repeat([]byte{0xd3}, 32), h.origin); !errors.Is(err, ErrBrowserSessionHTTPConfig) {
+		t.Fatal("nil resolver accepted")
+	}
 }
 
 func TestBrowserCSRFHMACBindsSessionOriginAndExpiry(t *testing.T) {
@@ -348,7 +382,9 @@ func TestBrowserCSRFHMACBindsSessionOriginAndExpiry(t *testing.T) {
 	second := base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x12}, 32))
 	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
 	a, err := newSessionCSRF(bytes.Repeat([]byte{0xc1}, 32), "https://app.example.test")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	a.clock = func() time.Time { return now }
 	csrf := a.issue(first)
 	if !a.verify(first, csrf) || a.verify(second, csrf) || a.verify(first, csrf+"x") ||
@@ -357,14 +393,24 @@ func TestBrowserCSRFHMACBindsSessionOriginAndExpiry(t *testing.T) {
 	}
 	other, _ := newSessionCSRF(bytes.Repeat([]byte{0xc1}, 32), "https://other.example.test")
 	other.clock = a.clock
-	if other.verify(first, csrf) { t.Fatal("CSRF reused across origins") }
+	if other.verify(first, csrf) {
+		t.Fatal("CSRF reused across origins")
+	}
 	other, _ = newSessionCSRF(bytes.Repeat([]byte{0xc2}, 32), "https://app.example.test")
 	other.clock = a.clock
-	if other.verify(first, csrf) { t.Fatal("CSRF reused across key rotation") }
+	if other.verify(first, csrf) {
+		t.Fatal("CSRF reused across key rotation")
+	}
 	a.clock = func() time.Time { return now.Add(14*time.Minute + 59*time.Second) }
-	if !a.verify(first, csrf) { t.Fatal("CSRF expired early") }
-	a.clock = func() time.Time { return now.Add(15*time.Minute) }
-	if a.verify(first, csrf) { t.Fatal("expired CSRF remains accepted") }
+	if !a.verify(first, csrf) {
+		t.Fatal("CSRF expired early")
+	}
+	a.clock = func() time.Time { return now.Add(15 * time.Minute) }
+	if a.verify(first, csrf) {
+		t.Fatal("expired CSRF remains accepted")
+	}
 	a.clock = func() time.Time { return now.Add(-time.Hour) }
-	if a.verify(first, csrf) { t.Fatal("CSRF from future was accepted") }
+	if a.verify(first, csrf) {
+		t.Fatal("CSRF from future was accepted")
+	}
 }
