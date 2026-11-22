@@ -42,12 +42,16 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 		}
 	}
 	admin, err := pgx.Connect(ctx, adminDSN)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() { _ = admin.Close(context.Background()) })
 	open := func(dsn, role string) *platformpg.Pool {
 		t.Helper()
 		p, err := platformpg.Open(ctx, platformpg.Config{DSN: dsn, RuntimeRole: role, MaxConns: 3})
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		t.Cleanup(p.Close)
 		return p
 	}
@@ -57,35 +61,61 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	sessionPool := open(sessionDSN, "mamony_identity_session_runtime")
 	maintPool := open(maintenanceDSN, "mamony_identity_maintenance_runtime")
 	reg, err := identitypg.NewStore(regPool)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	proofs, err := identitypg.NewProofStore(proofPool)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	reader, err := identitypg.NewAuthenticationStore(authPool)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	sessionStore, err := identitypg.NewOpaqueSessionStore(sessionPool)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	authority, err := usecase.NewOpaqueSessionAuthority(sessionStore)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	maintenance, err := identitypg.NewRetentionStore(maintPool)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	kdf, err := credential.NewPasswordHasher(1)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	passwordAuth, err := usecase.NewPasswordAuthentication(reader, kdf)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	admissionStore, err := identitypg.NewAdmissionStore(regPool)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	gate, err := usecase.NewLoginAdmission(admissionStore, bytes.Repeat([]byte{0xdb}, 32))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	composed, err := usecase.NewPasswordLoginFlow(gate, passwordAuth)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	sessionLogin, err := usecase.NewSessionLogin(composed, authority)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	email := strings.ToLower(randomSyntheticID(t, "session_")) + "@example.test"
 	password := "synthetic strong session issue test password"
 	subject := randomSyntheticID(t, "sub_")
 	verifier, err := kdf.Hash(ctx, password)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := reg.CreatePendingWithObligation(ctx, usecase.PendingRegistration{
 		SubjectID: subject, EventID: randomSyntheticID(t, "evt_"),
 		CanonicalEmail: email, Status: "UNVERIFIED", CreatedAt: time.Now().UTC(),
@@ -115,22 +145,36 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	sealer, err := mailcrypto.NewKeyring("session-test", map[string][]byte{
 		"session-test": bytes.Repeat([]byte{0xa7}, 32),
 	})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	proof, err := usecase.NewEmailVerification(proofs, sealer)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	challenge, err := proof.Prepare(ctx, subject)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, token := challenge.ForTrustedDelivery()
-	if err := proof.Confirm(ctx, token); err != nil { t.Fatal(err) }
+	if err := proof.Confirm(ctx, token); err != nil {
+		t.Fatal(err)
+	}
 
 	// Actual admission -> Argon2id -> session issuance, with an independent
 	// DB-side ACTIVE/verified recheck after the KDF has finished.
 	issued, err := sessionLogin.Authenticate(ctx, email, password, network)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	secret := issued.ForTrustedTransport()
-	if len(secret) != 43 { t.Fatal("CSPRNG session token must encode 32 bytes") }
+	if len(secret) != 43 {
+		t.Fatal("CSPRNG session token must encode 32 bytes")
+	}
 	realSubject, err := authority.Resolve(ctx, secret)
-	if err != nil || realSubject != subject { t.Fatal("issued session did not resolve") }
+	if err != nil || realSubject != subject {
+		t.Fatal("issued session did not resolve")
+	}
 	decoded, _ := base64.RawURLEncoding.DecodeString(secret)
 	domainDigest := sha256.Sum256(append([]byte("mamony:identity:session-token:v1\x00"), decoded...))
 	var rows, matching, events int
@@ -147,12 +191,16 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 		t.Fatalf("session persisted incorrect hash/epoch/ttl/audit: rows=%d digest=%d audit=%d ttl=%f err=%v",
 			rows, matching, events, ageHours, err)
 	}
-	if bytes.Contains(domainDigest[:], decoded) { t.Fatal("digest matched raw bearer bytes") }
+	if bytes.Contains(domainDigest[:], decoded) {
+		t.Fatal("digest matched raw bearer bytes")
+	}
 
 	// The test admin freezes the account between a correct prior password
 	// decision and a fresh issue. The owning SQL function MUST deny after
 	// revalidating ACTIVE and verified state in the locked transaction.
-	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='FROZEN' WHERE subject_id=$1", subject); err != nil { t.Fatal(err) }
+	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='FROZEN' WHERE subject_id=$1", subject); err != nil {
+		t.Fatal(err)
+	}
 	if stale, err := authority.Issue(ctx, subject); stale.ForTrustedTransport() != "" ||
 		!errors.Is(err, usecase.ErrSessionDenied) {
 		t.Fatal("stale password candidate minted after account freeze")
@@ -161,7 +209,9 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 		!errors.Is(err, usecase.ErrSessionInvalid) {
 		t.Fatal("frozen account retained session access")
 	}
-	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", subject); err != nil { t.Fatal(err) }
+	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", subject); err != nil {
+		t.Fatal(err)
+	}
 	if resolved, err := authority.Resolve(ctx, secret); resolved != "" ||
 		!errors.Is(err, usecase.ErrSessionInvalid) {
 		t.Fatal("session epoch failed to prevent token resurrection after thaw")
@@ -175,13 +225,19 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	// A fresh internal session may issue after ACTIVE is re-established;
 	// logout revocation is idempotent and audited exactly once.
 	fresh, err := authority.Issue(ctx, subject)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	freshSecret := fresh.ForTrustedTransport()
 	if resolved, err := authority.Resolve(ctx, freshSecret); err != nil || resolved != subject {
 		t.Fatal("new epoch session was not valid")
 	}
-	if err := authority.Revoke(ctx, freshSecret); err != nil { t.Fatal(err) }
-	if err := authority.Revoke(ctx, freshSecret); err != nil { t.Fatal(err) }
+	if err := authority.Revoke(ctx, freshSecret); err != nil {
+		t.Fatal(err)
+	}
+	if err := authority.Revoke(ctx, freshSecret); err != nil {
+		t.Fatal(err)
+	}
 	if err := authority.Revoke(ctx, base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0xcc}, 32))); err != nil {
 		t.Fatal("unknown syntactically valid token logout must remain idempotent")
 	}
@@ -211,7 +267,9 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 		t.Fatalf("session retention must purge two old digests: sessions=%d err=%v", sessions, err)
 	}
 	_, _, sessions, err = maintenance.PurgeOneBatchWithSessions(ctx)
-	if err != nil || sessions != 0 { t.Fatal("bounded session purge was not idempotent") }
+	if err != nil || sessions != 0 {
+		t.Fatal("bounded session purge was not idempotent")
+	}
 	if err := admin.QueryRow(ctx,
 		"SELECT count(*) FROM mamony_identity.security_outbox WHERE subject_id=$1 AND event_type='SESSION_CREATED'",
 		subject).Scan(&events); err != nil || events != 2 {
