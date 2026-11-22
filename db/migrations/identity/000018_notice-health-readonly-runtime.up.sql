@@ -10,4 +10,4 @@ REVOKE ALL ON FUNCTION mamony_identity.purge_old_mailgun_security_receipts()
 REVOKE ALL ON FUNCTION mamony_identity.purge_old_password_change_notices()
     FROM mamony_identity_notice_monitor_runtime;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (18, '84c6dfce94cdc5dbc625359a44f1eb900825a994822e8031c7c18d5ae6e2fd83');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (18, '9eae74a5ebafdef85c8f42e2cd8b150f1453249e5cd44bb285576f6829afba3b');
