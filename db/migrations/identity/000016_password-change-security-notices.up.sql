@@ -62,7 +62,7 @@ EXECUTE FUNCTION mamony_identity.enqueue_password_change_notice();
 -- Worker is EXECUTE-only: it never receives unrestricted SELECT on Identity
 -- contacts, sessions, password hashes or generic security event history.
 CREATE FUNCTION mamony_identity.claim_password_change_notice(p_lease text)
-RETURNS TABLE(event_id text,recipient text)
+RETURNS TABLE(event_id text,recipient text,sendable boolean)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 BEGIN -- PL/pgSQL function block; not a migration transaction
     IF p_lease IS NULL OR p_lease !~ '^lse_[A-Za-z0-9_-]{22}$' THEN
@@ -94,7 +94,12 @@ BEGIN -- PL/pgSQL function block; not a migration transaction
           FROM chosen c WHERE n.event_id=c.event_id
         RETURNING n.event_id,n.recipient,n.status
     )
-    SELECT u.event_id,u.recipient FROM updated u WHERE u.status='PENDING';
+    -- Return an explicit non-sendable row so Go commits a stale-recipient
+    -- terminal transition instead of rolling back on pgx.ErrNoRows.
+    SELECT u.event_id,
+           CASE WHEN u.status='PENDING' THEN u.recipient ELSE '' END,
+           u.status='PENDING'
+      FROM updated u;
 END;
 $$;
 
@@ -161,4 +166,4 @@ GRANT EXECUTE ON FUNCTION
     mamony_identity.purge_old_password_change_notices()
 TO mamony_identity_maintenance_runtime;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (16, '6b0281c1ee8b4a0d52205aab975629292a9b648bea906d3f7d10edf9eb73a86e');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (16, 'bc665a103a9c73d0707dd484bcc56b224b424ef29fa7567a4fb52e7bb84147e2');
