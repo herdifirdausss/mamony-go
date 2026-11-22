@@ -26,7 +26,7 @@ func newMockSecuritySender(t *testing.T, handler http.HandlerFunc) *SecurityNoti
 		t.Fatal(err)
 	}
 	client := &http.Client{
-		Timeout: 600 * time.Millisecond,
+		Timeout:   600 * time.Millisecond,
 		Transport: redirectToMock{target: origin, base: http.DefaultTransport},
 	}
 	s, err := NewSecurityNoticeSender(SecurityNoticeConfig{
@@ -82,14 +82,14 @@ func TestSecurityNoticeSenderSendsOnlyTokenFreeTextWithPinnedMailgunHost(t *test
 			fields[part.FormName()] = append(fields[part.FormName()], string(value))
 		}
 		want := map[string]string{
-			"from": "Mamony Security <security@mg.example.test>",
-			"to": "alice@example.test",
-			"subject": "Mamony security alert: password changed",
-			"o:tracking": "no",
-			"o:tracking-opens": "no",
+			"from":              "Mamony Security <security@mg.example.test>",
+			"to":                "alice@example.test",
+			"subject":           "Mamony security alert: password changed",
+			"o:tracking":        "no",
+			"o:tracking-opens":  "no",
 			"o:tracking-clicks": "no",
-			"o:require-tls": "yes",
-			"o:deliver-within": "5m",
+			"o:require-tls":     "yes",
+			"o:deliver-within":  "5m",
 		}
 		for field, expected := range want {
 			if len(fields[field]) != 1 || fields[field][0] != expected {
@@ -160,10 +160,10 @@ func TestSecurityNoticeMailgunRegionsAndConfiguration(t *testing.T) {
 
 func TestSecurityNoticeMailgunStatusClassificationAndRedaction(t *testing.T) {
 	for _, tc := range []struct {
-		name string
+		name   string
 		status int
-		body string
-		want error
+		body   string
+		want   error
 	}{
 		{"accepted", 200, `{"id":"<synthetic@mailgun.test>"}`, nil},
 		{"malformed acceptance", 200, `{"unexpected":"private URL"}`, usecase.ErrDeliveryUnavailable},
@@ -207,15 +207,13 @@ func TestSecurityNoticeSenderRejectsInvalidEventRecipientAndCancel(t *testing.T)
 		{fixtureNoticeEvent, "alice@example.test,bob@example.test"},
 		{fixtureNoticeEvent, "alice@example.test\nBCC:bad"},
 	} {
-		if err := s.SendPasswordChanged(context.Background(), tc.event, tc.recipient);
-			!errors.Is(err, usecase.ErrPermanentDelivery) {
+		if err := s.SendPasswordChanged(context.Background(), tc.event, tc.recipient); !errors.Is(err, usecase.ErrPermanentDelivery) {
 			t.Fatal("invalid security notice reached sender")
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test");
-		!errors.Is(err, usecase.ErrPermanentDelivery) {
+	if err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test"); !errors.Is(err, usecase.ErrPermanentDelivery) {
 		t.Fatal("canceled send attempted HTTP")
 	}
 	if calls != 0 {
@@ -230,8 +228,7 @@ func TestSecurityNoticeSenderMockHTTPTimeoutIsRedactedRetryable(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test");
-		!errors.Is(err, usecase.ErrDeliveryUnavailable) {
+	if err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test"); !errors.Is(err, usecase.ErrDeliveryUnavailable) {
 		t.Fatalf("timeout should be a sanitized retryable result: %v", err)
 	}
 }
