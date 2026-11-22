@@ -117,7 +117,7 @@ func (a *OpaqueSessionAuthority) Resolve(ctx context.Context, secret string) (st
 	if err != nil {
 		return "", ErrSessionUnavailable
 	}
-	if !validSessionSubject.MatchString(candidate.SubjectID) || candidate.SessionEpoch <= 0 {
+	if !validSessionSubject.MatchString(subject) {
 		return "", ErrSessionInvalid
 	}
 	return subject, nil
@@ -178,7 +178,7 @@ func (s *SessionLogin) Authenticate(ctx context.Context, email, password string,
 		}
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
-	if !validSessionSubject.MatchString(subject) {
+	if !validSessionSubject.MatchString(candidate.SubjectID) || candidate.SessionEpoch <= 0 {
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
 	proof, err := s.grant.Issue(ctx, candidate.SubjectID, candidate.SessionEpoch)
