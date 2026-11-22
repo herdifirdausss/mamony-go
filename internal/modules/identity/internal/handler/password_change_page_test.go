@@ -114,7 +114,10 @@ func TestPasswordChangePageRejectsUntrustedNavigation(t *testing.T) {
 		{"insecure request", passwordChangePagePath, func(r *http.Request) { r.TLS = nil }, 403},
 		{"spoof host", passwordChangePagePath, func(r *http.Request) { r.Host = "evil.test" }, 403},
 		{"cross origin", passwordChangePagePath, func(r *http.Request) { r.Header.Set("Origin", "https://evil.test") }, 403},
-		{"duplicate origin", passwordChangePagePath, func(r *http.Request) { r.Header.Add("Origin", "https://app.example.test"); r.Header.Add("Origin", "https://app.example.test") }, 403},
+		{"duplicate origin", passwordChangePagePath, func(r *http.Request) {
+			r.Header.Add("Origin", "https://app.example.test")
+			r.Header.Add("Origin", "https://app.example.test")
+		}, 403},
 		{"cross-site metadata", passwordChangePagePath, func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") }, 403},
 		{"forwarded proto", passwordChangePagePath, func(r *http.Request) { r.Header.Set("X-Forwarded-Proto", "https") }, 403},
 		{"forwarded chain", passwordChangePagePath, func(r *http.Request) { r.Header.Set("X-Forwarded-For", "203.0.113.6") }, 403},
