@@ -44,3 +44,35 @@ func TestListenerRouteIsolation(t *testing.T) {
 		})
 	}
 }
+// TestIdentitySessionCandidateMethodsRemainUnmounted checks the intended
+// HTTP methods, not just GET. A future accidental POST login/logout mount
+// would otherwise evade a GET-only 404 regression test.
+func TestIdentitySessionCandidateMethodsRemainUnmounted(t *testing.T) {
+	paths := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodPost, "/v1/identity/login"},
+		{http.MethodGet, "/v1/identity/session"},
+		{http.MethodGet, "/v1/identity/csrf"},
+		{http.MethodPost, "/v1/identity/logout"},
+	}
+	for _, listener := range []struct {
+		name string
+		h    http.Handler
+	}{
+		{"public", PublicHandler()},
+		{"private", PrivateHandler()},
+	} {
+		for _, target := range paths {
+			t.Run(listener.name+" "+target.method+" "+target.path, func(t *testing.T) {
+				req := httptest.NewRequest(target.method, target.path, nil)
+				out := httptest.NewRecorder()
+				listener.h.ServeHTTP(out, req)
+				if out.Code != http.StatusNotFound {
+					t.Fatalf("unapproved Identity route was mounted: %s %s (%d)", target.method, target.path, out.Code)
+				}
+			})
+		}
+	}
+}
