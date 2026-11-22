@@ -19,6 +19,7 @@ type RetentionConfig struct {
 type RetentionResult struct {
 	EnvelopesPurged int
 	CountersPurged  int
+	SessionsPurged  int
 }
 
 // PurgeRetention runs ONE bounded, atomic cleanup batch. The owner/operator
@@ -39,9 +40,9 @@ func PurgeRetention(ctx context.Context, cfg RetentionConfig) (RetentionResult, 
 	if err != nil {
 		return RetentionResult{}, ErrRetentionRuntime
 	}
-	envelopes, counters, err := store.PurgeOneBatch(ctx)
+	envelopes, counters, sessions, err := store.PurgeOneBatchWithSessions(ctx)
 	if err != nil {
 		return RetentionResult{}, ErrRetentionRuntime
 	}
-	return RetentionResult{EnvelopesPurged: envelopes, CountersPurged: counters}, nil
+	return RetentionResult{EnvelopesPurged: envelopes, CountersPurged: counters, SessionsPurged: sessions}, nil
 }
