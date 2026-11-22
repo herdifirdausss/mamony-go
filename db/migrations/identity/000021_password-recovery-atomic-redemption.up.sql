@@ -88,7 +88,8 @@ EXECUTE FUNCTION mamony_identity.enqueue_password_recovery_notice();
 -- Lock order is subject/alias -> challenge -> assurance -> verifier, which
 -- matches issuer's subject -> challenge order and avoids their deadlock.
 CREATE FUNCTION mamony_identity.redeem_password_recovery(
-    p_digest bytea,p_new_salt bytea,p_new_digest bytea,p_event text)
+    p_digest bytea,p_expected_email text,p_new_salt bytea,
+    p_new_digest bytea,p_event text)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,pg_temp AS $$
 DECLARE
@@ -105,6 +106,8 @@ BEGIN -- PL/pgSQL function block; not migration transaction
             USING ERRCODE='42501';
     END IF;
     IF p_digest IS NULL OR octet_length(p_digest)<>32
+       OR p_expected_email IS NULL OR length(p_expected_email)<3
+       OR length(p_expected_email)>254 OR p_expected_email<>lower(p_expected_email)
        OR p_new_salt IS NULL OR octet_length(p_new_salt)<>16
        OR p_new_digest IS NULL OR octet_length(p_new_digest)<>32
        OR p_event IS NULL OR p_event !~ '^evt_[A-Za-z0-9_-]{22}$'
@@ -135,7 +138,8 @@ BEGIN -- PL/pgSQL function block; not migration transaction
        AND c.contact_version=contact_version
      FOR UPDATE OF c;
     IF NOT FOUND OR token_epoch<>current_epoch
-       OR issued_alias IS DISTINCT FROM contact_email THEN
+       OR issued_alias IS DISTINCT FROM contact_email
+       OR p_expected_email IS DISTINCT FROM contact_email THEN
         RETURN false;
     END IF;
     stamp:=clock_timestamp();
@@ -195,12 +199,12 @@ BEGIN -- PL/pgSQL function block; not migration transaction
 END;
 $$;
 REVOKE ALL ON FUNCTION mamony_identity.redeem_password_recovery(
-    bytea,bytea,bytea,text) FROM PUBLIC;
+    bytea,text,bytea,bytea,text) FROM PUBLIC;
 GRANT USAGE ON SCHEMA mamony_identity
     TO mamony_identity_recovery_redeemer_runtime;
 GRANT EXECUTE ON FUNCTION mamony_identity.redeem_password_recovery(
-    bytea,bytea,bytea,text)
+    bytea,text,bytea,bytea,text)
     TO mamony_identity_recovery_redeemer_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (21, '51155dbc519d710e9ef0358a86cda610e8923fab25a0336e392a66724ee609dd');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (21, '__REPLACE_SHA256__');
