@@ -8,7 +8,7 @@ const https = require("node:https");
 const {chromium} = require("playwright");
 
 const origin = "https://app.example.test";
-const attackerOrigin = "https://attacker.example.test";
+const attackerOrigin = "https://attacker.other.test";
 const local = new URL(process.env.MAMONY_SESSION_E2E_LOCAL_TLS || "");
 assert.equal(local.protocol, "https:");
 assert.equal(local.hostname, "127.0.0.1");
@@ -125,7 +125,7 @@ async function run() {
         assert.equal(request.method(), "POST");
         counters.logout++;
         if (request.headers().origin === attackerOrigin) {
-          assert.equal(request.headers().cookie, undefined,
+          assert.ok(!request.headers().cookie,
             "SameSite=Strict must not send session to a cross-site POST");
           counters.deniedCrossSite++;
         } else {
