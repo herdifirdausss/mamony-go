@@ -13,7 +13,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF NEW.status IS DISTINCT FROM OLD.status THEN
         NEW.session_epoch := OLD.session_epoch + 1;
     END IF;
@@ -62,7 +62,7 @@ AS $$
 DECLARE
     current_epoch bigint;
     stamp timestamptz;
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF p_subject IS NULL OR p_subject !~ '^sub_[A-Za-z0-9_-]{22}$'
        OR p_digest IS NULL OR octet_length(p_digest) <> 32
        OR p_event IS NULL OR p_event !~ '^evt_[A-Za-z0-9_-]{22}$' THEN
@@ -98,7 +98,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     resolved_subject text;
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF p_digest IS NULL OR octet_length(p_digest) <> 32 THEN
         RETURN NULL;
     END IF;
@@ -125,7 +125,7 @@ AS $$
 DECLARE
     revoked_subject text;
     stamp timestamptz;
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF p_digest IS NULL OR octet_length(p_digest) <> 32
        OR p_event IS NULL OR p_event !~ '^evt_[A-Za-z0-9_-]{22}$' THEN
         RETURN false;
@@ -180,4 +180,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.issue_opaque_session(text,bytea,text),
 GRANT EXECUTE ON FUNCTION mamony_identity.purge_expired_opaque_sessions()
     TO mamony_identity_maintenance_runtime;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (10, 'a15eba43dc2500c1bb4a5de0acba338c3a6991152eb46efcd683fb29a28b311e');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (10, 'a5713dc7c6396dfdf50182f3271bd72e6e772d483c2261dce4b4827de003b3a2');
