@@ -127,4 +127,4 @@ GRANT EXECUTE ON FUNCTION
     mamony_identity.rotate_password_verifier(bytea,bytea,bytea,bytea,text)
     TO mamony_identity_password_change_runtime;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (15, '0000000000000000000000000000000000000000000000000000000000000000');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (15, '77a6b03db4d2bde43ba05410e059acfa72b44f183c971af05467b4bfcca22565');
