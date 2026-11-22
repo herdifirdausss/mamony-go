@@ -83,6 +83,17 @@ func TestIdentityRecoveryIssuance(t *testing.T) {
 		}
 	}
 	first := mk(1)
+	// Do not leave a claimable synthetic ciphertext for later DB/worker
+	// integration tests sharing the same disposable database.
+	t.Cleanup(func() {
+		cleanupCtx, done := context.WithTimeout(context.Background(), 3*time.Second)
+		defer done()
+		if _, err := admin.Exec(cleanupCtx, `UPDATE mamony_identity.password_recovery_deliveries
+			SET status='DEAD',lease_id=NULL,leased_until=NULL
+			WHERE challenge_id=$1 AND status='PENDING'`, first.ChallengeID); err != nil {
+			t.Errorf("quarantine v19 synthetic delivery: %v", err)
+		}
+	})
 	issued, err := issuer.Issue(ctx, first)
 	if err != nil || !issued {
 		t.Fatalf("eligible subject was not issued a sealed challenge: %v %v", issued, err)
