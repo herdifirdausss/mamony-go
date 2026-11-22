@@ -61,3 +61,7 @@ The session Chromium fixture now additionally configures `TEST_IDENTITY_AUTH_GRA
 ## Draft #47 — v12 server-side idle expiry test evidence
 
 `TestIdentityZSessionIdleExpiry` is a **mandatory** disposable-PostgreSQL integration test via `tools/testgate`: synthetic stored timestamps simulate inactivity (no 30-minute wall-clock wait), check activity updates on a valid resolve, a 31-minute inactivity denial, the unchanged 12-hour absolute expiry and freeze/thaw invalidation. The real Chromium E2E continues to run after the new migration with the same cookie and CSRF path; the browser's Max-Age is not used as an idle-expiry oracle. See [ADR-0010](../adr/0010-server-side-session-idle-expiry.md) for session row-lock contention and production traffic caveats.
+
+## Draft #48 — bounded active-session and lock-order evidence
+
+Mandatory disposable-PostgreSQL `TestIdentityZMaxActiveSessions` exercises five active session slots, sixth-login oldest revocation, separate identifier-only audit event, idle-expired slot reuse, rollback restoring both login and victim, and deterministic simultaneous distinct-grant issuers behind a subject lock. The existing real Chromium cookie/CSRF/logout test continues to assert the candidate first-party contract, but does not simulate six independent browser profiles. See [ADR-0011](../adr/0011-atomic-five-session-cap.md). All routes stay unmounted and CI evidence never substitutes for production load/perimeter testing.
