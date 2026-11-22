@@ -262,7 +262,7 @@ func TestIdentityZRecoveryCodeEnrollmentRotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if denied, err := manager.Rotate(ctx, bearer, email, currentPassword, other.TrustedOfflineDisplay(), peer); !errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) || denied.ForTrustedDisplay()[0] != "" {
-		t.Fatal("wrong saved recovery code rotated account codes")
+		t.Fatalf("wrong saved recovery code outcome: err=%v rawReturned=%t", err, denied.ForTrustedDisplay()[0] != "")
 	}
 	var challengeRevoked bool
 	if err := admin.QueryRow(ctx, `SELECT revoked_at IS NOT NULL
