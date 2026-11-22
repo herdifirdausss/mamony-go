@@ -37,3 +37,21 @@ func (s *AuthenticationGrantStore) Stage(ctx context.Context, subject string, ex
 	}
 	return allowed, nil
 }
+
+// StageChange uses the same privileged authentication assertion role, but
+// the PostgreSQL function fixes the distinct PASSWORD_CHANGE purpose.
+func (s *AuthenticationGrantStore) StageChange(ctx context.Context, subject string, expectedEpoch int64, digest []byte) (bool, error) {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
+		len(subject) != 26 || expectedEpoch <= 0 || len(digest) != 32 {
+		return false, usecase.ErrSessionUnavailable
+	}
+	var allowed bool
+	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "SELECT mamony_identity.stage_password_change_grant($1,$2,$3)",
+			subject, expectedEpoch, digest).Scan(&allowed)
+	})
+	if err != nil {
+		return false, usecase.ErrSessionUnavailable
+	}
+	return allowed, nil
+}
