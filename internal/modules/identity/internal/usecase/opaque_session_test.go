@@ -15,17 +15,17 @@ import (
 )
 
 type fakeSessionStore struct {
-	allow      bool
-	subject    string
-	issued     int
-	resolved   int
-	revoked    int
-	issueErr   error
-	resolveErr error
-	revokeErr  error
+	allow       bool
+	subject     string
+	issued      int
+	resolved    int
+	revoked     int
+	issueErr    error
+	resolveErr  error
+	revokeErr   error
 	digest      []byte
 	grantDigest []byte
-	event      string
+	event       string
 }
 
 func (f *fakeSessionStore) Issue(_ context.Context, grantDigest, digest []byte, event string) (bool, error) {
