@@ -262,7 +262,14 @@ func TestIdentityZRecoveryCodeEnrollmentRotation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if denied, err := manager.Rotate(ctx, bearer, email, currentPassword, other.TrustedOfflineDisplay(), peer); !errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) || denied.ForTrustedDisplay()[0] != "" {
-		t.Fatalf("wrong saved recovery code outcome: err=%v rawReturned=%t", err, denied.ForTrustedDisplay()[0] != "")
+		var proofCount int
+		if qerr := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_login_grants
+			WHERE subject_id=$1 AND purpose='RECOVERY_CODE_ROTATION'`, subject).Scan(&proofCount); qerr != nil {
+			t.Fatal(qerr)
+		}
+		who, sessionErr := sessions.Resolve(ctx, bearer)
+		t.Fatalf("wrong saved recovery code outcome: err=%v rawReturned=%t reauthGrants=%d sessionStillValid=%t sessionErr=%v",
+			err, denied.ForTrustedDisplay()[0] != "", proofCount, who == subject, sessionErr)
 	}
 	var challengeRevoked bool
 	if err := admin.QueryRow(ctx, `SELECT revoked_at IS NOT NULL
