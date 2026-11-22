@@ -17,7 +17,7 @@ import (
 // intended to guess when a concurrent statement has started. It observes
 // PostgreSQL's actual Lock wait state using the disposable fixture superuser.
 // NEVER run this helper against a real database or with application roles.
-func waitForSessionLock(t *testing.T, ctx context.Context, observer *pgx.Conn, pid uint32) {
+func waitForSessionLock(t *testing.T, ctx context.Context, observer *pgx.Conn, pid int32) {
 	t.Helper()
 	pollCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -26,7 +26,7 @@ func waitForSessionLock(t *testing.T, ctx context.Context, observer *pgx.Conn, p
 	for {
 		var waitType, waitEvent string
 		err := observer.QueryRow(pollCtx, "SELECT coalesce(wait_event_type,''), coalesce(wait_event,'') FROM pg_catalog.pg_stat_activity WHERE pid=$1",
-			int32(pid)).Scan(&waitType, &waitEvent)
+			pid).Scan(&waitType, &waitEvent)
 		if err != nil {
 			t.Fatalf("cannot observe disposable PostgreSQL lock waiter: %v", err)
 		}
@@ -79,7 +79,7 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sessionConn.Close(context.Background()) })
 
-	var sessionPID, freezerPID uint32
+	var sessionPID, freezerPID int32
 	if err := sessionConn.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&sessionPID); err != nil {
 		t.Fatal(err)
 	}
