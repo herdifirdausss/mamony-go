@@ -706,7 +706,6 @@ func TestPostgresIdentityZRecoveryRedeemerRole(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZRecoverySecurityNoticeRoles enforces v22's independent
 // sender and count-only monitor credentials, without direct table authority.
 func TestPostgresIdentityZRecoverySecurityNoticeRoles(t *testing.T) {
@@ -759,19 +758,19 @@ func TestPostgresIdentityZRecoverySecurityNoticeRoles(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		role string
-		sql string
+		sql  string
 	}{
-		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL",claim},
-		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL",finalize},
-		{"TEST_IDENTITY_RECOVERY_NOTICE_URL","SELECT * FROM mamony_identity.password_recovery_notice_health()"},
-		{"TEST_IDENTITY_SECURITY_NOTICE_URL",claim},
-		{"TEST_IDENTITY_SECURITY_NOTICE_URL",finalize},
-		{"TEST_IDENTITY_RECOVERY_ISSUER_URL",claim},
-		{"TEST_IDENTITY_RECOVERY_REDEEMER_URL",finalize},
-		{"TEST_IDENTITY_RUNTIME_URL",claim},
-		{"TEST_PLATFORM_RUNTIME_URL","SELECT * FROM mamony_identity.password_recovery_notice_health()"},
-		{"TEST_IDENTITY_RECOVERY_NOTICE_URL","SELECT mamony_identity.purge_old_password_recovery_notices()"},
-		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL","SELECT mamony_identity.purge_old_password_recovery_notices()"},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", claim},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", finalize},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_URL", "SELECT * FROM mamony_identity.password_recovery_notice_health()"},
+		{"TEST_IDENTITY_SECURITY_NOTICE_URL", claim},
+		{"TEST_IDENTITY_SECURITY_NOTICE_URL", finalize},
+		{"TEST_IDENTITY_RECOVERY_ISSUER_URL", claim},
+		{"TEST_IDENTITY_RECOVERY_REDEEMER_URL", finalize},
+		{"TEST_IDENTITY_RUNTIME_URL", claim},
+		{"TEST_PLATFORM_RUNTIME_URL", "SELECT * FROM mamony_identity.password_recovery_notice_health()"},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_URL", "SELECT mamony_identity.purge_old_password_recovery_notices()"},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", "SELECT mamony_identity.purge_old_password_recovery_notices()"},
 	} {
 		out, err := invokePSQL(tc.role, "-c", tc.sql)
 		if err == nil || !strings.Contains(out, "42501") {
