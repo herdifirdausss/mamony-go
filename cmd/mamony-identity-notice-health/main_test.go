@@ -21,11 +21,11 @@ func probeFixture(t *testing.T) map[string]string {
 	}
 	return map[string]string{
 		"MAMONY_IDENTITY_NOTICE_MONITOR_DSN_FILE": path,
-		"MAMONY_NOTICE_MAX_PENDING_DUE":          "2",
-		"MAMONY_NOTICE_MAX_DEAD":                 "0",
-		"MAMONY_NOTICE_MAX_SUBMITTED_UNKNOWN":    "10",
-		"MAMONY_NOTICE_MAX_PROVIDER_FAILURES":    "0",
-		"MAMONY_NOTICE_MAX_UNMATCHED_EVENTS":     "0",
+		"MAMONY_NOTICE_MAX_PENDING_DUE":           "2",
+		"MAMONY_NOTICE_MAX_DEAD":                  "0",
+		"MAMONY_NOTICE_MAX_SUBMITTED_UNKNOWN":     "10",
+		"MAMONY_NOTICE_MAX_PROVIDER_FAILURES":     "0",
+		"MAMONY_NOTICE_MAX_UNMATCHED_EVENTS":      "0",
 	}
 }
 
