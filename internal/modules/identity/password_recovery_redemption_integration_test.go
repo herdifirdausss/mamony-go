@@ -113,3 +113,100 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 	if err := redeemer.Redeem(ctx, "bad-token", email, next); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
 		t.Fatal("invalid bearer passed proof decoder")
 	}
+
+	sessionProof := sha256.Sum256([]byte("synthetic recovery login grant " + subject))
+	sessionDigest := sha256.Sum256([]byte("synthetic recovery opaque session " + subject))
+	var allowed bool
+	if err := grant.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
+		subject, epoch, sessionProof[:]).Scan(&allowed); err != nil || !allowed {
+		t.Fatalf("old-epoch login grant not issued: %v %t", err, allowed)
+	}
+	if err := session.QueryRow(ctx, "SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+		sessionProof[:], sessionDigest[:], randomSyntheticID(t, "evt_")).Scan(&allowed); err != nil || !allowed {
+		t.Fatalf("old-epoch session not issued: %v %t", err, allowed)
+	}
+	var resolved string
+	if err := session.QueryRow(ctx, "SELECT COALESCE(mamony_identity.resolve_opaque_session($1),'')",
+		sessionDigest[:]).Scan(&resolved); err != nil || resolved != subject {
+		t.Fatal("synthetic old session was not valid before reset")
+	}
+	previous := func() (int64, bool, bool, int) {
+		t.Helper()
+		var current int64
+		var tokenUsed, grantUsed bool
+		var notices int
+		err := admin.QueryRow(ctx, `SELECT s.session_epoch,
+			c.consumed_at IS NOT NULL,g.consumed_at IS NOT NULL,
+			(SELECT count(*) FROM mamony_identity.password_recovery_notices n
+			 WHERE n.subject_id=$1)
+			FROM mamony_identity.subjects s
+			JOIN mamony_identity.password_recovery_challenges c ON c.subject_id=s.subject_id
+			JOIN mamony_identity.password_recovery_assurance_grants g ON g.subject_id=s.subject_id
+			WHERE s.subject_id=$1 AND c.challenge_id=$2`, subject, challenge).
+			Scan(&current, &tokenUsed, &grantUsed, &notices)
+		if err != nil { t.Fatal(err) }
+		return current, tokenUsed, grantUsed, notices
+	}
+	newVerifier, err := hasher.Hash(ctx, next)
+	if err != nil { t.Fatal(err) }
+	collisionEvent := randomSyntheticID(t, "evt_")
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.security_outbox
+	(event_id,subject_id,event_type,occurred_at)
+	VALUES($1,$2,'SESSION_CREATED',clock_timestamp())`, collisionEvent, subject); err != nil {
+		t.Fatal(err)
+	}
+	if accepted, err := store.Redeem(ctx, proof.Digest(), email, newVerifier, collisionEvent); err == nil || accepted {
+		t.Fatal("audit ID collision incorrectly committed a password reset")
+	}
+	at, tokenUsed, grantUsed, notices := previous()
+	if at != epoch || tokenUsed || grantUsed || notices != 0 {
+		t.Fatal("late event insert failure failed to roll back entire reset")
+	}
+	if err := session.QueryRow(ctx, "SELECT COALESCE(mamony_identity.resolve_opaque_session($1),'')",
+		sessionDigest[:]).Scan(&resolved); err != nil || resolved != subject {
+		t.Fatal("failed reset incorrectly revoked old session")
+	}
+	if err := redeemer.Redeem(ctx, proof.ForTrustedDelivery(), email, next); err != nil {
+		t.Fatalf("eligible one-shot recovery failed: %v", err)
+	}
+	at, tokenUsed, grantUsed, notices = previous()
+	if at != epoch+1 || !tokenUsed || !grantUsed || notices != 1 {
+		t.Fatal("password rotation did not atomically consume both proofs, bump epoch and enqueue notice")
+	}
+	if err := session.QueryRow(ctx, "SELECT COALESCE(mamony_identity.resolve_opaque_session($1),'')",
+		sessionDigest[:]).Scan(&resolved); err != nil || resolved != "" {
+		t.Fatal("old session still authorized after account recovery")
+	}
+	var oldMailStatus string
+	if err := admin.QueryRow(ctx, "SELECT status FROM mamony_identity.password_recovery_deliveries WHERE challenge_id=$1",
+		challenge).Scan(&oldMailStatus); err != nil || oldMailStatus != "DEAD" {
+		t.Fatal("recovery request ciphertext remained pending after reset")
+	}
+	var auditCount int
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.security_outbox
+		WHERE subject_id=$1 AND event_type='PASSWORD_RECOVERED'`,
+		subject).Scan(&auditCount); err != nil || auditCount != 1 {
+		t.Fatal("missing dedicated PASSWORD_RECOVERED audit event")
+	}
+	var recipient string
+	if err := admin.QueryRow(ctx, "SELECT recipient FROM mamony_identity.password_recovery_notices WHERE subject_id=$1",
+		subject).Scan(&recipient); err != nil || recipient != email {
+		t.Fatal("recovery notice recipient did not match verified contact")
+	}
+	var persisted domain.PasswordVerifier
+	if err := admin.QueryRow(ctx, `SELECT kdf_version,memory_kib,iterations,parallelism,salt,digest
+		FROM mamony_identity.password_verifiers WHERE subject_id=$1`, subject).
+		Scan(&persisted.Version, &persisted.MemoryKiB, &persisted.Iterations,
+			&persisted.Parallelism, &persisted.Salt, &persisted.Digest); err != nil { t.Fatal(err) }
+	if valid, err := hasher.Verify(ctx, next, persisted); err != nil || !valid {
+		t.Fatal("new Argon2id password was not valid after reset")
+	}
+	if valid, err := hasher.Verify(ctx, "synthetic initial password for recovery", persisted); err != nil || valid {
+		t.Fatal("old password still verified after recovery")
+	}
+	if err := redeemer.Redeem(ctx, proof.ForTrustedDelivery(), email, next); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
+		t.Fatal("replayed token performed another recovery")
+	}
+	at, _, _, notices = previous()
+	if at != epoch+1 || notices != 1 { t.Fatal("replay changed epoch or audit") }
+}
