@@ -901,7 +901,6 @@ func TestPostgresIdentityZRecoveryAssuranceRole(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZRecoveryCodeManagerRole enforces v25's EXECUTE-only
 // enrollment/rotation principal and distinct one-use reauthentication purpose.
 func TestPostgresIdentityZRecoveryCodeManagerRole(t *testing.T) {
