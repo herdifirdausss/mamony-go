@@ -261,8 +261,7 @@ func TestIdentityZRecoveryCodeEnrollmentRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if denied, err := manager.Rotate(ctx, bearer, email, currentPassword, other.TrustedOfflineDisplay(), peer);
-		!errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) || denied.ForTrustedDisplay()[0] != "" {
+	if denied, err := manager.Rotate(ctx, bearer, email, currentPassword, other.TrustedOfflineDisplay(), peer); !errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) || denied.ForTrustedDisplay()[0] != "" {
 		t.Fatal("wrong saved recovery code rotated account codes")
 	}
 	var challengeRevoked bool
@@ -314,18 +313,15 @@ func TestIdentityZRecoveryCodeEnrollmentRotation(t *testing.T) {
 			(SELECT count(*) FROM mamony_identity.security_outbox o WHERE o.subject_id=$1
 				AND o.event_type='RECOVERY_CODES_ROTATED'),
 			(SELECT count(*) FROM mamony_identity.password_recovery_code_notices n WHERE n.subject_id=$1
-				AND n.status='PENDING')`, subject).Scan(&enrolled, &rotatedEvents, &notices);
-		err != nil || enrolled != 1 || rotatedEvents != 1 || notices != 2 {
+				AND n.status='PENDING')`, subject).Scan(&enrolled, &rotatedEvents, &notices); err != nil || enrolled != 1 || rotatedEvents != 1 || notices != 2 {
 		t.Fatal("offline code set changes not atomically audited and queued for token-free notification")
 	}
 	// Replay of a prior code is denied even with the correct password;
 	// reused enrollment approval is also denied once a set exists.
-	if _, err := manager.Rotate(ctx, bearer, email, currentPassword, issued[0], peer);
-		!errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) {
+	if _, err := manager.Rotate(ctx, bearer, email, currentPassword, issued[0], peer); !errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) {
 		t.Fatal("burned recovery code authorized a later rotation")
 	}
-	if _, err := manager.Enroll(ctx, bearer, email, currentPassword, approval, peer);
-		!errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) {
+	if _, err := manager.Enroll(ctx, bearer, email, currentPassword, approval, peer); !errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) {
 		t.Fatal("used bootstrap approval allowed re-enrollment over existing code set")
 	}
 
