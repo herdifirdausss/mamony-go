@@ -30,7 +30,7 @@ for (const account of [a, b]) {
   assert.ok(account.next && account.next.length >= 20);
 }
 
-function forward(request) {
+function forward(request, sourceAddress) {
   const url = new URL(request.url());
   const headers = request.headers();
   delete headers["content-length"];
@@ -38,6 +38,7 @@ function forward(request) {
   return new Promise((resolve, reject) => {
     const upstream = https.request({
       hostname: "127.0.0.1",
+      localAddress: sourceAddress,
       port: Number(local.port),
       path: url.pathname,
       method: request.method(),
@@ -129,7 +130,7 @@ async function run() {
   const unexpected = [];
   let dropNextChange = false;
 
-  async function createContext() {
+  async function createContext(sourceAddress) {
     const context = await browser.newContext({
       serviceWorkers: "block", javaScriptEnabled: true, ignoreHTTPSErrors: false,
     });
@@ -168,7 +169,7 @@ async function run() {
           assert.equal(headers.origin, origin);
         }
       }
-      const response = await forward(request);
+      const response = await forward(request, sourceAddress);
       if (headers.origin === siblingOrigin || headers.origin === attackerOrigin) {
         assert.equal(response.status, 403, "server must deny cross-origin mutation");
       }
@@ -189,9 +190,11 @@ async function run() {
   }
 
   try {
-    const first = await createContext();
-    const second = await createContext();
-    const other = await createContext();
+    // Distinct synthetic loopback client IPs preserve the real production
+    // admission quotas (8/client/minute) without loosening any policy.
+    const first = await createContext("127.0.0.2");
+    const second = await createContext("127.0.0.2");
+    const other = await createContext("127.0.0.3");
 
     // Same user, two genuinely separate browser cookie jars.
     await login(first.page, a, a.old, 204);
