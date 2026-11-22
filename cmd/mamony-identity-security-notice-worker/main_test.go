@@ -30,10 +30,10 @@ func fixtureNoticeFiles(t *testing.T) map[string]string {
 			syntheticNoticeDSN("mamony_identity_security_notice_runtime",
 				"db.example.test:5432", "mamony_staging", "verify-full")+"\n"),
 		"MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_KEY_FILE": write("notice-key", "synthetic-mailgun-domain-key\n"),
-		"MAMONY_IDENTITY_SECURITY_NOTICE_LIVE_APPROVAL": noticeApproval,
-		"MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_REGION": "EU",
-		"MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_DOMAIN": "mg.example.test",
-		"MAMONY_IDENTITY_SECURITY_NOTICE_MAIL_FROM": "Mamony Security <security@mg.example.test>",
+		"MAMONY_IDENTITY_SECURITY_NOTICE_LIVE_APPROVAL":    noticeApproval,
+		"MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_REGION":   "EU",
+		"MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_DOMAIN":   "mg.example.test",
+		"MAMONY_IDENTITY_SECURITY_NOTICE_MAIL_FROM":        "Mamony Security <security@mg.example.test>",
 	}
 }
 
@@ -70,7 +70,7 @@ func TestSecurityNoticeWorkerRequiresExplicitLiveOptIn(t *testing.T) {
 
 func TestSecurityNoticeWorkerRefusesUnsafeCredentialSourcesAndDSNs(t *testing.T) {
 	for _, tc := range []struct {
-		name string
+		name   string
 		change func(*testing.T, map[string]string)
 	}{
 		{"missing key file", func(_ *testing.T, env map[string]string) {
@@ -144,8 +144,7 @@ func TestSecurityNoticeWorkerRefusesUnsafeCredentialSourcesAndDSNs(t *testing.T)
 		t.Run(tc.name, func(t *testing.T) {
 			env := fixtureNoticeFiles(t)
 			tc.change(t, env)
-			if _, err := readRuntimeConfig(noticeEnv(env), []string{realNoticeFlag});
-				!errors.Is(err, errStartup) {
+			if _, err := readRuntimeConfig(noticeEnv(env), []string{realNoticeFlag}); !errors.Is(err, errStartup) {
 				t.Fatal("unsafe security notice worker settings were accepted")
 			}
 		})
