@@ -27,7 +27,7 @@ import (
 )
 
 // TestIdentityZBrowserSessionE2E exercises actual Chromium cookie rules and
-// the full real-Argon2id -> PostgreSQL admission -> v10 session transaction
+// the full real-Argon2id -> PostgreSQL admission -> v11 grant-bound session transaction
 // chain. It MUST only run with disposable loopback credentials and a test-only
 // TLS mux. None of these paths are registered in the application router.
 func TestIdentityZBrowserSessionE2E(t *testing.T) {
@@ -38,9 +38,10 @@ func TestIdentityZBrowserSessionE2E(t *testing.T) {
 	regDSN := guardedDB(t, "TEST_IDENTITY_RUNTIME_URL", "mamony_identity_runtime")
 	verifyDSN := guardedDB(t, "TEST_IDENTITY_VERIFIER_URL", "mamony_identity_verifier_runtime")
 	authDSN := guardedDB(t, "TEST_IDENTITY_AUTHENTICATOR_URL", "mamony_identity_authenticator_runtime")
+	grantDSN := guardedDB(t, "TEST_IDENTITY_AUTH_GRANT_URL", "mamony_identity_auth_grant_runtime")
 	sessionDSN := guardedDB(t, "TEST_IDENTITY_SESSION_URL", "mamony_identity_session_runtime")
 	adminURL, _ := url.Parse(adminDSN)
-	for _, dsn := range []string{regDSN, verifyDSN, authDSN, sessionDSN} {
+	for _, dsn := range []string{regDSN, verifyDSN, authDSN, grantDSN, sessionDSN} {
 		u, _ := url.Parse(dsn)
 		if u.Host != adminURL.Host || u.Path != adminURL.Path {
 			t.Fatal("session browser E2E requires the same disposable loopback database")
@@ -66,6 +67,7 @@ func TestIdentityZBrowserSessionE2E(t *testing.T) {
 	regPool := open(regDSN, "mamony_identity_runtime")
 	verifyPool := open(verifyDSN, "mamony_identity_verifier_runtime")
 	authPool := open(authDSN, "mamony_identity_authenticator_runtime")
+	grantPool := open(grantDSN, "mamony_identity_auth_grant_runtime")
 	sessionPool := open(sessionDSN, "mamony_identity_session_runtime")
 
 	reg, err := identitypg.NewStore(regPool)
@@ -85,6 +87,14 @@ func TestIdentityZBrowserSessionE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 	sessionStore, err := identitypg.NewOpaqueSessionStore(sessionPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grantStore, err := identitypg.NewAuthenticationGrantStore(grantPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grantAuthority, err := usecase.NewAuthenticationGrantAuthority(grantStore)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +118,7 @@ func TestIdentityZBrowserSessionE2E(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	login, err := usecase.NewSessionLogin(passwordFlow, authority)
+	login, err := usecase.NewSessionLogin(passwordFlow, grantAuthority, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
