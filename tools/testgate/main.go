@@ -39,6 +39,7 @@ var requiredTests = []string{
 	"TestPostgresIdentityZRecoveryDeliveryRole",
 	"TestPostgresIdentityZRecoveryRedeemerRole",
 	"TestPostgresIdentityZRecoverySecurityNoticeRoles",
+	"TestPostgresIdentityZRecoveryNoticeWebhookRole",
 	"TestPostgresIdentityDeliveryRole",
 	"TestPostgresIdentityAdmissionRole",
 	"TestPostgresIdentityMaintenanceRole",
@@ -61,6 +62,7 @@ var requiredTests = []string{
 	"TestIdentityMailgunMockRecoverySecurityNotice",
 	"TestIdentityMailgunMockSecurityNoticePipeline",
 	"TestIdentityMailgunMockWebhookReconciliation",
+	"TestIdentityMailgunMockRecoveryNoticeWebhookReconciliation",
 	"TestIdentityMailgunNoticeMonitorRole",
 	"TestIdentityHTTPEnrollmentDB",
 	"TestIdentityZEnrollmentReconciliationDB",
@@ -106,6 +108,7 @@ func run() error {
 	identityRecoveryRedeemerDSN := os.Getenv("TEST_IDENTITY_RECOVERY_REDEEMER_URL")
 	identityRecoveryNoticeDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_URL")
 	identityRecoveryNoticeMonitorDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL")
+	identityRecoveryNoticeWebhookDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_WEBHOOK_URL")
 	identitySessionDSN := os.Getenv("TEST_IDENTITY_SESSION_URL")
 	identityDeliveryDSN := os.Getenv("TEST_IDENTITY_DELIVERY_URL")
 	identityNoticeDSN := os.Getenv("TEST_IDENTITY_SECURITY_NOTICE_URL")
@@ -141,6 +144,9 @@ func run() error {
 	}
 	if err := validateDSN(identityRecoveryNoticeDSN, "mamony_identity_recovery_notice_runtime"); err != nil {
 		return fmt.Errorf("identity recovery notice fixture: %w", err)
+	}
+	if err := validateDSN(identityRecoveryNoticeWebhookDSN, "mamony_identity_recovery_notice_webhook_runtime"); err != nil {
+		return fmt.Errorf("identity recovery notice webhook fixture: %w", err)
 	}
 	if err := validateDSN(identityRecoveryNoticeMonitorDSN, "mamony_identity_recovery_notice_monitor_runtime"); err != nil {
 		return fmt.Errorf("identity recovery notice monitor fixture: %w", err)
@@ -190,13 +196,14 @@ func run() error {
 	identityRecoveryRedeemerURL, _ := url.Parse(identityRecoveryRedeemerDSN)
 	identityRecoveryNoticeURL, _ := url.Parse(identityRecoveryNoticeDSN)
 	identityRecoveryNoticeMonitorURL, _ := url.Parse(identityRecoveryNoticeMonitorDSN)
+	identityRecoveryNoticeWebhookURL, _ := url.Parse(identityRecoveryNoticeWebhookDSN)
 	identitySessionURL, _ := url.Parse(identitySessionDSN)
 	identityDeliveryURL, _ := url.Parse(identityDeliveryDSN)
 	identityNoticeURL, _ := url.Parse(identityNoticeDSN)
 	identityWebhookURL, _ := url.Parse(identityWebhookDSN)
 	identityMonitorURL, _ := url.Parse(identityMonitorDSN)
 	identityMaintenanceURL, _ := url.Parse(identityMaintenanceDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}
