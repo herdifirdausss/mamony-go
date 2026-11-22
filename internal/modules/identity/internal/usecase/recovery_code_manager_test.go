@@ -19,6 +19,7 @@ type syntheticRecoveryCodeGrantStore struct {
 	err     error
 	calls   int
 }
+
 func (f *syntheticRecoveryCodeGrantStore) StageRecoveryCodes(_ context.Context, subject string,
 	epoch int64, digest []byte) (bool, error) {
 	f.calls++
@@ -92,19 +93,16 @@ func TestRecoveryCodeRotationGrantPurposeAssertion(t *testing.T) {
 		t.Fatal("denied grant was issued")
 	}
 	store.err = errors.New("sensitive SQL DSN")
-	if _, err := a.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", 2);
-		!errors.Is(err, ErrSessionUnavailable) || err.Error() != ErrSessionUnavailable.Error() {
+	if _, err := a.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", 2); !errors.Is(err, ErrSessionUnavailable) || err.Error() != ErrSessionUnavailable.Error() {
 		t.Fatal("grant failure leaked a database secret")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := a.Issue(ctx, "sub_AAAAAAAAAAAAAAAAAAAAAA", 2);
-		!errors.Is(err, ErrSessionUnavailable) {
+	if _, err := a.Issue(ctx, "sub_AAAAAAAAAAAAAAAAAAAAAA", 2); !errors.Is(err, ErrSessionUnavailable) {
 		t.Fatal("cancelled grant staging was not rejected")
 	}
 	a.random = io.LimitReader(bytes.NewReader(nil), 1)
-	if _, err := a.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", 2);
-		!errors.Is(err, ErrSessionUnavailable) {
+	if _, err := a.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", 2); !errors.Is(err, ErrSessionUnavailable) {
 		t.Fatal("broken entropy source issued an authentication grant")
 	}
 }
