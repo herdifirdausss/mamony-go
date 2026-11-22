@@ -304,6 +304,11 @@ func TestPostgresIdentityZSessionRole(t *testing.T) {
 }
 
 func TestPostgresIdentityZAuthenticationGrantRole(t *testing.T) {
+	legacy, legacyErr := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
+		"SELECT to_regprocedure('mamony_identity.stage_password_auth_grant(text,bytea)') IS NULL")
+	if legacyErr != nil || legacy != "t" {
+		t.Fatalf("old unversioned authentication grant function still exists: %v %q", legacyErr, legacy)
+	}
 	out, err := invokePSQL("TEST_IDENTITY_AUTH_GRANT_URL", "-c",
 		"SELECT mamony_identity.stage_password_auth_grant('invalid',1,decode(repeat('11',32),'hex'))")
 	if err != nil || out != "f" {
