@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
@@ -48,17 +49,28 @@ func (s *SecurityNoticeStore) Claim(ctx context.Context, lease string) (usecase.
 	return job, true, nil
 }
 
-func (s *SecurityNoticeStore) Finalize(ctx context.Context, event, lease string, outcome usecase.ProofDeliveryOutcome) error {
+func (s *SecurityNoticeStore) Finalize(ctx context.Context, event, lease string, outcome usecase.ProofDeliveryOutcome, providerID string) error {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
 		len(event) != 26 || len(lease) != 26 ||
 		(outcome != usecase.DeliveryAccepted && outcome != usecase.DeliveryTemporary && outcome != usecase.DeliveryPermanent) {
 		return ErrStorageUnavailable
 	}
+	var providerDigest any
+	if outcome == usecase.DeliveryAccepted {
+		normalized, ok := usecase.NormalizeMailgunMessageID(providerID)
+		if !ok {
+			return ErrStorageUnavailable
+		}
+		sum := sha256.Sum256([]byte(normalized))
+		providerDigest = sum[:]
+	} else if providerID != "" {
+		return ErrStorageUnavailable
+	}
 	var accepted bool
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx,
-			"SELECT mamony_identity.finalize_password_change_notice($1,$2,$3)",
-			event, lease, string(outcome)).Scan(&accepted)
+			"SELECT mamony_identity.finalize_password_change_notice_v2($1,$2,$3,$4)",
+			event, lease, string(outcome), providerDigest).Scan(&accepted)
 	})
 	if err != nil || !accepted {
 		return ErrStorageUnavailable
