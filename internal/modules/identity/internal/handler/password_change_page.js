@@ -2,7 +2,7 @@
   "use strict";
 
   // This test-only, unmounted page never stores a credential, a session
-  // bearer or an in-flight mutation in localStorage, cookies or a URL.
+  // bearer or an in-flight mutation in browser persistence or an HTTP URL.
   // Both uncertain network outcomes and HTTP 503 permanently lock the form:
   // the password rotation may already have committed.
   window.addEventListener("DOMContentLoaded", function () {
