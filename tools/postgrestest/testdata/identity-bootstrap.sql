@@ -26,6 +26,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_notice_monitor_runtime') THEN
         CREATE ROLE mamony_identity_recovery_notice_monitor_runtime LOGIN PASSWORD 'local-test-identity-recovery-notice-monitor';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_code_manager_runtime') THEN
+        CREATE ROLE mamony_identity_recovery_code_manager_runtime LOGIN PASSWORD 'local-test-identity-recovery-code-manager';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_assurance_runtime') THEN
         CREATE ROLE mamony_identity_recovery_assurance_runtime LOGIN PASSWORD 'local-test-identity-recovery-assurance';
     END IF;
@@ -69,6 +72,7 @@ ALTER ROLE mamony_identity_auth_grant_runtime LOGIN NOSUPERUSER NOCREATEDB NOCRE
 ALTER ROLE mamony_identity_recovery_notice_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice';
 ALTER ROLE mamony_identity_recovery_notice_webhook_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice-webhook';
 ALTER ROLE mamony_identity_recovery_notice_monitor_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice-monitor';
+ALTER ROLE mamony_identity_recovery_code_manager_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-code-manager';
 ALTER ROLE mamony_identity_recovery_assurance_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-assurance';
 ALTER ROLE mamony_identity_recovery_redeemer_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-redeemer';
 ALTER ROLE mamony_identity_recovery_delivery_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-delivery';
