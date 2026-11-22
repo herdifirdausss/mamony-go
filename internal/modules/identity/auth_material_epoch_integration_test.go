@@ -236,7 +236,10 @@ func TestIdentityZAuthMaterialEpochFence(t *testing.T) {
 		SET salt=decode(repeat('55',16),'hex') WHERE subject_id=$1`, subject); err != nil {
 		t.Fatal(err)
 	}
-	type result struct { allowed bool; err error }
+	type result struct {
+		allowed bool
+		err     error
+	}
 	stageResult := make(chan result, 1)
 	staleDigest := sha256.Sum256([]byte("synthetic:epoch:staged-after-lock:" + subject))
 	go func() {
