@@ -5,6 +5,7 @@ package identity
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"net/url"
 	"strings"
@@ -97,23 +98,15 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 			subject).Scan(&epoch); err != nil {
 			t.Fatal(err)
 		}
-		loginDigest := bytes.Repeat([]byte{0x21}, 31)
-		loginDigest = append(loginDigest, subject[len(subject)-1])
-		changeDigest := bytes.Repeat([]byte{0x32}, 31)
-		changeDigest = append(changeDigest, subject[len(subject)-1])
-		sessionDigest := bytes.Repeat([]byte{0x43}, 31)
-		sessionDigest = append(sessionDigest, subject[len(subject)-1])
-		// To avoid any cross-fixture digest collisions, overwrite the suffix
-		// with 32-byte deterministic SHA-256 of the fixture subject.
-		// (The digest never represents an actual bearer or password.)
-		for _, item := range [][]byte{loginDigest, changeDigest, sessionDigest} {
-			copy(item, []byte(subject))
-			item[0] ^= byte(len(label))
-		}
-		// Each digest is domain-separated even for a same-subject fixture.
-		loginDigest[0] = 0x11
-		changeDigest[0] = 0x22
-		sessionDigest[0] = 0x33
+		// Distinct domain-separated synthetic digests are fixtures, not
+		// actual bearer/password secrets. The subject and label ensure that
+		// unrelated test cases cannot accidentally share a primary key.
+		loginHash := sha256.Sum256([]byte("mamony:test:notice:login:" + subject + ":" + label))
+		changeHash := sha256.Sum256([]byte("mamony:test:notice:change:" + subject + ":" + label))
+		sessionHash := sha256.Sum256([]byte("mamony:test:notice:session:" + subject + ":" + label))
+		loginDigest := loginHash[:]
+		changeDigest := changeHash[:]
+		sessionDigest := sessionHash[:]
 		var allowed bool
 		if err := granter.QueryRow(ctx,
 			"SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
