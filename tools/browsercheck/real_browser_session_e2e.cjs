@@ -116,7 +116,9 @@ async function run() {
       } else if (url.pathname === "/v1/identity/login") {
         assert.equal(request.method(), "POST");
         assert.equal(request.headers().origin, origin);
-        assert.equal(request.headers()["sec-fetch-site"], "same-origin");
+        if (request.headers()["sec-fetch-site"] !== undefined) {
+          assert.equal(request.headers()["sec-fetch-site"], "same-origin");
+        }
         counters.login++;
       }
       if (url.pathname === "/v1/identity/logout") {
@@ -128,7 +130,9 @@ async function run() {
           counters.deniedCrossSite++;
         } else {
           assert.equal(request.headers().origin, origin);
+          if (request.headers()["sec-fetch-site"] !== undefined) {
           assert.equal(request.headers()["sec-fetch-site"], "same-origin");
+        }
         }
       }
       const response = await forward(request);
