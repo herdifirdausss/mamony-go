@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	browserOldPassword = "an old synthetic very strong password"
-	browserNewPassword = "a fresh synthetic very strong password"
+	syntheticCurrentPhrase = "an old synthetic very strong password"
+	syntheticReplacementPhrase = "a fresh synthetic very strong password"
 )
 
 type browserChangeHasher struct{ calls int }
@@ -73,11 +73,11 @@ func browserChangeFixture(t *testing.T) (*BrowserPasswordChangeHTTP, *BrowserSes
 }
 
 func browserChangeBody() string {
-	return `{"email":"alice@example.test","currentPassword":"` + browserOldPassword + `","nextPassword":"` + browserNewPassword + `"}`
+	return `{"email":"alice@example.test","currentPassword":"` + syntheticCurrentPhrase + `","nextPassword":"` + syntheticReplacementPhrase + `"}`
 }
 
 func browserChangeRequest(cookie *http.Cookie, csrf, body string) *http.Request {
-	r := browserRequest(http.MethodPost, browserChangePasswordPath, body)
+	r := browserRequest(http.MethodPost, browserRotatePath, body)
 	r.Header.Set("Content-Type", "application/json")
 	if cookie != nil {
 		r.Header.Set("Cookie", cookie.String())
@@ -198,7 +198,7 @@ func TestBrowserPasswordChangeCandidateDenialAndAmbiguousCommit(t *testing.T) {
 	})
 	t.Run("blocked replacement refused", func(t *testing.T) {
 		h, browser, _, _, hasher, store, cookie := browserChangeFixture(t)
-		body := strings.Replace(browserChangeBody(), browserNewPassword, "blocked synthetic replacement password", 1)
+		body := strings.Replace(browserChangeBody(), syntheticReplacementPhrase, "blocked synthetic replacement password", 1)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, browserChangeRequest(cookie, browser.csrf.issue(cookie.Value), body))
 		if w.Code != 401 || hasher.calls != 0 || store.calls != 0 {
@@ -238,7 +238,7 @@ func TestBrowserPasswordChangeCandidateConstructorAndPayload(t *testing.T) {
 		t.Fatal("nil trusted password-change workflow accepted")
 	}
 	email, old, next, err := decodePasswordChangeJSON(strings.NewReader(browserChangeBody()))
-	if err != nil || email != "alice@example.test" || old != browserOldPassword || next != browserNewPassword {
+	if err != nil || email != "alice@example.test" || old != syntheticCurrentPhrase || next != syntheticReplacementPhrase {
 		t.Fatal("valid strict password change JSON did not decode")
 	}
 }
