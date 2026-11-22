@@ -73,3 +73,15 @@ func TestAuthenticationGrantSecretAndAmbiguousStageFailClosed(t *testing.T) {
 		t.Fatal("nil grant issuer accepted")
 	}
 }
+
+func TestAuthenticationGrantRejectsMissingVerifierEpoch(t *testing.T) {
+	authority, store := testAuthenticationGrantAuthority(t)
+	if proof, err := authority.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", 0);
+		!errors.Is(err, ErrSessionDenied) || proof.secret != "" || store.stages != 0 {
+		t.Fatal("missing verifier epoch reached SQL grant authority")
+	}
+	if proof, err := authority.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", -1);
+		!errors.Is(err, ErrSessionDenied) || proof.secret != "" || store.stages != 0 {
+		t.Fatal("negative epoch reached SQL grant authority")
+	}
+}
