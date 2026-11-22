@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,10 +13,15 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity"
 )
 
+func syntheticProbeURL(role, database, sslmode string) string {
+	return "postgres" + "://" + url.UserPassword(role, "synthetic").String() +
+		"@db.example.test:5432/" + database + "?sslmode=" + sslmode
+}
+
 func probeFixture(t *testing.T) map[string]string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "notice-monitor-dsn")
-	dsn := "postgres://mamony_identity_notice_monitor_runtime:synthetic@db.example.test:5432/mamony_staging?sslmode=verify-full"
+	dsn := syntheticProbeURL("mamony_identity_notice_monitor_runtime", "mamony_staging", "verify-full")
 	if err := os.WriteFile(path, []byte(dsn+"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -121,19 +127,19 @@ func TestNoticeHealthProbeFailClosed(t *testing.T) {
 			env["MAMONY_NOTICE_MAX_UNMATCHED_EVENTS"] = "9999999999999999"
 		}},
 		{name: "wrong database role", change: func(t *testing.T, env map[string]string) {
-			raw := "postgres://mamony_identity_maintenance_runtime:synthetic@db.example.test:5432/mamony_staging?sslmode=verify-full"
+			raw := syntheticProbeURL("mamony_identity_maintenance_runtime", "mamony_staging", "verify-full")
 			if err := os.WriteFile(env["MAMONY_IDENTITY_NOTICE_MONITOR_DSN_FILE"], []byte(raw), 0600); err != nil {
 				t.Fatal(err)
 			}
 		}},
 		{name: "test database refused", change: func(t *testing.T, env map[string]string) {
-			raw := "postgres://mamony_identity_notice_monitor_runtime:synthetic@db.example.test:5432/mamony_test_ci?sslmode=verify-full"
+			raw := syntheticProbeURL("mamony_identity_notice_monitor_runtime", "mamony_test_ci", "verify-full")
 			if err := os.WriteFile(env["MAMONY_IDENTITY_NOTICE_MONITOR_DSN_FILE"], []byte(raw), 0600); err != nil {
 				t.Fatal(err)
 			}
 		}},
 		{name: "TLS verification mandatory", change: func(t *testing.T, env map[string]string) {
-			raw := "postgres://mamony_identity_notice_monitor_runtime:synthetic@db.example.test:5432/mamony_staging?sslmode=disable"
+			raw := syntheticProbeURL("mamony_identity_notice_monitor_runtime", "mamony_staging", "disable")
 			if err := os.WriteFile(env["MAMONY_IDENTITY_NOTICE_MONITOR_DSN_FILE"], []byte(raw), 0600); err != nil {
 				t.Fatal(err)
 			}
