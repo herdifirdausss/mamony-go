@@ -63,7 +63,5 @@ jobs:
         run: make integration
       - name: Run actual Chromium for email verification and first-party sessions
         run: |
-          go test -tags=integration,browser_e2e -run '^TestIdentityZBrowser(Verification|Session)E2E
+          go test -tags=integration,browser_e2e -run '^TestIdentityZBrowser(Verification|Session)E2E$' \
             -count=1 -timeout=4m ./internal/modules/identity
- \
-            -count=1 -timeout=3m ./internal/modules/identity
