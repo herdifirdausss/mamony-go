@@ -32,6 +32,7 @@ var requiredTests = []string{
 	"TestPostgresIdentityZSessionRole",
 	"TestPostgresIdentityZAuthenticationGrantRole",
 	"TestPostgresIdentityZPasswordChangeRole",
+	"TestPostgresIdentityZSecurityNoticeRole",
 	"TestPostgresIdentityDeliveryRole",
 	"TestPostgresIdentityAdmissionRole",
 	"TestPostgresIdentityMaintenanceRole",
@@ -45,6 +46,7 @@ var requiredTests = []string{
 	"TestIdentityZMaxActiveSessions",
 	"TestIdentityZAuthMaterialEpochFence",
 	"TestIdentityZAuthenticatedPasswordChange",
+	"TestIdentityZSecurityNoticeOutbox",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
@@ -87,6 +89,7 @@ func run() error {
 	identityPasswordChangeDSN := os.Getenv("TEST_IDENTITY_PASSWORD_CHANGE_URL")
 	identitySessionDSN := os.Getenv("TEST_IDENTITY_SESSION_URL")
 	identityDeliveryDSN := os.Getenv("TEST_IDENTITY_DELIVERY_URL")
+	identityNoticeDSN := os.Getenv("TEST_IDENTITY_SECURITY_NOTICE_URL")
 	identityMaintenanceDSN := os.Getenv("TEST_IDENTITY_MAINTENANCE_URL")
 	if err := validateDSN(runtimeDSN, "mamony_test_runtime"); err != nil {
 		return fmt.Errorf("runtime fixture: %w", err)
@@ -121,6 +124,9 @@ func run() error {
 	if err := validateDSN(identitySessionDSN, "mamony_identity_session_runtime"); err != nil {
 		return fmt.Errorf("identity session fixture: %w", err)
 	}
+	if err := validateDSN(identityNoticeDSN, "mamony_identity_security_notice_runtime"); err != nil {
+		return fmt.Errorf("identity security notice fixture: %w", err)
+	}
 	if err := validateDSN(identityDeliveryDSN, "mamony_identity_delivery_runtime"); err != nil {
 		return fmt.Errorf("identity delivery fixture: %w", err)
 	}
@@ -139,8 +145,9 @@ func run() error {
 	identityPasswordChangeURL, _ := url.Parse(identityPasswordChangeDSN)
 	identitySessionURL, _ := url.Parse(identitySessionDSN)
 	identityDeliveryURL, _ := url.Parse(identityDeliveryDSN)
+	identityNoticeURL, _ := url.Parse(identityNoticeDSN)
 	identityMaintenanceURL, _ := url.Parse(identityMaintenanceDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identitySessionURL, identityDeliveryURL, identityMaintenanceURL} {
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identitySessionURL, identityNoticeURL, identityDeliveryURL, identityMaintenanceURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}
@@ -158,7 +165,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -260,7 +267,8 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZSessionIdleExpiry") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZMaxActiveSessions") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZAuthMaterialEpochFence") ||
-						strings.HasPrefix(ev.Test, "TestIdentityZAuthenticatedPasswordChange"))) {
+						strings.HasPrefix(ev.Test, "TestIdentityZAuthenticatedPasswordChange") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZSecurityNoticeOutbox"))) {
 				passed[ev.Test] = true
 			}
 
