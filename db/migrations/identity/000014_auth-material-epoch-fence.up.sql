@@ -23,12 +23,12 @@ END;
 $$;
 REVOKE ALL ON FUNCTION mamony_identity.bump_epoch_on_auth_material() FROM PUBLIC;
 CREATE TRIGGER password_verifier_changed_bumps_epoch
-AFTER UPDATE OF kdf_version,memory_kib,iterations,parallelism,salt,digest
+AFTER UPDATE OF subject_id,kdf_version,memory_kib,iterations,parallelism,salt,digest
 ON mamony_identity.password_verifiers
 FOR EACH ROW WHEN (
-  ROW(OLD.kdf_version,OLD.memory_kib,OLD.iterations,OLD.parallelism,OLD.salt,OLD.digest)
+  ROW(OLD.subject_id,OLD.kdf_version,OLD.memory_kib,OLD.iterations,OLD.parallelism,OLD.salt,OLD.digest)
   IS DISTINCT FROM
-  ROW(NEW.kdf_version,NEW.memory_kib,NEW.iterations,NEW.parallelism,NEW.salt,NEW.digest))
+  ROW(NEW.subject_id,NEW.kdf_version,NEW.memory_kib,NEW.iterations,NEW.parallelism,NEW.salt,NEW.digest))
 EXECUTE FUNCTION mamony_identity.bump_epoch_on_auth_material();
 CREATE TRIGGER password_verifier_removed_bumps_epoch
 AFTER DELETE ON mamony_identity.password_verifiers FOR EACH ROW
@@ -84,4 +84,4 @@ REVOKE ALL ON FUNCTION mamony_identity.stage_password_auth_grant(text,bigint,byt
 GRANT EXECUTE ON FUNCTION mamony_identity.stage_password_auth_grant(text,bigint,bytea)
   TO mamony_identity_auth_grant_runtime;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (14, '7a8fc2586a00582d9b0a32c9ebb00d39cf5efc29b5ff93f22b314515e5947982');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (14, 'a99c08c12f3cc9db665a83161cdcaab7ed6ceb54b6e63d2af1904aa352fb2c66');
