@@ -7,20 +7,20 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 )
 
 const (
-	browserLoginPath   = "/v1/identity/login"
-	browserSessionPath = "/v1/identity/session"
-	browserCSRFPath    = "/v1/identity/csrf"
-	browserLogoutPath  = "/v1/identity/logout"
-	browserCookieName  = "__Host-mamony_sid"
-	browserLoginBytes  = 2048
+	browserLoginPath     = "/v1/identity/login"
+	browserSessionPath   = "/v1/identity/session"
+	browserCSRFPath      = "/v1/identity/csrf"
+	browserLogoutPath    = "/v1/identity/logout"
+	browserCookieName    = "__Host-mamony_sid"
+	browserLoginBytes    = 2048
 	browserSessionMaxAge = 12 * 60 * 60
 )
 
