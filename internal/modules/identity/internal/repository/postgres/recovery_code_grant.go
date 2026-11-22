@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	"github.com/jackc/pgx/v5"
@@ -20,7 +21,7 @@ func NewRecoveryCodeGrantStore(db Transactor) (*RecoveryCodeGrantStore, error) {
 
 func (s *RecoveryCodeGrantStore) StageRecoveryCodes(ctx context.Context, subject string, epoch int64, digest []byte) (bool, error) {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
-		!usecase.ValidRecoveryCodeSubject(subject) || epoch <= 0 || len(digest) != 32 {
+		len(subject) != 26 || !strings.HasPrefix(subject, "sub_") || epoch <= 0 || len(digest) != 32 {
 		return false, usecase.ErrSessionUnavailable
 	}
 	var allowed bool
