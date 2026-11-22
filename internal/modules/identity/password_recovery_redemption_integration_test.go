@@ -127,6 +127,11 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			challenge); err != nil {
 			t.Errorf("cleanup: %v", err)
 		}
+		if _, err := conn.Exec(cleanupCtx, `UPDATE mamony_identity.password_recovery_notices
+			SET status='DEAD',lease_id=NULL,leased_until=NULL
+			WHERE subject_id=$1 AND status='PENDING'`, subject); err != nil {
+			t.Errorf("quarantine synthetic recovered-password alert: %v", err)
+		}
 	})
 	next := "synthetic new recovered password credential"
 	if err := redeemer.Redeem(ctx, proof.ForTrustedDelivery(), email, next); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
@@ -310,6 +315,11 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 				SET status='DEAD',lease_id=NULL,leased_until=NULL
 				WHERE challenge_id=$1 AND status='PENDING'`, id); err != nil {
 				t.Errorf("recovery cleanup: %v", err)
+			}
+			if _, err := conn.Exec(cleanupCtx, `UPDATE mamony_identity.password_recovery_notices
+				SET status='DEAD',lease_id=NULL,leased_until=NULL
+				WHERE subject_id=$1 AND status='PENDING'`, s); err != nil {
+				t.Errorf("quarantine synthetic concurrent recovery notice: %v", err)
 			}
 		})
 		if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_assurance_grants
