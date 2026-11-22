@@ -74,12 +74,12 @@ func TestAuthenticatedPasswordChangeRequiresSessionAndRealOldPasswordPath(t *tes
 		return change, gate, password, sessionStore, grantStore, hasher, changeStore
 	}
 	net := netip.MustParseAddr("192.0.2.63")
-	const oldPassword = "an old synthetic very strong password"
-	const newPassword = "a fresh synthetic very strong password"
+	const currentCandidate = "an old synthetic very strong password"
+	const replacementCandidate = "a fresh synthetic very strong password"
 	t.Run("good session and correct password stage exactly once", func(t *testing.T) {
 		change, gate, password, session, grant, hasher, store := newFixture()
 		err := change.Change(context.Background(), sessionSecret,
-			"test@example.com", oldPassword, newPassword, net)
+			"test@example.com", currentCandidate, replacementCandidate, net)
 		if err != nil || gate.calls != 1 || password.calls != 1 ||
 			session.resolved != 1 || grant.stages != 1 || hasher.calls != 1 || store.calls != 1 {
 			t.Fatalf("missing mandatory authorization path: err=%v gate=%d KDF=%d session=%d grant=%d hash=%d SQL=%d",
@@ -94,7 +94,7 @@ func TestAuthenticatedPasswordChangeRequiresSessionAndRealOldPasswordPath(t *tes
 		change, gate, password, session, grant, hasher, store := newFixture()
 		session.subject = ""
 		err := change.Change(context.Background(), sessionSecret,
-			"test@example.com", oldPassword, newPassword, net)
+			"test@example.com", currentCandidate, replacementCandidate, net)
 		if !errors.Is(err, ErrPasswordChangeDenied) || gate.calls != 0 ||
 			password.calls != 0 || grant.stages != 0 || hasher.calls != 0 || store.calls != 0 {
 			t.Fatal("invalid bearer progressed into old-password work")
@@ -104,7 +104,7 @@ func TestAuthenticatedPasswordChangeRequiresSessionAndRealOldPasswordPath(t *tes
 		change, _, password, _, grant, hasher, store := newFixture()
 		password.subject = "sub_BBBBBBBBBBBBBBBBBBBBBB"
 		err := change.Change(context.Background(), sessionSecret,
-			"test@example.com", oldPassword, newPassword, net)
+			"test@example.com", currentCandidate, replacementCandidate, net)
 		if !errors.Is(err, ErrPasswordChangeDenied) || grant.stages != 0 ||
 			hasher.calls != 0 || store.calls != 0 {
 			t.Fatal("cross-account password assertion mutated another identity")
@@ -114,7 +114,7 @@ func TestAuthenticatedPasswordChangeRequiresSessionAndRealOldPasswordPath(t *tes
 		change, _, password, _, grant, hasher, store := newFixture()
 		password.err = ErrPasswordAuthenticationDenied
 		err := change.Change(context.Background(), sessionSecret,
-			"test@example.com", oldPassword, newPassword, net)
+			"test@example.com", currentCandidate, replacementCandidate, net)
 		if !errors.Is(err, ErrPasswordChangeDenied) || grant.stages != 0 ||
 			hasher.calls != 0 || store.calls != 0 {
 			t.Fatal("wrong password reached mutation")
@@ -124,17 +124,17 @@ func TestAuthenticatedPasswordChangeRequiresSessionAndRealOldPasswordPath(t *tes
 		change, gate, password, _, grant, hasher, store := newFixture()
 		gate.allowed = false
 		err := change.Change(context.Background(), sessionSecret,
-			"test@example.com", oldPassword, newPassword, net)
+			"test@example.com", currentCandidate, replacementCandidate, net)
 		if !errors.Is(err, ErrPasswordChangeDenied) || password.calls != 0 ||
 			grant.stages != 0 || hasher.calls != 0 || store.calls != 0 {
 			t.Fatal("throttled password comparison bypassed quota")
 		}
 	})
 	t.Run("invalid or same new password is denied before new KDF", func(t *testing.T) {
-		for _, next := range []string{oldPassword, "short", "blocked password new long enough"} {
+		for _, next := range []string{currentCandidate, "short", "blocked password new long enough"} {
 			change, _, _, _, grant, hasher, store := newFixture()
 			err := change.Change(context.Background(), sessionSecret,
-				"test@example.com", oldPassword, next, net)
+				"test@example.com", currentCandidate, next, net)
 			if !errors.Is(err, ErrPasswordChangeDenied) || grant.stages != 0 ||
 				hasher.calls != 0 || store.calls != 0 {
 				t.Fatalf("invalid new password %q reached mutation: %v", next, err)
@@ -145,7 +145,7 @@ func TestAuthenticatedPasswordChangeRequiresSessionAndRealOldPasswordPath(t *tes
 		change, _, _, _, _, _, store := newFixture()
 		store.err = errors.New("private connection reset after commit")
 		err := change.Change(context.Background(), sessionSecret,
-			"test@example.com", oldPassword, newPassword, net)
+			"test@example.com", currentCandidate, replacementCandidate, net)
 		if !errors.Is(err, ErrPasswordChangeUnavailable) || store.calls != 1 ||
 			err.Error() != ErrPasswordChangeUnavailable.Error() {
 			t.Fatal("database ambiguity leaked or became success")
