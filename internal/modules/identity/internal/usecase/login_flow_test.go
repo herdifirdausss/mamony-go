@@ -29,10 +29,13 @@ type loginPasswordFake struct {
 	password string
 }
 
-func (f *loginPasswordFake) Authenticate(_ context.Context, email, password string) (string, error) {
+func (f *loginPasswordFake) AuthenticateWithEpoch(_ context.Context, email, password string) (AuthenticatedSubject, error) {
 	f.calls++
 	f.email, f.password = email, password
-	return f.subject, f.err
+	if f.err != nil || f.subject == "" {
+		return AuthenticatedSubject{}, f.err
+	}
+	return AuthenticatedSubject{SubjectID: f.subject, SessionEpoch: 1}, nil
 }
 
 func TestPasswordLoginFlowMustAdmitBeforeAnyPasswordWork(t *testing.T) {
