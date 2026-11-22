@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -48,19 +49,38 @@ func TestRecoveryMailSenderFragmentAndClassification(t *testing.T) {
 			t.Error("recovery sender attempted an unapproved provider route")
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 12<<10)
-		if err := r.ParseMultipartForm(8192); err != nil {
+		reader, err := r.MultipartReader()
+		if err != nil {
 			t.Error(err)
 			return
 		}
-		if r.FormValue("to") != "owner@example.test" ||
-			r.FormValue("subject") != "Mamony account password recovery" ||
-			r.FormValue("o:tracking") != "no" ||
-			r.FormValue("o:tracking-opens") != "no" ||
-			r.FormValue("o:tracking-clicks") != "no" ||
-			r.FormValue("o:require-tls") != "yes" ||
-			r.FormValue("o:deliver-within") != "5m" ||
-			!strings.Contains(r.FormValue("text"), "https://app.example.test/account/recover-password#token="+sampleSecret) ||
-			strings.Contains(r.FormValue("text"), "?token=") {
+		fields := make(map[string]string)
+		for {
+			part, err := reader.NextPart()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			value, readErr := io.ReadAll(io.LimitReader(part, 4097))
+			_ = part.Close()
+			if readErr != nil || len(value) > 4096 {
+				t.Error("oversized recovery Mailgun multipart field")
+				return
+			}
+			fields[part.FormName()] = string(value)
+		}
+		if fields["to") != "owner@example.test" ||
+			fields["subject") != "Mamony account password recovery" ||
+			fields["o:tracking") != "no" ||
+			fields["o:tracking-opens") != "no" ||
+			fields["o:tracking-clicks") != "no" ||
+			fields["o:require-tls") != "yes" ||
+			fields["o:deliver-within") != "5m" ||
+			!strings.Contains(fields["text"), "https://app.example.test/account/recover-password#token="+sampleSecret) ||
+			strings.Contains(fields["text"), "?token=") {
 			t.Error("recovery sender leaked proof in URL query or omitted controls")
 		}
 		w.Header().Set("Content-Type", "application/json")
