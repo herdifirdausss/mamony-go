@@ -57,3 +57,7 @@ The test bridge is **not** a production DNS, TLS ingress or proxy test. A browse
 ## Draft #46 — grant-bound session E2E candidate
 
 The session Chromium fixture now additionally configures `TEST_IDENTITY_AUTH_GRANT_URL` for the separate disposable PostgreSQL role `mamony_identity_auth_grant_runtime`. A successful real Argon2id password comparison is followed by 30-second grant staging and v11 atomic grant consume, then the same real cookie, CSRF, logout and ambiguous-revocation tests. Existing `TestIdentityZBrowserVerificationE2E` is unchanged. The integration role matrix must establish no subject-only SQL mint remains; this is **not a claim** of production workload isolation or independent credential verification.
+
+## Draft #47 — v12 server-side idle expiry test evidence
+
+`TestIdentityZSessionIdleExpiry` is a **mandatory** disposable-PostgreSQL integration test via `tools/testgate`: synthetic stored timestamps simulate inactivity (no 30-minute wall-clock wait), check activity updates on a valid resolve, a 31-minute inactivity denial, the unchanged 12-hour absolute expiry and freeze/thaw invalidation. The real Chromium E2E continues to run after the new migration with the same cookie and CSRF path; the browser's Max-Age is not used as an idle-expiry oracle. See [ADR-0010](../adr/0010-server-side-session-idle-expiry.md) for session row-lock contention and production traffic caveats.
