@@ -601,7 +601,6 @@ func TestPostgresIdentityZRecoveryIssuerRole(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZRecoveryDeliveryRole exercises the isolated v20
 // SECURITY DEFINER surface: only lease claim/finalize, no direct table access.
 func TestPostgresIdentityZRecoveryDeliveryRole(t *testing.T) {
