@@ -632,7 +632,7 @@ func TestPostgresIdentityZRecoveryDeliveryRole(t *testing.T) {
 		"SELECT * FROM mamony_identity.schema_migrations",
 		"UPDATE mamony_identity.password_recovery_deliveries SET status='ACCEPTED'",
 		"UPDATE mamony_identity.password_verifiers SET digest=decode(repeat('11',32),'hex')",
-		"SELECT mamony_identity.issue_password_recovery('missing@example.test','"+challenge+"',decode(repeat('11',32),'hex'),'fixture-key',decode(repeat('22',72),'hex'))",
+		"SELECT mamony_identity.issue_password_recovery('missing@example.test','" + challenge + "',decode(repeat('11',32),'hex'),'fixture-key',decode(repeat('22',72),'hex'))",
 		"SET ROLE mamony_identity_migrator",
 	} {
 		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_DELIVERY_URL", "-c", sql)
