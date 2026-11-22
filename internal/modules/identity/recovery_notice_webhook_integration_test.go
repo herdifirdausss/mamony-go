@@ -243,7 +243,11 @@ func TestIdentityMailgunMockRecoveryNoticeWebhookReconciliation(t *testing.T) {
 		t.Fatalf("wrong provider domain accepted: %d", got)
 	}
 	var countBefore int
-	if err := admin.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.password_recovery_notice_mailgun_receipts").
+	unknownDigest := sha256.Sum256([]byte("unknown-recovery@mailgun.test"))
+	if err := admin.QueryRow(ctx, `SELECT count(*)
+		FROM mamony_identity.password_recovery_notice_mailgun_receipts
+		WHERE message_digest=$1 OR message_digest=$2`,
+		messageDigest[:], unknownDigest[:]).
 		Scan(&countBefore); err != nil {
 		t.Fatal(err)
 	}
