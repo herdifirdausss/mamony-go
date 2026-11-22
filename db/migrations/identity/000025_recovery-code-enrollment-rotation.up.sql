@@ -141,7 +141,7 @@ DECLARE
     expected_epoch bigint;
     session_subject text;
     current_epoch bigint;
-    contact_version bigint;
+    locked_contact_version bigint;
     last_seen timestamptz;
     absolute_expiry timestamptz;
     previously_enrolled boolean;
@@ -188,7 +188,7 @@ BEGIN -- PL/pgSQL function block, not a migration transaction
     END IF;
 
     SELECT s.session_epoch,a.contact_version
-      INTO current_epoch,contact_version
+      INTO current_epoch,locked_contact_version
       FROM mamony_identity.subjects s
       JOIN mamony_identity.email_aliases a ON a.subject_id=s.subject_id
      WHERE s.subject_id=authorized_subject AND s.status='ACTIVE'
@@ -224,7 +224,7 @@ BEGIN -- PL/pgSQL function block, not a migration transaction
          WHERE c.code_digest=p_independent_digest
            AND c.subject_id=authorized_subject
            AND c.enrolled_epoch=current_epoch
-           AND c.contact_version=contact_version
+           AND c.contact_version=locked_contact_version
            AND c.consumed_at IS NULL
          FOR UPDATE OF c;
         IF NOT FOUND THEN RETURN false; END IF;
@@ -256,7 +256,7 @@ BEGIN -- PL/pgSQL function block, not a migration transaction
     INSERT INTO mamony_identity.password_recovery_offline_codes
         (code_digest,subject_id,enrolled_epoch,contact_version,enrolled_at)
     SELECT codes.code_digest,authorized_subject,current_epoch,
-           contact_version,stamp
+           locked_contact_version,stamp
       FROM unnest(p_new_code_digests) AS codes(code_digest);
 
     -- A code-set change revokes all outstanding email recovery attempts
@@ -297,4 +297,4 @@ GRANT EXECUTE ON FUNCTION
 TO mamony_identity_recovery_code_manager_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (25, 'a883d1b84d9a4b72bbe255dadd93f0baf93f7550c8e3d138269d12738cf06039');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (25, '__REPLACE_SHA256__');
