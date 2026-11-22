@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -203,6 +204,9 @@ func TestIdentityZBrowserSessionE2E(t *testing.T) {
 	output, runErr := cmd.CombinedOutput()
 	logText := strings.ReplaceAll(string(output), password, "[REDACTED_PASSWORD]")
 	logText = strings.ReplaceAll(logText, email, "[REDACTED_EMAIL]")
+	// A browser assertion failure must not echo synthetic HttpOnly bearer or CSRF.
+	logText = regexp.MustCompile("__Host-mamony_sid=[A-Za-z0-9_-]{43}").ReplaceAllString(logText, "[REDACTED_SESSION_COOKIE]")
+	logText = regexp.MustCompile("\\b[A-Za-z0-9_-]{54}\\b").ReplaceAllString(logText, "[REDACTED_CSRF_TOKEN]")
 	if runErr != nil {
 		t.Fatalf("real Chromium session E2E failed: %v (sanitized): %s", runErr, logText)
 	}
