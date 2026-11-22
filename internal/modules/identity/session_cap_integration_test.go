@@ -223,14 +223,27 @@ func TestIdentityZMaxActiveSessions(t *testing.T) {
 	if _, err := block.Exec(ctx, "SELECT 1 FROM mamony_identity.subjects WHERE subject_id=$1 FOR UPDATE", subject); err != nil {
 		t.Fatal(err)
 	}
-	type result struct { ok bool; err error }
+	type result struct {
+		ok  bool
+		err error
+	}
 	results := make(chan result, 2)
-	go func() { var ok bool; err := sessionA.QueryRow(ctx,
-		"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
-		proofA, token("parallel-a"), randomSyntheticID(t, "evt_")).Scan(&ok); results <- result{ok, err} }()
-	go func() { var ok bool; err := sessionB.QueryRow(ctx,
-		"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
-		proofB, token("parallel-b"), randomSyntheticID(t, "evt_")).Scan(&ok); results <- result{ok, err} }()
+	evA := randomSyntheticID(t, "evt_")
+	evB := randomSyntheticID(t, "evt_")
+	go func() {
+		var ok bool
+		err := sessionA.QueryRow(ctx,
+			"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+			proofA, token("parallel-a"), evA).Scan(&ok)
+		results <- result{ok, err}
+	}()
+	go func() {
+		var ok bool
+		err := sessionB.QueryRow(ctx,
+			"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+			proofB, token("parallel-b"), evB).Scan(&ok)
+		results <- result{ok, err}
+	}()
 	waitForSessionLock(t, ctx, admin, pidA, blockerPID)
 	waitForSessionLock(t, ctx, admin, pidB, blockerPID)
 	if err := block.Commit(ctx); err != nil {
