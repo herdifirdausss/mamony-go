@@ -394,7 +394,7 @@ func TestPostgresIdentityZPasswordChangeRole(t *testing.T) {
 			}
 		}
 	}
-	for _, role := range []string{"TEST_IDENTITY_AUTH_GRANT_URL","TEST_IDENTITY_PASSWORD_CHANGE_URL"} {
+	for _, role := range []string{"TEST_IDENTITY_AUTH_GRANT_URL", "TEST_IDENTITY_PASSWORD_CHANGE_URL"} {
 		out, err := invokePSQL(role, "-c",
 			"SELECT (NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls)::text FROM pg_roles WHERE rolname=current_user")
 		if err != nil || out != "true" {
