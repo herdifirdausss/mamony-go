@@ -82,7 +82,8 @@
       lock("We could not safely check your session. Return through your trusted account entry point.");
     });
 
-    submit.addEventListener("click", function () {
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
       if (state !== "ready" || !csrf) {
         return;
       }
