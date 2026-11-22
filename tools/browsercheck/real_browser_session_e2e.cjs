@@ -9,6 +9,7 @@ const {chromium} = require("playwright");
 
 const origin = "https://app.example.test";
 const attackerOrigin = "https://attacker.other.test";
+const siblingOrigin = "https://attacker.example.test";
 const local = new URL(process.env.MAMONY_SESSION_E2E_LOCAL_TLS || "");
 assert.equal(local.protocol, "https:");
 assert.equal(local.hostname, "127.0.0.1");
@@ -91,14 +92,14 @@ async function run() {
   const context = await browser.newContext({
     serviceWorkers: "block", javaScriptEnabled: true, ignoreHTTPSErrors: false,
   });
-  const counters = {login: 0, logout: 0, deniedCrossSite: 0, dropped: 0};
+  const counters = {login: 0, logout: 0, deniedCrossSite: 0, deniedSibling: 0, dropped: 0};
   const violations = [];
   let dropNextLogout = false;
   try {
     await context.route("**/*", async (route) => {
       const request = route.request();
       const url = new URL(request.url());
-      if (url.origin === attackerOrigin && url.pathname === "/") {
+      if ((url.origin === attackerOrigin || url.origin === siblingOrigin) && url.pathname === "/") {
         await route.fulfill({status: 200, contentType: "text/html",
           body: "<!doctype html><title>Cross-site test</title>"});
         return;
@@ -128,6 +129,10 @@ async function run() {
           assert.ok(!request.headers().cookie,
             "SameSite=Strict must not send session to a cross-site POST");
           counters.deniedCrossSite++;
+        } else if (request.headers().origin === siblingOrigin) {
+          assert.ok(request.headers().cookie?.startsWith("__Host-mamony_sid="),
+            "a same-site sibling may carry Strict cookies to the victim host");
+          counters.deniedSibling++;
         } else {
           assert.equal(request.headers().origin, origin);
           if (request.headers()["sec-fetch-site"] !== undefined) {
@@ -137,8 +142,9 @@ async function run() {
       }
       const response = await forward(request);
       if (url.pathname === "/v1/identity/logout" &&
-          request.headers().origin === attackerOrigin) {
-        assert.equal(response.status, 403, "cross-site POST must be rejected");
+          (request.headers().origin === attackerOrigin ||
+           request.headers().origin === siblingOrigin)) {
+        assert.equal(response.status, 403, "cross-origin POST must be rejected");
       }
       if (dropNextLogout && url.pathname === "/v1/identity/logout" &&
           request.headers().origin === origin) {
@@ -203,6 +209,25 @@ async function run() {
       "cross-site POST must be rejected by the server");
     assert.equal(counters.deniedCrossSite, 1);
     await evil.close();
+
+    // SameSite=Strict is NOT a same-origin policy: a sibling subdomain is
+    // same-site and can send the cookie. Only the exact server Origin check
+    // prevents a cross-origin sibling from revoking the victim's session.
+    const sibling = await context.newPage();
+    await sibling.goto(siblingOrigin + "/");
+    const siblingOutcome = await sibling.evaluate(async (destination) => {
+      try {
+        const response = await fetch(destination, {method: "POST", credentials: "include",
+          headers: {"Content-Type": "text/plain"}, body: ""});
+        return response.status;
+      } catch {
+        return "cors-blocked";
+      }
+    }, origin + "/v1/identity/logout");
+    assert.ok(siblingOutcome === 403 || siblingOutcome === "cors-blocked",
+      "same-site cross-origin POST must be denied by Origin policy");
+    assert.equal(counters.deniedSibling, 1);
+    await sibling.close();
     assert.equal((await perform(page, "/v1/identity/session")).status, 200);
 
     reply = await perform(page, "/v1/identity/logout", {method: "POST"});
@@ -253,7 +278,7 @@ async function run() {
     expectSafeSessionCookie(await context.cookies(origin));
     assert.equal((await perform(page, "/v1/identity/session")).status, 401);
     assert.equal(counters.login, 3, "unexpected password retry");
-    assert.equal(counters.logout, 6, "unexpected automatic logout replay");
+    assert.equal(counters.logout, 7, "unexpected automatic logout replay");
     assert.deepEqual(violations, []);
     process.stdout.write("real Chromium cookie/CSRF/logout/uncertain-revoke: PASS\n");
   } finally {
