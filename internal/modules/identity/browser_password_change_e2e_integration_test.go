@@ -297,11 +297,16 @@ func TestIdentityZBrowserPasswordChangeE2E(t *testing.T) {
 		}
 	}
 	for _, active := range []http.Handler{httpedge.PublicHandler(), httpedge.PrivateHandler()} {
-		rr := httptest.NewRecorder()
-		active.ServeHTTP(rr, httptest.NewRequest(http.MethodPost,
-			"https://app.example.test/v1/identity/change-password", nil))
-		if rr.Code != http.StatusNotFound {
-			t.Fatal("password-change candidate leaked into an application router")
+		for _, route := range []struct{ method, path string }{
+			{http.MethodPost, "/v1/identity/change-password"},
+			{http.MethodGet, "/account/change-password"},
+		} {
+			rr := httptest.NewRecorder()
+			active.ServeHTTP(rr, httptest.NewRequest(route.method,
+				"https://app.example.test"+route.path, nil))
+			if rr.Code != http.StatusNotFound {
+				t.Fatal("browser password-change candidate leaked into an application router")
+			}
 		}
 	}
 	t.Log(fmt.Sprintf("real Chromium password rotation E2E: subjects=%d, exactly one event+notice each", len(accounts)))
