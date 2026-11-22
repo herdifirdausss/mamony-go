@@ -9,11 +9,11 @@ import (
 )
 
 type recoveryBudgetFake struct {
-	allow bool
-	fail  bool
-	calls int
+	allow  bool
+	fail   bool
+	calls  int
 	action AnonymousAction
-	bins  []AdmissionBucket
+	bins   []AdmissionBucket
 }
 
 func (f *recoveryBudgetFake) Spend(_ context.Context, action AnonymousAction, bins []AdmissionBucket) (bool, error) {
