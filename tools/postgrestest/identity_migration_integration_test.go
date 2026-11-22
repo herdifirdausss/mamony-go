@@ -552,3 +552,52 @@ func TestPostgresIdentityZNoticeMonitorRole(t *testing.T) {
 		t.Fatalf("notice monitoring role has elevated DB attributes: %q %v", out, err)
 	}
 }
+
+
+// TestPostgresIdentityZRecoveryIssuerRole proves the v19 issuance credential
+// cannot read recovery envelopes, inspect account data or mutate a verifier.
+// Only the purpose-bound, owner-controlled issue function may be executed.
+func TestPostgresIdentityZRecoveryIssuerRole(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT mamony_identity.issue_password_recovery('missing@example.test','rcv_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'),'fixture-key',decode(repeat('22',72),'hex'))",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_ISSUER_URL", "-c", sql)
+		if err != nil || out != "false" {
+			t.Fatalf("dedicated recovery issuer lost narrow EXECUTE permission: out=%s err=%v", out, err)
+		}
+	}
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.recovery_escape(id integer)",
+		"SELECT * FROM mamony_identity.password_recovery_challenges",
+		"SELECT * FROM mamony_identity.password_recovery_deliveries",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.email_verification_challenges",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT * FROM mamony_identity.anonymous_admission_buckets",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"UPDATE mamony_identity.password_verifiers SET digest='\\x00'::bytea",
+		"DELETE FROM mamony_identity.password_recovery_challenges",
+		"SELECT mamony_identity.rotate_password_verifier(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',16),'hex'),decode(repeat('44',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_ISSUER_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("recovery issuer gained forbidden SQL: %q err=%v out=%s", stmt, err, out)
+		}
+	}
+	for _, env := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_PASSWORD_CHANGE_URL", "TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_DELIVERY_URL", "TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(env, "-c",
+			"SELECT mamony_identity.issue_password_recovery('missing@example.test','rcv_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'),'fixture-key',decode(repeat('22',72),'hex'))")
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("other role gained recovery issuance permission: role=%s err=%v out=%s", env, err, out)
+		}
+	}
+}
