@@ -145,19 +145,17 @@ func (a *OpaqueSessionAuthority) Revoke(ctx context.Context, secret string) erro
 // It chains the PR #40 pre-KDF gate + password comparison and then asks
 // the separate session authority to RECHECK eligibility atomically.
 type SessionLogin struct {
-	candidate PasswordLoginCandidate
+	candidate *PasswordLoginFlow
 	issuer    SessionIssuer
 }
 
-type PasswordLoginCandidate interface {
-	Authenticate(context.Context, string, string, netip.Addr) (string, error)
-}
-
+// SessionIssuer is the only independently injected authority; the candidate
+// must be the concrete, mandatory-admission PasswordLoginFlow from PR #40.
 type SessionIssuer interface {
 	Issue(context.Context, string) (OpaqueSession, error)
 }
 
-func NewSessionLogin(candidate PasswordLoginCandidate, issuer SessionIssuer) (*SessionLogin, error) {
+func NewSessionLogin(candidate *PasswordLoginFlow, issuer SessionIssuer) (*SessionLogin, error) {
 	if candidate == nil || issuer == nil {
 		return nil, ErrSessionUnavailable
 	}
