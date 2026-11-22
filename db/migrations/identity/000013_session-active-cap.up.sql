@@ -25,7 +25,7 @@ DECLARE
     oldest_digest bytea;
     evicted_subject text;
     eviction_event text;
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF p_grant_digest IS NULL OR octet_length(p_grant_digest) <> 32
        OR p_token_digest IS NULL OR octet_length(p_token_digest) <> 32
        OR p_event IS NULL OR p_event !~ '^evt_[A-Za-z0-9_-]{22}$' THEN
@@ -128,7 +128,7 @@ DECLARE
     seen_at timestamptz;
     limit_at timestamptz;
     stamp timestamptz;
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF p_digest IS NULL OR octet_length(p_digest) <> 32 THEN
         RETURN NULL;
     END IF;
@@ -178,7 +178,7 @@ DECLARE
     revoked_subject text;
     candidate_subject text;
     stamp timestamptz;
-BEGIN
+BEGIN -- PL/pgSQL function block; not a migration transaction
     IF p_digest IS NULL OR octet_length(p_digest) <> 32
        OR p_event IS NULL OR p_event !~ '^evt_[A-Za-z0-9_-]{22}$' THEN
         RETURN false;
@@ -207,4 +207,4 @@ BEGIN
 END;
 $$;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (13, '9cc3c08aa31f07ea713acdb981204567210b80a88e8fba268ba5cec0a6184bb0');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (13, '0b10cb2b0ab3de43c294a70d1b21357d6f8625cb366b38ad0f565eb2aec2488d');
