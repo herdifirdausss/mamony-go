@@ -62,7 +62,7 @@ func TestRecoveryDeliveryWorkerOutcomeIsolation(t *testing.T) {
 			found: true,
 			job: RecoveryDeliveryJob{
 				ChallengeID: "rcv_AAAAAAAAAAAAAAAAAAAAAA",
-				Recipient: "owner@example.test", KeyID: "recovery-key",
+				Recipient:   "owner@example.test", KeyID: "recovery-key",
 				SealedToken: make([]byte, 71), ExpiresAt: now.Add(15 * time.Minute),
 			},
 		}
