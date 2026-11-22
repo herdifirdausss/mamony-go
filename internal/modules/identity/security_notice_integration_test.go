@@ -106,7 +106,7 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 		// To avoid any cross-fixture digest collisions, overwrite the suffix
 		// with 32-byte deterministic SHA-256 of the fixture subject.
 		// (The digest never represents an actual bearer or password.)
-		for _, item := range [][]byte{loginDigest,changeDigest,sessionDigest} {
+		for _, item := range [][]byte{loginDigest, changeDigest, sessionDigest} {
 			copy(item, []byte(subject))
 			item[0] ^= byte(len(label))
 		}
@@ -133,8 +133,8 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 		event := randomSyntheticID(t, "evt_")
 		if err := changer.QueryRow(ctx,
 			"SELECT mamony_identity.rotate_password_verifier($1,$2,$3,$4,$5)",
-			sessionDigest,changeDigest,bytes.Repeat([]byte{0x54},16),
-			bytes.Repeat([]byte{0x65},32),event).Scan(&allowed); err != nil || !allowed {
+			sessionDigest, changeDigest, bytes.Repeat([]byte{0x54}, 16),
+			bytes.Repeat([]byte{0x65}, 32), event).Scan(&allowed); err != nil || !allowed {
 			t.Fatalf("synthetic rotation missing trusted event: %v %v", err, allowed)
 		}
 		var events, queued int
@@ -143,8 +143,8 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 				AND subject_id=$2 AND event_type='PASSWORD_CHANGED'),
 			(SELECT count(*) FROM mamony_identity.password_change_notices
 			 WHERE event_id=$1 AND subject_id=$2 AND recipient=$3 AND status='PENDING')`,
-			event,subject,email).Scan(&events,&queued); err != nil || events!=1 || queued!=1 {
-			t.Fatalf("outbox + verified recipient snapshot were not atomic: %v %d %d", err, events,queued)
+			event, subject, email).Scan(&events, &queued); err != nil || events != 1 || queued != 1 {
+			t.Fatalf("outbox + verified recipient snapshot were not atomic: %v %d %d", err, events, queued)
 		}
 		return subject, email, event
 	}
@@ -155,7 +155,7 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 		_, err := conn.Exec(ctx, `INSERT INTO mamony_identity.security_outbox
 			(event_id,subject_id,event_type,occurred_at)
 			VALUES ($1,$2,'PASSWORD_CHANGED',clock_timestamp())`,
-			randomSyntheticID(t, "evt_"),subject)
+			randomSyntheticID(t, "evt_"), subject)
 		var pgErr *pgconn.PgError
 		if !errors.As(err, &pgErr) || pgErr.Code != "42501" {
 			t.Fatalf("privileged but non-change event origin forged notice: %v", err)
@@ -163,98 +163,98 @@ func TestIdentityZSecurityNoticeOutbox(t *testing.T) {
 	}
 	first, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_"))
 	if err != nil || !ok || first.EventID != event || first.Recipient != recipient {
-		t.Fatalf("claim did not return committed password event: %+v %v", first,err)
+		t.Fatalf("claim did not return committed password event: %+v %v", first, err)
 	}
 	if _, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_")); err != nil || ok {
 		t.Fatal("leased notice was reclaimed before expiry")
 	}
-	if err := notices.Finalize(ctx,first.EventID,randomSyntheticID(t,"lse_"),usecase.DeliveryAccepted); err==nil {
+	if err := notices.Finalize(ctx, first.EventID, randomSyntheticID(t, "lse_"), usecase.DeliveryAccepted); err == nil {
 		t.Fatal("wrong lease acknowledged notice")
 	}
-	if err := notices.Finalize(ctx,first.EventID,first.LeaseID,usecase.DeliveryTemporary); err!=nil {
+	if err := notices.Finalize(ctx, first.EventID, first.LeaseID, usecase.DeliveryTemporary); err != nil {
 		t.Fatal(err)
 	}
 	var state string
 	var attempts int
 	if err := admin.QueryRow(ctx, `SELECT status,attempts FROM mamony_identity.password_change_notices
-		WHERE event_id=$1`,event).Scan(&state,&attempts); err!=nil || state!="PENDING" || attempts!=1 {
+		WHERE event_id=$1`, event).Scan(&state, &attempts); err != nil || state != "PENDING" || attempts != 1 {
 		t.Fatal("temporary failure did not persist first bounded retry")
 	}
-	if _, ok, err := notices.Claim(ctx,randomSyntheticID(t,"lse_"));err!=nil || ok {
+	if _, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_")); err != nil || ok {
 		t.Fatal("backoff bypassed before due time")
 	}
 	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_change_notices
-		SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE event_id=$1`,event);err!=nil {
+		SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE event_id=$1`, event); err != nil {
 		t.Fatal(err)
 	}
-	second, ok, err := notices.Claim(ctx,randomSyntheticID(t,"lse_"))
-	if err!=nil || !ok || second.LeaseID==first.LeaseID || second.EventID!=event {
+	second, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_"))
+	if err != nil || !ok || second.LeaseID == first.LeaseID || second.EventID != event {
 		t.Fatal("a fresh lease did not recover retryable notice")
 	}
-	if err := notices.Finalize(ctx,first.EventID,first.LeaseID,usecase.DeliveryAccepted);err==nil {
+	if err := notices.Finalize(ctx, first.EventID, first.LeaseID, usecase.DeliveryAccepted); err == nil {
 		t.Fatal("stale lease completed current worker claim")
 	}
-	if err := notices.Finalize(ctx,second.EventID,second.LeaseID,usecase.DeliveryAccepted);err!=nil {
+	if err := notices.Finalize(ctx, second.EventID, second.LeaseID, usecase.DeliveryAccepted); err != nil {
 		t.Fatal(err)
 	}
-	if err := admin.QueryRow(ctx,`SELECT status,attempts FROM mamony_identity.password_change_notices
-		WHERE event_id=$1`,event).Scan(&state,&attempts);err!=nil || state!="ACCEPTED" || attempts!=2 {
+	if err := admin.QueryRow(ctx, `SELECT status,attempts FROM mamony_identity.password_change_notices
+		WHERE event_id=$1`, event).Scan(&state, &attempts); err != nil || state != "ACCEPTED" || attempts != 2 {
 		t.Fatal("accepted provider submission did not finalize once")
 	}
-	if _, ok, err := notices.Claim(ctx,randomSyntheticID(t,"lse_"));err!=nil || ok {
+	if _, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_")); err != nil || ok {
 		t.Fatal("accepted notification was redelivered")
 	}
 	// If the account contact changed before submission, never send an old
 	// contact-address notice; quarantine it as DEAD on the next claim.
 	staleSubject, oldRecipient, staleEvent := makeChanged("second")
-	newRecipient := strings.ToLower(randomSyntheticID(t,"changed_"))+"@example.test"
-	if _,err := admin.Exec(ctx,`UPDATE mamony_identity.email_aliases
-		SET canonical_email=$1 WHERE subject_id=$2`,newRecipient,staleSubject);err!=nil {
+	newRecipient := strings.ToLower(randomSyntheticID(t, "changed_")) + "@example.test"
+	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_aliases
+		SET canonical_email=$1 WHERE subject_id=$2`, newRecipient, staleSubject); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := notices.Claim(ctx,randomSyntheticID(t,"lse_"));err!=nil || ok {
+	if _, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_")); err != nil || ok {
 		t.Fatal("stale-contact notification escaped recipient fence")
 	}
-	if err := admin.QueryRow(ctx,`SELECT status,recipient FROM mamony_identity.password_change_notices
-		WHERE event_id=$1`,staleEvent).Scan(&state,&oldRecipient);err!=nil || state!="DEAD" {
+	if err := admin.QueryRow(ctx, `SELECT status,recipient FROM mamony_identity.password_change_notices
+		WHERE event_id=$1`, staleEvent).Scan(&state, &oldRecipient); err != nil || state != "DEAD" {
 		t.Fatal("rebound email was not quarantined")
 	}
 	// A third pending notice fails permanently after the fifth bounded send.
 	_, _, retryEvent := makeChanged("third")
-	for i:=0;i<5;i++ {
-		if _,err:=admin.Exec(ctx,`UPDATE mamony_identity.password_change_notices
-			SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE event_id=$1`,retryEvent);err!=nil {
+	for i := 0; i < 5; i++ {
+		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_change_notices
+			SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE event_id=$1`, retryEvent); err != nil {
 			t.Fatal(err)
 		}
-		job, ok, err:=notices.Claim(ctx,randomSyntheticID(t,"lse_"))
-		if err!=nil || !ok || job.EventID!=retryEvent {
-			t.Fatalf("retry %d not claimable: %+v %v",i,job,err)
+		job, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_"))
+		if err != nil || !ok || job.EventID != retryEvent {
+			t.Fatalf("retry %d not claimable: %+v %v", i, job, err)
 		}
-		if err:=notices.Finalize(ctx,job.EventID,job.LeaseID,usecase.DeliveryTemporary);err!=nil {
+		if err := notices.Finalize(ctx, job.EventID, job.LeaseID, usecase.DeliveryTemporary); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err:=admin.QueryRow(ctx,`SELECT status,attempts FROM mamony_identity.password_change_notices
-		WHERE event_id=$1`,retryEvent).Scan(&state,&attempts);err!=nil || state!="DEAD" || attempts!=5 {
+	if err := admin.QueryRow(ctx, `SELECT status,attempts FROM mamony_identity.password_change_notices
+		WHERE event_id=$1`, retryEvent).Scan(&state, &attempts); err != nil || state != "DEAD" || attempts != 5 {
 		t.Fatal("bounded fifth send did not enter terminal status")
 	}
-	if _,ok,err:=notices.Claim(ctx,randomSyntheticID(t,"lse_"));err!=nil || ok {
+	if _, ok, err := notices.Claim(ctx, randomSyntheticID(t, "lse_")); err != nil || ok {
 		t.Fatal("terminal notice was claimed again")
 	}
 	// Seven-day recipient PII purge is role-restricted, bounded and leaves
 	// identifier-only PASSWORD_CHANGED history intact.
-	if _,err:=admin.Exec(ctx,`UPDATE mamony_identity.password_change_notices
+	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_change_notices
 		SET occurred_at=clock_timestamp()-interval '8 days'
-		WHERE event_id=$1`,event);err!=nil {
+		WHERE event_id=$1`, event); err != nil {
 		t.Fatal(err)
 	}
 	var purged int
-	if err:=maint.QueryRow(ctx,`SELECT mamony_identity.purge_old_password_change_notices()`).Scan(&purged);err!=nil || purged<1 {
-		t.Fatalf("bounded PII retention failed: %v %d",err,purged)
+	if err := maint.QueryRow(ctx, `SELECT mamony_identity.purge_old_password_change_notices()`).Scan(&purged); err != nil || purged < 1 {
+		t.Fatalf("bounded PII retention failed: %v %d", err, purged)
 	}
 	var retained int
-	if err:=admin.QueryRow(ctx,`SELECT count(*) FROM mamony_identity.security_outbox
-		WHERE event_id=$1 AND event_type='PASSWORD_CHANGED'`,event).Scan(&retained);err!=nil || retained!=1 {
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.security_outbox
+		WHERE event_id=$1 AND event_type='PASSWORD_CHANGED'`, event).Scan(&retained); err != nil || retained != 1 {
 		t.Fatal("recipient purge deleted mandatory event obligation")
 	}
 }
