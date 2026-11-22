@@ -99,15 +99,15 @@ func passwordRecoveryDigest(raw []byte) [32]byte {
 // Never let general-purpose formatting, logging, or JSON/text serialization
 // accidentally publish a password-reset bearer. The explicit trusted
 // delivery accessor above is intentionally narrow and visually conspicuous.
-const redactedPasswordRecoveryProof = "[REDACTED password recovery proof]"
+const recoveryRedactionLabel = "[REDACTED password recovery proof]"
 
-func (PasswordRecoveryProof) String() string   { return redactedPasswordRecoveryProof }
-func (PasswordRecoveryProof) GoString() string { return redactedPasswordRecoveryProof }
+func (PasswordRecoveryProof) String() string   { return recoveryRedactionLabel }
+func (PasswordRecoveryProof) GoString() string { return recoveryRedactionLabel }
 func (PasswordRecoveryProof) Format(s fmt.State, _ rune) {
-	_, _ = io.WriteString(s, redactedPasswordRecoveryProof)
+	_, _ = io.WriteString(s, recoveryRedactionLabel)
 }
 func (PasswordRecoveryProof) LogValue() slog.Value {
-	return slog.StringValue(redactedPasswordRecoveryProof)
+	return slog.StringValue(recoveryRedactionLabel)
 }
 func (PasswordRecoveryProof) MarshalJSON() ([]byte, error) {
 	return nil, ErrPasswordRecoveryProofInvalid
