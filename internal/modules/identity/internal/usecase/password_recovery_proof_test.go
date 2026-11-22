@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"testing"
@@ -71,7 +72,7 @@ func TestPasswordRecoveryProofDigestStrictInput(t *testing.T) {
 }
 
 func TestPasswordRecoveryProofFailsClosedOnEntropyError(t *testing.T) {
-	for _, source := range []*bytes.Reader{nil, bytes.NewReader(nil), bytes.NewReader(bytes.Repeat([]byte{0x44}, 31))} {
+	for _, source := range []io.Reader{nil, bytes.NewReader(nil), bytes.NewReader(bytes.Repeat([]byte{0x44}, 31))} {
 		proof, err := newPasswordRecoveryProof(source)
 		if !errors.Is(err, ErrPasswordRecoveryProofUnavailable) ||
 			proof.ForTrustedDelivery() != "" || proof.Digest() != ([32]byte{}) {
