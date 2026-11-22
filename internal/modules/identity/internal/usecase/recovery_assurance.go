@@ -10,7 +10,7 @@ import (
 // ErrRecoveryAssuranceDenied reveals neither an account nor token/code
 // eligibility. The caller must keep one generic user-facing response.
 var (
-	ErrRecoveryAssuranceDenied = errors.New("recovery assurance denied")
+	ErrRecoveryAssuranceDenied      = errors.New("recovery assurance denied")
 	ErrRecoveryAssuranceUnavailable = errors.New("recovery assurance unavailable")
 )
 
@@ -25,7 +25,7 @@ type RecoveryAssuranceStore interface {
 // The caller must present BOTH an issued 15-minute email recovery bearer
 // AND a saved 256-bit offline code enrolled before that email challenge.
 type RecoveryOfflineCodeAssurance struct {
-	store RecoveryAssuranceStore
+	store  RecoveryAssuranceStore
 	random io.Reader
 }
 
