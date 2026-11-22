@@ -60,9 +60,12 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 
 	adminDSN := guardedDB(t, "TEST_DATABASE_ADMIN_URL", "mamony_test_admin")
 	sessionDSN := guardedDB(t, "TEST_IDENTITY_SESSION_URL", "mamony_identity_session_runtime")
+	grantDSN := guardedDB(t, "TEST_IDENTITY_AUTH_GRANT_URL", "mamony_identity_auth_grant_runtime")
 	adminURL, _ := url.Parse(adminDSN)
 	sessionURL, _ := url.Parse(sessionDSN)
-	if adminURL.Host != sessionURL.Host || adminURL.Path != sessionURL.Path {
+	grantURL, _ := url.Parse(grantDSN)
+	if adminURL.Host != sessionURL.Host || adminURL.Path != sessionURL.Path ||
+		adminURL.Host != grantURL.Host || adminURL.Path != grantURL.Path {
 		t.Fatal("session concurrency tests must use one disposable loopback database")
 	}
 
@@ -81,6 +84,11 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = sessionConn.Close(context.Background()) })
+	grantConn, err := pgx.Connect(ctx, grantDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = grantConn.Close(context.Background()) })
 
 	var sessionPID, freezerPID int32
 	if err := sessionConn.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&sessionPID); err != nil {
@@ -114,7 +122,20 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 		t.Fatalf("cannot activate isolated verified fixture: %v", err)
 	}
 
+	stage := func(label string) []byte {
+		t.Helper()
+		digest := sha256.Sum256([]byte("mamony:test:login-grant:" + subject + ":" + label))
+		var allowed bool
+		if err := grantConn.QueryRow(ctx,
+			"SELECT mamony_identity.stage_password_auth_grant($1,$2)",
+			subject, digest[:]).Scan(&allowed); err != nil || !allowed {
+			t.Fatalf("cannot stage disposable password proof: label=%s allowed=%t err=%v", label, allowed, err)
+		}
+		return digest[:]
+	}
+
 	t.Run("freeze acquires lock first: waiting issuer is denied", func(t *testing.T) {
+		grantDigest := stage("freeze-first")
 		freezeTx, err := freezer.Begin(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -132,8 +153,8 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 		go func() {
 			var allowed bool
 			err := sessionConn.QueryRow(ctx,
-				"SELECT mamony_identity.issue_opaque_session($1,$2,$3)",
-				subject, digest[:], eventID).Scan(&allowed)
+				"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+				grantDigest, digest[:], eventID).Scan(&allowed)
 			resultCh <- sessionTxResult{allowed: allowed, err: err}
 		}()
 		waitForSessionLock(t, ctx, observer, sessionPID, freezerPID)
@@ -172,6 +193,7 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 	})
 
 	t.Run("issuer acquires lock first: later freeze invalidates its session", func(t *testing.T) {
+		grantDigest := stage("issue-first")
 		issueTx, err := sessionConn.Begin(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -181,8 +203,8 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 		eventID := randomSyntheticID(t, "evt_")
 		var issued bool
 		if err := issueTx.QueryRow(ctx,
-			"SELECT mamony_identity.issue_opaque_session($1,$2,$3)",
-			subject, digest[:], eventID).Scan(&issued); err != nil || !issued {
+			"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+			grantDigest, digest[:], eventID).Scan(&issued); err != nil || !issued {
 			t.Fatalf("cannot issue in uncommitted transaction: issued=%v err=%v", issued, err)
 		}
 
@@ -253,11 +275,12 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		grantDigest := stage("rollback")
 		digest := sha256.Sum256([]byte(subject + ":rollback"))
 		eventID := randomSyntheticID(t, "evt_")
 		var issued bool
-		if err := issueTx.QueryRow(ctx, "SELECT mamony_identity.issue_opaque_session($1,$2,$3)",
-			subject, digest[:], eventID).Scan(&issued); err != nil || !issued {
+		if err := issueTx.QueryRow(ctx, "SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+			grantDigest, digest[:], eventID).Scan(&issued); err != nil || !issued {
 			_ = issueTx.Rollback(context.Background())
 			t.Fatalf("session fixture cannot issue before rollback: %v", err)
 		}
