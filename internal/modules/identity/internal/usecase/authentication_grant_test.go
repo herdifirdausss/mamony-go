@@ -68,7 +68,7 @@ func TestAuthenticationGrantSecretAndAmbiguousStageFailClosed(t *testing.T) {
 		t.Fatal("cancelled login minted grant")
 	}
 	var nilAuthority *AuthenticationGrantAuthority
-	if value, err := nilAuthority.Issue(context.Background(), subject); !errors.Is(err, ErrSessionUnavailable) ||
+	if value, err := nilAuthority.Issue(context.Background(), subject, 1); !errors.Is(err, ErrSessionUnavailable) ||
 		value.secret != "" {
 		t.Fatal("nil grant issuer accepted")
 	}
@@ -76,12 +76,12 @@ func TestAuthenticationGrantSecretAndAmbiguousStageFailClosed(t *testing.T) {
 
 func TestAuthenticationGrantRejectsMissingVerifierEpoch(t *testing.T) {
 	authority, store := testAuthenticationGrantAuthority(t)
-	if proof, err := authority.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", 0);
-		!errors.Is(err, ErrSessionDenied) || proof.secret != "" || store.stages != 0 {
+	proof, err := authority.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", 0)
+	if !errors.Is(err, ErrSessionDenied) || proof.secret != "" || store.stages != 0 {
 		t.Fatal("missing verifier epoch reached SQL grant authority")
 	}
-	if proof, err := authority.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", -1);
-		!errors.Is(err, ErrSessionDenied) || proof.secret != "" || store.stages != 0 {
+	proof, err = authority.Issue(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA", -1)
+	if !errors.Is(err, ErrSessionDenied) || proof.secret != "" || store.stages != 0 {
 		t.Fatal("negative epoch reached SQL grant authority")
 	}
 }
