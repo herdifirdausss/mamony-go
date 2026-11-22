@@ -9,6 +9,7 @@ UPDATE mamony_identity.opaque_sessions
    SET last_seen_at=issued_at;
 ALTER TABLE mamony_identity.opaque_sessions
     ALTER COLUMN last_seen_at SET NOT NULL,
+    ALTER COLUMN last_seen_at SET DEFAULT clock_timestamp(),
     ADD CONSTRAINT opaque_sessions_activity_window
         CHECK (last_seen_at >= issued_at AND last_seen_at < expires_at);
 
@@ -56,4 +57,4 @@ BEGIN -- PL/pgSQL function block; not a migration transaction
 END;
 $$;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (12, '42fe3d874ccbee560007baeb05fa64341f2c450181afc6db813f46c691762e11');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (12, 'acedf07e7e5b00a9a76cb543e909504719e0bd736dbf7d86e9b598de75688ba9');
