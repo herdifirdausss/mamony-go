@@ -80,11 +80,11 @@ func readRuntimeConfig(getenv func(string) string, args []string) (identity.Secu
 		return empty, errStartup
 	}
 	return identity.SecurityNoticeDeliveryConfig{
-		DSN: dsn,
-		Region: getenv("MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_REGION"),
-		Domain: getenv("MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_DOMAIN"),
-		From: getenv("MAMONY_IDENTITY_SECURITY_NOTICE_MAIL_FROM"),
-		MailgunKey: key,
+		DSN:          dsn,
+		Region:       getenv("MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_REGION"),
+		Domain:       getenv("MAMONY_IDENTITY_SECURITY_NOTICE_MAILGUN_DOMAIN"),
+		From:         getenv("MAMONY_IDENTITY_SECURITY_NOTICE_MAIL_FROM"),
+		MailgunKey:   key,
 		PollInterval: 5 * time.Second,
 	}, nil
 }
