@@ -29,5 +29,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0023 — Recovery AEAD and fenced delivery worker](0023-password-recovery-delivery-worker.md) | PROPOSED: Identity v20 EXECUTE-only lease/finalize worker, separate AES-GCM recovery keys, bounded Mailgun adapter and local mock tests; no live send or reset. |
 | [ADR-0024 — Assurance-gated atomic recovery redemption](0024-atomic-password-recovery-redemption.md) | PROPOSED: Identity v21 separate EXECUTE-only one-use recovery authority, default-deny assurance grant, global session epoch rotation and token-free recovery notice; no public reset. |
 | [ADR-0025 — Token-free recovery security notice worker](0025-password-recovery-security-notice-worker.md) | PROPOSED: Identity v22 separate recovery-only alert worker, strict SQL lease, count-only monitor and seven-day recipient retention; no live send. |
+| [ADR-0026 — Signed recovery notice Mailgun webhook](0026-signed-recovery-notice-webhook.md) | PROPOSED: Identity v23 signed HMAC callback, separate recovery-only receipt role/table, monotonic provider states and count-only delivery health; no mounted route. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
