@@ -46,11 +46,11 @@ func ReadSecurityNoticeHealth(ctx context.Context, dsn string) (SecurityNoticeHe
 		return empty, ErrNoticeHealthUnavailable
 	}
 	return SecurityNoticeHealthSnapshot{
-		PendingDue: result.PendingDue,
-		Dead: result.Dead,
+		PendingDue:       result.PendingDue,
+		Dead:             result.Dead,
 		SubmittedUnknown: result.SubmittedUnknown,
-		Delivered: result.Delivered,
+		Delivered:        result.Delivered,
 		ProviderFailures: result.ProviderFailures,
-		UnmatchedEvents: result.UnmatchedEvents,
+		UnmatchedEvents:  result.UnmatchedEvents,
 	}, nil
 }
