@@ -24,5 +24,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0018 — Browser password-change HTTP candidate](0018-first-party-password-change-http-candidate.md) | PROPOSED: explicit unmounted first-party password-change handler reusing session-bound CSRF and internal credential proof; no public route. |
 | [ADR-0019 — Browser password-change PostgreSQL E2E](0019-browser-password-change-postgres-e2e.md) | PROPOSED: real Chromium cookie/CSRF, Argon2id, PostgreSQL epoch/audit/notice and lost-response behavior under disposable TLS fixture; no live route. |
 | [ADR-0020 — Password-change recovery page](0020-unmounted-password-change-recovery-page.md) | PROPOSED: unmounted strict-CSP one-shot browser page, with explicit uncertainty lock and no automatic retry or recovery claim. |
+| [ADR-0021 — Password recovery authority foundation](0021-password-recovery-authority-foundation.md) | PROPOSED: 256-bit domain-separated recovery proof primitive and threat model; no issuance, SQL authority, public recovery route or password reset. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
