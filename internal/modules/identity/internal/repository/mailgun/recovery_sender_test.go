@@ -72,15 +72,15 @@ func TestRecoveryMailSenderFragmentAndClassification(t *testing.T) {
 			}
 			fields[part.FormName()] = string(value)
 		}
-		if fields["to") != "owner@example.test" ||
-			fields["subject") != "Mamony account password recovery" ||
-			fields["o:tracking") != "no" ||
-			fields["o:tracking-opens") != "no" ||
-			fields["o:tracking-clicks") != "no" ||
-			fields["o:require-tls") != "yes" ||
-			fields["o:deliver-within") != "5m" ||
-			!strings.Contains(fields["text"), "https://app.example.test/account/recover-password#token="+sampleSecret) ||
-			strings.Contains(fields["text"), "?token=") {
+		if fields["to"] != "owner@example.test" ||
+			fields["subject"] != "Mamony account password recovery" ||
+			fields["o:tracking"] != "no" ||
+			fields["o:tracking-opens"] != "no" ||
+			fields["o:tracking-clicks"] != "no" ||
+			fields["o:require-tls"] != "yes" ||
+			fields["o:deliver-within"] != "5m" ||
+			!strings.Contains(fields["text"], "https://app.example.test/account/recover-password#token="+sampleSecret) ||
+			strings.Contains(fields["text"], "?token=") {
 			t.Error("recovery sender leaked proof in URL query or omitted controls")
 		}
 		w.Header().Set("Content-Type", "application/json")
