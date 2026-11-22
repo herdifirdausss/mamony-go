@@ -167,19 +167,22 @@ func (m *AuthenticatedRecoveryCodeManager) replace(ctx context.Context,
 	// authentication grant. Never expose a secret before SQL COMMIT.
 	var next RecoveryCodeSet
 	var digests [5][32]byte
+	ordered := make([][32]byte, 0, len(next.codes))
+	seen := make(map[[32]byte]bool, len(next.codes))
 	for i := range next.codes {
 		code, err := newOfflineRecoveryCode(m.random)
 		if err != nil {
 			return RecoveryCodeSet{}, ErrRecoveryCodeManagerUnavailable
 		}
 		next.codes[i] = code
-		digests[i] = code.Digest()
-		for j := 0; j < i; j++ {
-			if digests[i] == digests[j] {
-				return RecoveryCodeSet{}, ErrRecoveryCodeManagerUnavailable
-			}
+		digest := code.Digest()
+		if seen[digest] {
+			return RecoveryCodeSet{}, ErrRecoveryCodeManagerUnavailable
 		}
+		seen[digest] = true
+		ordered = append(ordered, digest)
 	}
+	copy(digests[:], ordered)
 	proof, err := m.grants.Issue(ctx, candidate.SubjectID, candidate.SessionEpoch)
 	if errors.Is(err, ErrSessionDenied) {
 		return RecoveryCodeSet{}, ErrRecoveryCodeManagerDenied
