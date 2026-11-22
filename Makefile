@@ -4,7 +4,6 @@ check: fmt-check vet unit architecture docs skills migrations-check build
 
 
 fmt-check:
-	@gofmt -d internal/modules/identity/internal/handler/mailgun_security_notice_webhook_test.go internal/modules/identity/security_notice_health.go
 	@gofmt -l .
 	@test -z "`gofmt -l .`" || { echo "gofmt required"; exit 1; }
 
