@@ -122,7 +122,7 @@ func TestIdentityZRecoveryOfflineAssurance(t *testing.T) {
 		if _,err:=admin.Exec(ctx,`INSERT INTO mamony_identity.password_recovery_offline_codes
 			(code_digest,subject_id,enrolled_epoch,contact_version,enrolled_at)
 			VALUES($1,$2,$3,1,clock_timestamp()-interval '1 hour')`,
-			code.Digest()[:],f.subject,f.epoch);err!=nil{t.Fatal(err)}
+			func() []byte { d := code.Digest(); return d[:] }(),f.subject,f.epoch);err!=nil{t.Fatal(err)}
 		return code
 	}
 	issue:=func(f fixture)fixture{
