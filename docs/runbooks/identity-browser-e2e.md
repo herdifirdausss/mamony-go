@@ -69,3 +69,7 @@ Mandatory disposable-PostgreSQL `TestIdentityZMaxActiveSessions` exercises five 
 ## Draft #49 — credential mutation race regression
 
 Required PostgreSQL `TestIdentityZAuthMaterialEpochFence` uses disposable role-separated SQL to verify that password and current contact changes transactionally invalidate previous opaque sessions and grants, including a deterministic grant-stage SQL wait behind a concurrent password rotation. Snapshot epoch is read with verifier before real Argon2id in existing browser E2E; one-use grant stage now requires the same epoch, so it cannot re-issue with a newly changed account epoch. No reset/password-change HTTP route is introduced or browser-tested. See [ADR-0012](../adr/0012-auth-material-epoch-grant-fence.md).
+
+## Draft #50 — internal password-change integration evidence
+
+Mandatory `TestIdentityZAuthenticatedPasswordChange` runs real disposable PostgreSQL role separation, pre-KDF admission, Argon2id verification, purpose-bound one-use `PASSWORD_CHANGE` grant, a session-bound password-verifier update and transactional audit/epoch invalidation. Adversarial checks reject ordinary login grants as change proof and change grants as login proof; a duplicate outbox event must roll back the password update. The existing Chromium suite continues to test the candidate login/CSRF/logout browser contract; **no public password-change form or browser route has been implemented**. See [ADR-0013](../adr/0013-authenticated-password-change.md).
