@@ -18,7 +18,7 @@ type PasswordLoginAdmission interface {
 }
 
 type PasswordLoginAuthenticator interface {
-	Authenticate(context.Context, string, string) (string, error)
+	AuthenticateWithEpoch(context.Context, string, string) (AuthenticatedSubject, error)
 }
 
 // PasswordLoginFlow is the only composed login candidate. Admission MUST
@@ -42,28 +42,33 @@ func NewPasswordLoginFlow(admission PasswordLoginAdmission, password PasswordLog
 // A 503/commit ambiguity from the admission DB fails closed; it must not be
 // retried in this call, because a budget may already have been charged.
 func (f *PasswordLoginFlow) Authenticate(ctx context.Context, email, password string, peer netip.Addr) (string, error) {
+	candidate, err := f.AuthenticateWithEpoch(ctx, email, password, peer)
+	return candidate.SubjectID, err
+}
+
+func (f *PasswordLoginFlow) AuthenticateWithEpoch(ctx context.Context, email, password string, peer netip.Addr) (AuthenticatedSubject, error) {
 	if f == nil || f.admission == nil || f.password == nil ||
 		ctx == nil || ctx.Err() != nil {
-		return "", ErrPasswordLoginUnavailable
+		return AuthenticatedSubject{}, ErrPasswordLoginUnavailable
 	}
 	ok, err := f.admission.Admit(ctx, email, peer)
 	if errors.Is(err, ErrLoginAdmissionInvalid) {
-		return "", ErrPasswordAuthenticationDenied
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationDenied
 	}
 	if err != nil {
-		return "", ErrPasswordLoginUnavailable
+		return AuthenticatedSubject{}, ErrPasswordLoginUnavailable
 	}
 	if !ok {
-		return "", ErrPasswordLoginThrottled
+		return AuthenticatedSubject{}, ErrPasswordLoginThrottled
 	}
-	subject, err := f.password.Authenticate(ctx, email, password)
+	candidate, err := f.password.AuthenticateWithEpoch(ctx, email, password)
 	if errors.Is(err, ErrPasswordAuthenticationDenied) {
-		return "", ErrPasswordAuthenticationDenied
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationDenied
 	}
-	if err != nil || subject == "" {
-		return "", ErrPasswordLoginUnavailable
+	if err != nil || candidate.SubjectID == "" || candidate.SessionEpoch <= 0 {
+		return AuthenticatedSubject{}, ErrPasswordLoginUnavailable
 	}
 	// This candidate can become stale when a subject is frozen; any future
 	// session creation MUST recheck status/verified contact atomically.
-	return subject, nil
+	return candidate, nil
 }
