@@ -306,6 +306,19 @@ async function run() {
     // cookie, but PostgreSQL has already atomically invalidated that session.
     await login(other.page, b, b.old, 204);
     secureCookie(await other.context.cookies(origin));
+    // A definite generic denial is rendered without revealing which
+    // credential/policy factor was rejected, and never resubmits itself.
+    await populatePage(other.page, b);
+    await other.page.locator("#current").fill(b.old + "-incorrect");
+    const countBeforeDenied = counters.changes;
+    await other.page.locator("#change").click();
+    await other.page.waitForFunction(() =>
+      document.getElementById("status").textContent.includes("could not complete this change"));
+    assert.equal(counters.changes, countBeforeDenied + 1);
+    assert.equal(await other.page.locator("#change-form").isHidden(), true);
+    assert.equal(await other.page.locator("#current").inputValue(), "");
+    assert.equal((await perform(other.page, "/v1/identity/session")).status, 200);
+    // A fresh user navigation is required for another deliberate attempt.
     await populatePage(other.page, b);
     const countBeforeLost = counters.changes;
     dropNextChange = true;
