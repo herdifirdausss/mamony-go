@@ -41,6 +41,7 @@ var requiredTests = []string{
 	"TestIdentityZDirectSessionMintThreatFixture",
 	"TestIdentityZAuthenticationGrants",
 	"TestIdentityZSessionIdleExpiry",
+	"TestIdentityZMaxActiveSessions",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
@@ -149,7 +150,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -248,7 +249,8 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZSessionFreezeIssueInterleavings") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZDirectSessionMintThreatFixture") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZAuthenticationGrants") ||
-						strings.HasPrefix(ev.Test, "TestIdentityZSessionIdleExpiry"))) {
+						strings.HasPrefix(ev.Test, "TestIdentityZSessionIdleExpiry") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZMaxActiveSessions"))) {
 				passed[ev.Test] = true
 			}
 
