@@ -85,4 +85,3 @@ func (a *AuthenticationGrantAuthority) Issue(ctx context.Context, subject string
 	}
 	return AuthenticationGrant{secret: secret}, nil
 }
-
