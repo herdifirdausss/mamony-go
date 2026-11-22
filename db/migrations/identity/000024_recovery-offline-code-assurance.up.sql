@@ -276,4 +276,4 @@ $$;
 
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (24, '__REPLACE_SHA256__');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (24, '2cb2a5606886b5eac5d6d748affc670f0dde371576ff82b01bb7467828be769b');
