@@ -553,7 +553,6 @@ func TestPostgresIdentityZNoticeMonitorRole(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZRecoveryIssuerRole proves the v19 issuance credential
 // cannot read recovery envelopes, inspect account data or mutate a verifier.
 // Only the purpose-bound, owner-controlled issue function may be executed.
@@ -562,7 +561,7 @@ func TestPostgresIdentityZRecoveryIssuerRole(t *testing.T) {
 		"SELECT mamony_identity.issue_password_recovery('missing@example.test','rcv_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'),'fixture-key',decode(repeat('22',72),'hex'))",
 	} {
 		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_ISSUER_URL", "-c", sql)
-		if err != nil || out != "false" {
+		if err != nil || out != "f" {
 			t.Fatalf("dedicated recovery issuer lost narrow EXECUTE permission: out=%s err=%v", out, err)
 		}
 	}
