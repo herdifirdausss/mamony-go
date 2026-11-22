@@ -132,7 +132,10 @@ func (h *BrowserPasswordChangeHTTP) ServeHTTP(w http.ResponseWriter, r *http.Req
 func decodePasswordChangeJSON(body io.Reader) (string, string, string, error) {
 	dec := json.NewDecoder(body)
 	first, err := dec.Token()
-	if err != nil || first != json.Delim('{') {
+	if err != nil {
+		return "", "", "", err
+	}
+	if first != json.Delim('{') {
 		return "", "", "", ErrBrowserSessionHTTPConfig
 	}
 	seen := make(map[string]bool, 3)
@@ -140,7 +143,7 @@ func decodePasswordChangeJSON(body io.Reader) (string, string, string, error) {
 	for dec.More() {
 		token, err := dec.Token()
 		if err != nil {
-			return "", "", "", ErrBrowserSessionHTTPConfig
+			return "", "", "", err
 		}
 		key, ok := token.(string)
 		if !ok || seen[key] || (key != "email" && key != "currentPassword" && key != "nextPassword") {
@@ -148,7 +151,12 @@ func decodePasswordChangeJSON(body io.Reader) (string, string, string, error) {
 		}
 		seen[key] = true
 		var value string
-		if err := dec.Decode(&value); err != nil || len(value) == 0 ||
+		if err := dec.Decode(&value); err != nil {
+			// Preserve *http.MaxBytesError when the client streams a body
+			// without Content-Length; the HTTP boundary must respond 413.
+			return "", "", "", err
+		}
+		if len(value) == 0 ||
 			(key == "email" && len(value) > 254) ||
 			(key != "email" && len(value) > 512) {
 			return "", "", "", ErrBrowserSessionHTTPConfig
@@ -156,11 +164,17 @@ func decodePasswordChangeJSON(body io.Reader) (string, string, string, error) {
 		values[key] = value
 	}
 	end, err := dec.Token()
-	if err != nil || end != json.Delim('}') || !seen["email"] ||
+	if err != nil {
+		return "", "", "", err
+	}
+	if end != json.Delim('}') || !seen["email"] ||
 		!seen["currentPassword"] || !seen["nextPassword"] {
 		return "", "", "", ErrBrowserSessionHTTPConfig
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		if err != nil {
+			return "", "", "", err
+		}
 		return "", "", "", ErrBrowserSessionHTTPConfig
 	}
 	return values["email"], values["currentPassword"], values["nextPassword"], nil
