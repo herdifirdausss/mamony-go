@@ -8,7 +8,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
+	"strings"
 )
 
 var ErrRecoveryEnvelope = errors.New("recovery envelope unavailable")
@@ -47,9 +47,44 @@ func NewRecoveryKeyring(active string, material map[string][]byte) (*RecoveryKey
 	return &RecoveryKeyring{active: active, keys: keys}, nil
 }
 
+// AAD input is already canonically validated by the usecase and persisted
+// SQL. Keep this defensive syntax check local to the crypto adapter so the
+// repository cannot import Identity domain (enforced by archlint).
+func validRecoveryEnvelopeEmail(email string) bool {
+	if len(email) < 3 || len(email) > 254 || strings.ToLower(email) != email ||
+		strings.TrimSpace(email) != email || strings.Count(email, "@") != 1 {
+		return false
+	}
+	local, host, ok := strings.Cut(email, "@")
+	if !ok || len(local) == 0 || len(local) > 64 ||
+		strings.HasPrefix(local, ".") || strings.HasSuffix(local, ".") ||
+		strings.Contains(local, "..") || strings.ContainsAny(local, "()<>[]:;\\\" ,") ||
+		!strings.Contains(host, ".") || strings.HasPrefix(host, ".") ||
+		strings.HasSuffix(host, ".") || strings.Contains(host, "..") {
+		return false
+	}
+	for _, ch := range local {
+		if !(ch >= 'a' && ch <= 'z' || ch >= '0' && ch <= '9' ||
+			strings.ContainsRune("!#$%&'*+-/=?^_`{|}~.", ch)) {
+			return false
+		}
+	}
+	for _, label := range strings.Split(host, ".") {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' ||
+			label[len(label)-1] == '-' {
+			return false
+		}
+		for _, ch := range label {
+			if !(ch >= 'a' && ch <= 'z' || ch >= '0' && ch <= '9' || ch == '-') {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func recoveryAAD(email, challenge string) ([]byte, error) {
-	canonical, err := domain.CanonicalEmail(email)
-	if err != nil || canonical != email || len(challenge) != 26 ||
+	if !validRecoveryEnvelopeEmail(email) || len(challenge) != 26 ||
 		challenge[:4] != "rcv_" {
 		return nil, ErrRecoveryEnvelope
 	}
