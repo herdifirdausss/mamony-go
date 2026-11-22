@@ -402,3 +402,49 @@ func TestPostgresIdentityZPasswordChangeRole(t *testing.T) {
 		}
 	}
 }
+
+func TestPostgresIdentityZSecurityNoticeRole(t *testing.T) {
+	const claim = "SELECT * FROM mamony_identity.claim_password_change_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')"
+	const finalize = "SELECT mamony_identity.finalize_password_change_notice('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','ACCEPTED')"
+	out, err := invokePSQL("TEST_IDENTITY_SECURITY_NOTICE_URL", "-c", claim)
+	if err != nil || out != "" {
+		t.Fatalf("notice worker could not execute safe empty claim: %q %v", out, err)
+	}
+	out, err = invokePSQL("TEST_IDENTITY_SECURITY_NOTICE_URL", "-c", finalize)
+	if err != nil || out != "f" {
+		t.Fatalf("notice worker cannot execute fenced finalize: %q %v", out, err)
+	}
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.malicious_notice (id integer)",
+		"SELECT * FROM mamony_identity.password_change_notices",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT canonical_email FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"UPDATE mamony_identity.password_change_notices SET status='ACCEPTED'",
+		"DELETE FROM mamony_identity.password_change_notices",
+		"INSERT INTO mamony_identity.security_outbox(event_id) VALUES ('bad')",
+		"SELECT mamony_identity.stage_password_change_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'))",
+		"SELECT mamony_identity.rotate_password_verifier(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',16),'hex'),decode(repeat('44',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.purge_old_password_change_notices()",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_SECURITY_NOTICE_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("notice role escaped EXECUTE-only boundary: %q output=%q err=%v", stmt, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL", "TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL", "TEST_IDENTITY_PASSWORD_CHANGE_URL",
+		"TEST_IDENTITY_DELIVERY_URL", "TEST_PLATFORM_RUNTIME_URL",
+	} {
+		for _, stmt := range []string{claim, finalize} {
+			out, err := invokePSQL(role, "-c", stmt)
+			if err == nil || !strings.Contains(out, "42501") {
+				t.Fatalf("role %s could claim/finalize alerts: sql=%q out=%q err=%v", role, stmt, out, err)
+			}
+		}
+	}
+}
