@@ -26,7 +26,7 @@ func (AuthenticationGrant) MarshalText() ([]byte, error) { return nil, ErrSessio
 // A compromise of this role can assert arbitrary successful authentication;
 // it must not be treated as a password verifier or independent security root.
 type AuthenticationGrantStore interface {
-	Stage(context.Context, string, []byte) (bool, error)
+	Stage(context.Context, string, int64, []byte) (bool, error)
 }
 
 type AuthenticationGrantAuthority struct {
@@ -59,11 +59,11 @@ func authenticationGrantDigest(secret string) ([32]byte, error) {
 // Issue may be invoked ONLY after PasswordLoginFlow successfully consumes
 // admission and verifies the password. Profile A relies on this trusted
 // composition, NOT on a cryptographically independent SQL password check.
-func (a *AuthenticationGrantAuthority) Issue(ctx context.Context, subject string) (AuthenticationGrant, error) {
+func (a *AuthenticationGrantAuthority) Issue(ctx context.Context, subject string, expectedEpoch int64) (AuthenticationGrant, error) {
 	if a == nil || a.store == nil || a.random == nil || ctx == nil || ctx.Err() != nil {
 		return AuthenticationGrant{}, ErrSessionUnavailable
 	}
-	if !validSessionSubject.MatchString(subject) {
+	if !validSessionSubject.MatchString(subject) || expectedEpoch <= 0 {
 		return AuthenticationGrant{}, ErrSessionDenied
 	}
 	var token [32]byte
@@ -75,7 +75,7 @@ func (a *AuthenticationGrantAuthority) Issue(ctx context.Context, subject string
 	if err != nil {
 		return AuthenticationGrant{}, ErrSessionUnavailable
 	}
-	allowed, err := a.store.Stage(ctx, subject, digest[:])
+	allowed, err := a.store.Stage(ctx, subject, expectedEpoch, digest[:])
 	if err != nil {
 		// Including an ambiguous commit: no raw grant may be returned or retried.
 		return AuthenticationGrant{}, ErrSessionUnavailable
