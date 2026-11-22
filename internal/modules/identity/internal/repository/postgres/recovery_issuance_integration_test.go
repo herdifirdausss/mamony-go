@@ -79,7 +79,7 @@ func TestIdentityRecoveryIssuance(t *testing.T) {
 		return usecase.RecoveryIssue{
 			CanonicalEmail: email, ChallengeID: randomID(t, "rcv_"),
 			TokenDigest: [32]byte{n},
-			KeyID: "synthetic-aead", SealedToken: bytes.Repeat([]byte{n}, 72),
+			KeyID:       "synthetic-aead", SealedToken: bytes.Repeat([]byte{n}, 72),
 		}
 	}
 	first := mk(1)
