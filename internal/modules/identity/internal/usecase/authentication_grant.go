@@ -17,8 +17,8 @@ type AuthenticationGrant struct {
 	secret string
 }
 
-func (AuthenticationGrant) String() string { return "[authentication grant redacted]" }
-func (AuthenticationGrant) GoString() string { return "[authentication grant redacted]" }
+func (AuthenticationGrant) String() string               { return "[authentication grant redacted]" }
+func (AuthenticationGrant) GoString() string             { return "[authentication grant redacted]" }
 func (AuthenticationGrant) MarshalJSON() ([]byte, error) { return nil, ErrSessionUnavailable }
 func (AuthenticationGrant) MarshalText() ([]byte, error) { return nil, ErrSessionUnavailable }
 
