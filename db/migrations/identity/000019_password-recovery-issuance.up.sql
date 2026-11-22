@@ -128,4 +128,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.issue_password_recovery(
     TO mamony_identity_recovery_issuer_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (19, '__REPLACE_SHA256__');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (19, 'aa8e55f536fc8d451c01d4d7569162fdf5e745ee9ae069ccd5b44fe5ce438ae2');
