@@ -50,6 +50,7 @@ var requiredTests = []string{
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
+	"TestIdentityMailgunMockSecurityNoticePipeline",
 	"TestIdentityHTTPEnrollmentDB",
 	"TestIdentityZEnrollmentReconciliationDB",
 	"TestIdentityZEnrollmentBacklogDB",
