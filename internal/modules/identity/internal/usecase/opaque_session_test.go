@@ -174,12 +174,12 @@ func TestSessionLoginNeverIssuesWithoutAuthenticatedCandidateOrRecheck(t *testin
 		t.Fatal("nil atomic session issuer accepted")
 	}
 	for _, tc := range []struct {
-		name string
+		name         string
 		candidateErr error
-		subject string
-		issueErr error
-		want error
-		issueCount int
+		subject      string
+		issueErr     error
+		want         error
+		issueCount   int
 	}{
 		{"denied", ErrPasswordAuthenticationDenied, "", nil, ErrPasswordAuthenticationDenied, 0},
 		{"rate limited", ErrPasswordLoginThrottled, "", nil, ErrPasswordLoginThrottled, 0},
@@ -193,7 +193,9 @@ func TestSessionLoginNeverIssuesWithoutAuthenticatedCandidateOrRecheck(t *testin
 			candidate := &sessionCandidateFake{subject: tc.subject, err: tc.candidateErr}
 			issuer := &sessionIssuerFake{token: OpaqueSession{secret: "secret"}, err: tc.issueErr}
 			login, err := NewSessionLogin(candidate, issuer)
-			if err != nil { t.Fatal(err) }
+			if err != nil {
+				t.Fatal(err)
+			}
 			session, gotErr := login.Authenticate(context.Background(), "alice@example.test", "password", netip.MustParseAddr("192.0.2.1"))
 			if candidate.calls != 1 || issuer.calls != tc.issueCount {
 				t.Fatal("session issued without pre-KDF admission and successful password")
