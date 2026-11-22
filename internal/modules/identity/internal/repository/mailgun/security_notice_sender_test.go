@@ -120,7 +120,7 @@ func TestSecurityNoticeSenderSendsOnlyTokenFreeTextWithPinnedMailgunHost(t *test
 	if sender.endpoint != "https://api.eu.mailgun.net/v3/mg.example.test/messages" {
 		t.Fatal("sender used a caller-controlled or incorrect API endpoint")
 	}
-	if err := sender.SendPasswordChanged(context.Background(), fixtureNoticeEvent,
+	if _, err := sender.SendPasswordChanged(context.Background(), fixtureNoticeEvent,
 		"alice@example.test"); err != nil || requests != 1 {
 		t.Fatalf("expected one mock provider acceptance: %v requests=%d", err, requests)
 	}
@@ -184,7 +184,7 @@ func TestSecurityNoticeMailgunStatusClassificationAndRedaction(t *testing.T) {
 				w.WriteHeader(tc.status)
 				_, _ = fmt.Fprint(w, tc.body)
 			})
-			err := s.SendPasswordChanged(context.Background(), fixtureNoticeEvent, "alice@example.test")
+			_, err := s.SendPasswordChanged(context.Background(), fixtureNoticeEvent, "alice@example.test")
 			if tc.want == nil && err != nil || tc.want != nil && !errors.Is(err, tc.want) {
 				t.Fatalf("status %d: unexpected result: %v", tc.status, err)
 			}
@@ -207,7 +207,7 @@ func TestSecurityNoticeSenderRejectsInvalidEventRecipientAndCancel(t *testing.T)
 		{fixtureNoticeEvent, "alice@example.test,bob@example.test"},
 		{fixtureNoticeEvent, "alice@example.test\nBCC:bad"},
 	} {
-		if err := s.SendPasswordChanged(context.Background(), tc.event, tc.recipient); !errors.Is(err, usecase.ErrPermanentDelivery) {
+		if _, err := s.SendPasswordChanged(context.Background(), tc.event, tc.recipient); !errors.Is(err, usecase.ErrPermanentDelivery) {
 			t.Fatal("invalid security notice reached sender")
 		}
 	}
