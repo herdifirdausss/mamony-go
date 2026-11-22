@@ -600,3 +600,56 @@ func TestPostgresIdentityZRecoveryIssuerRole(t *testing.T) {
 		}
 	}
 }
+
+
+// TestPostgresIdentityZRecoveryDeliveryRole exercises the isolated v20
+// SECURITY DEFINER surface: only lease claim/finalize, no direct table access.
+func TestPostgresIdentityZRecoveryDeliveryRole(t *testing.T) {
+	lease := "lse_AAAAAAAAAAAAAAAAAAAAAA"
+	challenge := "rcv_AAAAAAAAAAAAAAAAAAAAAA"
+	out, err := invokePSQL("TEST_IDENTITY_RECOVERY_DELIVERY_URL", "-c",
+		"SELECT mamony_identity.finalize_password_recovery_delivery('"+challenge+"','"+lease+"','TEMPORARY')")
+	if err != nil || out != "f" {
+		t.Fatalf("recovery delivery must EXECUTE only approved function: %q %v", out, err)
+	}
+	if _, err := invokePSQL("TEST_IDENTITY_RECOVERY_DELIVERY_URL", "-c",
+		"SELECT * FROM mamony_identity.claim_password_recovery_delivery('"+lease+"')"); err != nil {
+		t.Fatalf("recovery delivery claim EXECUTE was denied: %v", err)
+	}
+	for _, sql := range []string{
+		"CREATE TABLE mamony_identity.delivery_escape(id integer)",
+		"SELECT * FROM mamony_identity.password_recovery_challenges",
+		"SELECT * FROM mamony_identity.password_recovery_deliveries",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.email_verification_challenges",
+		"SELECT * FROM mamony_identity.email_proof_deliveries",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT * FROM mamony_identity.anonymous_admission_buckets",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"SELECT * FROM mamony_identity.schema_migrations",
+		"UPDATE mamony_identity.password_recovery_deliveries SET status='ACCEPTED'",
+		"UPDATE mamony_identity.password_verifiers SET digest=decode(repeat('11',32),'hex')",
+		"SELECT mamony_identity.issue_password_recovery('missing@example.test','"+challenge+"',decode(repeat('11',32),'hex'),'fixture-key',decode(repeat('22',72),'hex'))",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_DELIVERY_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("recovery delivery role escalated on %q: out=%q err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_RECOVERY_ISSUER_URL",
+		"TEST_IDENTITY_VERIFIER_URL", "TEST_IDENTITY_DELIVERY_URL",
+		"TEST_IDENTITY_PASSWORD_CHANGE_URL", "TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c",
+			"SELECT * FROM mamony_identity.claim_password_recovery_delivery('"+lease+"')")
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("non-worker role called recovery delivery: role=%s out=%q err=%v", role, out, err)
+		}
+	}
+}
