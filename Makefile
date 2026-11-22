@@ -4,6 +4,7 @@ check: fmt-check vet unit architecture docs skills migrations-check build
 
 
 fmt-check:
+	@gofmt -d cmd/mamony-identity-notice-health/main_test.go
 	@gofmt -l .
 	@test -z "`gofmt -l .`" || { echo "gofmt required"; exit 1; }
 
