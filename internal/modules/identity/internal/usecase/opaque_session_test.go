@@ -23,7 +23,7 @@ type fakeSessionStore struct {
 	issueErr   error
 	resolveErr error
 	revokeErr  error
-	digest     []byte
+	digest      []byte
 	grantDigest []byte
 	event      string
 }
@@ -52,11 +52,11 @@ func fixedAuthenticationGrant() AuthenticationGrant {
 }
 
 type fakeAuthenticationGrantStore struct {
-	allow    bool
-	err      error
-	stages   int
-	subject  string
-	digest   []byte
+	allow   bool
+	err     error
+	stages  int
+	subject string
+	digest  []byte
 }
 
 func (f *fakeAuthenticationGrantStore) Stage(_ context.Context, subject string, digest []byte) (bool, error) {
