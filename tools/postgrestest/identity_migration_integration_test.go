@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "11:false" {
-		t.Fatalf("identity migration should be at clean version 11: %q err=%v", out, err)
+	if err != nil || out != "12:false" {
+		t.Fatalf("identity migration should be at clean version 12: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "11" {
+	if err != nil || out != "12" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -259,6 +259,7 @@ func TestPostgresIdentityZSessionRole(t *testing.T) {
 	}
 	for _, sql := range []string{
 		"SELECT * FROM mamony_identity.password_login_grants",
+		"UPDATE mamony_identity.opaque_sessions SET last_seen_at=clock_timestamp()",
 		"SELECT mamony_identity.stage_password_auth_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'))",
 		"SELECT * FROM mamony_identity.opaque_sessions",
 		"SELECT token_digest FROM mamony_identity.opaque_sessions LIMIT 1",
