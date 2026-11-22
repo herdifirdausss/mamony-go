@@ -36,13 +36,13 @@ func (s *AuthenticationStore) LookupCredential(ctx context.Context, canonical st
 	var memory, iterations int32
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT
-				s.subject_id, s.status, a.verified_at IS NOT NULL,
+				s.subject_id, s.session_epoch, s.status, a.verified_at IS NOT NULL,
 				p.kdf_version, p.memory_kib, p.iterations, p.parallelism, p.salt, p.digest
 			FROM mamony_identity.email_aliases a
 			JOIN mamony_identity.subjects s ON s.subject_id=a.subject_id
 			JOIN mamony_identity.password_verifiers p ON p.subject_id=s.subject_id
 			WHERE a.canonical_email=$1`, canonical).
-			Scan(&out.SubjectID, &out.Status, &out.EmailVerified,
+			Scan(&out.SubjectID, &out.SessionEpoch, &out.Status, &out.EmailVerified,
 				&version, &memory, &iterations, &parallelism,
 				&out.Verifier.Salt, &out.Verifier.Digest)
 	})
@@ -63,7 +63,7 @@ func (s *AuthenticationStore) LookupCredential(ctx context.Context, canonical st
 		Iterations: uint32(iterations), Parallelism: uint8(parallelism),
 		Salt: out.Verifier.Salt, Digest: out.Verifier.Digest,
 	}
-	if out.SubjectID == "" {
+	if out.SubjectID == "" || out.SessionEpoch <= 0 {
 		return usecase.AuthenticationCredential{}, false, usecase.ErrPasswordAuthenticationUnavailable
 	}
 	return out, true, nil
