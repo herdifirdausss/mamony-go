@@ -27,16 +27,22 @@ func (s *SecurityNoticeStore) Claim(ctx context.Context, lease string) (usecase.
 		len(lease) != 26 || lease[:4] != "lse_" {
 		return job, false, ErrStorageUnavailable
 	}
+	var sendable bool
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx,
-			"SELECT event_id,recipient FROM mamony_identity.claim_password_change_notice($1)",
-			lease).Scan(&job.EventID, &job.Recipient)
+			"SELECT event_id,recipient,sendable FROM mamony_identity.claim_password_change_notice($1)",
+			lease).Scan(&job.EventID, &job.Recipient, &sendable)
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return usecase.SecurityNoticeJob{}, false, nil
 	}
 	if err != nil {
 		return usecase.SecurityNoticeJob{}, false, ErrStorageUnavailable
+	}
+	if !sendable {
+		// Deliberate no-send result committed the DEAD queue transition.
+		// Never expose the stale recipient to a notification sender.
+		return usecase.SecurityNoticeJob{}, false, nil
 	}
 	job.LeaseID = lease
 	return job, true, nil
