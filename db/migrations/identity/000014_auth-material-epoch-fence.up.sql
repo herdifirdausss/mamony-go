@@ -6,9 +6,11 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN -- PL/pgSQL function block; not a migration transaction
-    IF TG_OP = 'UPDATE' AND NEW.subject_id IS DISTINCT FROM OLD.subject_id THEN
-        RAISE EXCEPTION 'identity auth material cannot change owner'
-            USING ERRCODE='23514';
+    IF TG_OP = 'UPDATE' THEN
+        IF NEW.subject_id IS DISTINCT FROM OLD.subject_id THEN
+            RAISE EXCEPTION 'identity auth material cannot change owner'
+                USING ERRCODE='23514';
+        END IF;
     END IF;
     UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1
       WHERE subject_id=OLD.subject_id;
@@ -82,4 +84,4 @@ REVOKE ALL ON FUNCTION mamony_identity.stage_password_auth_grant(text,bigint,byt
 GRANT EXECUTE ON FUNCTION mamony_identity.stage_password_auth_grant(text,bigint,bytea)
   TO mamony_identity_auth_grant_runtime;
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (14, '5f268c098f6067c192179c115ac11bebe1a5237255a8a5cc90d868d0838ade33');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (14, '7a8fc2586a00582d9b0a32c9ebb00d39cf5efc29b5ff93f22b314515e5947982');
