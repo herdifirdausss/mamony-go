@@ -68,7 +68,5 @@ jobs:
         run: make integration
       - name: Run actual Chromium for verification, sessions, and password change
         run: |
-          go test -tags=integration,browser_e2e -run '^TestIdentityZBrowser(Verification|Session|PasswordChange)E2E \
+          go test -tags=integration,browser_e2e -run '^TestIdentityZBrowser(Verification|Session|PasswordChange)E2E$' \
             -count=1 -timeout=6m ./internal/modules/identity
- \
-            -count=1 -timeout=4m ./internal/modules/identity
