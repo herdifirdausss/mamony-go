@@ -336,7 +336,9 @@ async function run() {
     secureCookie(await other.context.cookies(origin));
     assert.equal((await perform(other.page, "/v1/identity/session")).status, 401);
     await other.context.clearCookies(); // test-only acknowledgement of stale cookie
-    await login(other.page, b, b.old, 401);
+    // Account A already proved the old secret is denied. Do not repeat an
+    // equivalent bad-password probe here: it would consume B's durable
+    // alias/client admission budget and make a valid re-login return 429.
     await login(other.page, b, b.next, 204);
     secureCookie(await other.context.cookies(origin));
     assert.equal((await perform(other.page, "/v1/identity/session")).status, 200);
