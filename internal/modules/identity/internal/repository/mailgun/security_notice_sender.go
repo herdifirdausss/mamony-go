@@ -93,10 +93,10 @@ func validSecurityEventID(id string) bool {
 // SendPasswordChanged implements the internal token-free notice port.
 // The event ID is a local correlation key, NOT a Mailgun exactly-once key.
 // A provider may accept an ambiguous HTTP request more than once.
-func (s *SecurityNoticeSender) SendPasswordChanged(ctx context.Context, eventID, recipient string) error {
+func (s *SecurityNoticeSender) SendPasswordChanged(ctx context.Context, eventID, recipient string) (string, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil ||
 		!validSecurityEventID(eventID) || !validRecipient(recipient) {
-		return usecase.ErrPermanentDelivery
+		return "", usecase.ErrPermanentDelivery
 	}
 	const message = "The password for your Mamony account was changed.\n\n" +
 		"If you made this change, no action is needed.\n" +
@@ -117,15 +117,15 @@ func (s *SecurityNoticeSender) SendPasswordChanged(ctx context.Context, eventID,
 	}
 	for _, pair := range fields {
 		if err := form.WriteField(pair[0], pair[1]); err != nil {
-			return usecase.ErrDeliveryUnavailable
+			return "", usecase.ErrDeliveryUnavailable
 		}
 	}
 	if err := form.Close(); err != nil {
-		return usecase.ErrDeliveryUnavailable
+		return "", usecase.ErrDeliveryUnavailable
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint, &buf)
 	if err != nil {
-		return usecase.ErrDeliveryUnavailable
+		return "", usecase.ErrDeliveryUnavailable
 	}
 	req.Header.Set("Content-Type", form.FormDataContentType())
 	req.Header.Set("Accept", "application/json")
@@ -134,22 +134,25 @@ func (s *SecurityNoticeSender) SendPasswordChanged(ctx context.Context, eventID,
 	if err != nil {
 		// Never expose provider URLs, credentials, recipient addresses or
 		// response bodies via returned errors, audits or process logs.
-		return usecase.ErrDeliveryUnavailable
+		return "", usecase.ErrDeliveryUnavailable
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == 420 ||
 			resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode >= http.StatusInternalServerError {
-			return usecase.ErrDeliveryUnavailable
+			return "", usecase.ErrDeliveryUnavailable
 		}
-		return usecase.ErrPermanentDelivery
+		return "", usecase.ErrPermanentDelivery
 	}
 	var accepted struct {
 		ID string `json:"id"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&accepted); err != nil ||
-		len(accepted.ID) < 3 || len(accepted.ID) > 512 {
-		return usecase.ErrDeliveryUnavailable
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&accepted); err != nil {
+		return "", usecase.ErrDeliveryUnavailable
 	}
-	return nil
+	normalized, ok := usecase.NormalizeMailgunMessageID(accepted.ID)
+	if !ok {
+		return "", usecase.ErrDeliveryUnavailable
+	}
+	return normalized, nil
 }
