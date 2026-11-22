@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "20:false" {
-		t.Fatalf("identity migration should be at clean version 20: %q err=%v", out, err)
+	if err != nil || out != "21:false" {
+		t.Fatalf("identity migration should be at clean version 21: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "20" {
+	if err != nil || out != "21" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
