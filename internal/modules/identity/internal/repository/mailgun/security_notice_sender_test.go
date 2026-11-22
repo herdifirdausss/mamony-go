@@ -213,7 +213,7 @@ func TestSecurityNoticeSenderRejectsInvalidEventRecipientAndCancel(t *testing.T)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test"); !errors.Is(err, usecase.ErrPermanentDelivery) {
+	if _, err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test"); !errors.Is(err, usecase.ErrPermanentDelivery) {
 		t.Fatal("canceled send attempted HTTP")
 	}
 	if calls != 0 {
@@ -228,7 +228,7 @@ func TestSecurityNoticeSenderMockHTTPTimeoutIsRedactedRetryable(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test"); !errors.Is(err, usecase.ErrDeliveryUnavailable) {
+	if _, err := s.SendPasswordChanged(ctx, fixtureNoticeEvent, "alice@example.test"); !errors.Is(err, usecase.ErrDeliveryUnavailable) {
 		t.Fatalf("timeout should be a sanitized retryable result: %v", err)
 	}
 }
