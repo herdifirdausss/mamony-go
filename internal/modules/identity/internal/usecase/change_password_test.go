@@ -156,8 +156,7 @@ func TestAuthenticatedPasswordChangeRequiresSessionAndRealOldPasswordPath(t *tes
 		login, _ := NewPasswordLoginFlow(gate, &loginPasswordFake{subject: "sub_AAAAAAAAAAAAAAAAAAAAAA"})
 		grant, _ := testAuthenticationGrantAuthority(t)
 		if _, err := NewAuthenticatedPasswordChange(nil, login, grant, hasher, store,
-			domain.PasswordPolicy{IsBlocked: func(string, string) bool { return false }});
-			!errors.Is(err, ErrPasswordChangeUnavailable) {
+			domain.PasswordPolicy{IsBlocked: func(string, string) bool { return false }}); !errors.Is(err, ErrPasswordChangeUnavailable) {
 			t.Fatal("missing verified session authority accepted")
 		}
 	})
