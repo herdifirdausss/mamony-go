@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Print gofmt review only
         run: |
-          gofmt -d internal/modules/identity/internal/usecase/opaque_session.go
-          gofmt -d internal/modules/identity/internal/usecase/opaque_session_test.go
-          gofmt -d internal/modules/identity/opaque_session_integration_test.go
-          gofmt -d internal/modules/identity/internal/repository/postgres/maintenance.go
+          gofmt -d internal/modules/identity/internal/usecase/opaque_session.go || true
+          gofmt -d internal/modules/identity/internal/usecase/opaque_session_test.go || true
+          gofmt -d internal/modules/identity/opaque_session_integration_test.go || true
+          gofmt -d internal/modules/identity/internal/repository/postgres/maintenance.go || true
