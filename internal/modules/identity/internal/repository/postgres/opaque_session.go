@@ -9,7 +9,7 @@ import (
 )
 
 // OpaqueSessionStore MUST use the separately provisioned session runtime.
-// That role has EXECUTE on three narrow SECURITY DEFINER functions and no
+// That role has EXECUTE on grant-consume/resolve/revoke functions and no
 // direct table SELECT, INSERT, UPDATE or DELETE privileges.
 type OpaqueSessionStore struct {
 	db Transactor
@@ -22,16 +22,16 @@ func NewOpaqueSessionStore(db Transactor) (*OpaqueSessionStore, error) {
 	return &OpaqueSessionStore{db: db}, nil
 }
 
-func (s *OpaqueSessionStore) Issue(ctx context.Context, subject string, digest []byte, event string) (bool, error) {
+func (s *OpaqueSessionStore) Issue(ctx context.Context, grantDigest, digest []byte, event string) (bool, error) {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
-		len(digest) != 32 || len(subject) != 26 || len(event) != 26 {
+		len(digest) != 32 || len(grantDigest) != 32 || len(event) != 26 {
 		return false, usecase.ErrSessionUnavailable
 	}
 	var allowed bool
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx,
-			"SELECT mamony_identity.issue_opaque_session($1,$2,$3)",
-			subject, digest, event).Scan(&allowed)
+			"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+			grantDigest, digest, event).Scan(&allowed)
 	})
 	if err != nil {
 		// Includes unknown outcome after COMMIT: no bearer can be released.
