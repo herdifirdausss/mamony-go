@@ -259,7 +259,7 @@ func TestPostgresIdentityZSessionRole(t *testing.T) {
 	}
 	for _, sql := range []string{
 		"SELECT * FROM mamony_identity.password_login_grants",
-		"SELECT mamony_identity.stage_password_auth_grant(\'sub_AAAAAAAAAAAAAAAAAAAAAA\',decode(repeat(\'11\',32),\'hex\'))",
+		"SELECT mamony_identity.stage_password_auth_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'))",
 		"SELECT * FROM mamony_identity.opaque_sessions",
 		"SELECT token_digest FROM mamony_identity.opaque_sessions LIMIT 1",
 		"INSERT INTO mamony_identity.opaque_sessions (token_digest) VALUES ('\\x00'::bytea)",
