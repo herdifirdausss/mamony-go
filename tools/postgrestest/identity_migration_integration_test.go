@@ -245,10 +245,10 @@ func TestPostgresIdentityZAuthenticatorRole(t *testing.T) {
 }
 
 // TestPostgresIdentityZSessionRole verifies that the dedicated session runtime
-// only executes three reviewed SECURITY DEFINER functions and no direct SQL.
+// only executes grant-consume/resolve/revoke SECURITY DEFINER functions and no direct SQL.
 func TestPostgresIdentityZSessionRole(t *testing.T) {
 	for _, stmt := range []string{
-		"SELECT mamony_identity.issue_opaque_session('invalid',decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.issue_opaque_session_with_grant(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
 		"SELECT mamony_identity.resolve_opaque_session(decode(repeat('22',32),'hex')) IS NULL",
 		"SELECT mamony_identity.revoke_opaque_session(decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
 	} {
@@ -258,6 +258,8 @@ func TestPostgresIdentityZSessionRole(t *testing.T) {
 		}
 	}
 	for _, sql := range []string{
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT mamony_identity.stage_password_auth_grant(\'sub_AAAAAAAAAAAAAAAAAAAAAA\',decode(repeat(\'11\',32),\'hex\'))",
 		"SELECT * FROM mamony_identity.opaque_sessions",
 		"SELECT token_digest FROM mamony_identity.opaque_sessions LIMIT 1",
 		"INSERT INTO mamony_identity.opaque_sessions (token_digest) VALUES ('\\x00'::bytea)",
@@ -288,7 +290,7 @@ func TestPostgresIdentityZSessionRole(t *testing.T) {
 		"TEST_PLATFORM_RUNTIME_URL",
 	} {
 		out, err := invokePSQL(role, "-c",
-			"SELECT mamony_identity.issue_opaque_session('invalid',decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')")
+			"SELECT mamony_identity.issue_opaque_session_with_grant(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')")
 		if err == nil || !strings.Contains(out, "42501") {
 			t.Fatalf("non-session role could mint: %s err=%v out=%s", role, err, out)
 		}
@@ -297,5 +299,49 @@ func TestPostgresIdentityZSessionRole(t *testing.T) {
 		"SELECT (NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls)::text FROM pg_roles WHERE rolname=current_user")
 	if err != nil || out != "true" {
 		t.Fatalf("session runtime has elevated privileges: err=%v out=%s", err, out)
+	}
+}
+
+func TestPostgresIdentityZAuthenticationGrantRole(t *testing.T) {
+	out, err := invokePSQL("TEST_IDENTITY_AUTH_GRANT_URL", "-c",
+		"SELECT mamony_identity.stage_password_auth_grant('invalid',decode(repeat('11',32),'hex'))")
+	if err != nil || out != "false" {
+		t.Fatalf("dedicated grant role cannot stage approved typed function: %v %s", err, out)
+	}
+	for _, sql := range []string{
+		"SELECT mamony_identity.issue_opaque_session_with_grant(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.resolve_opaque_session(decode(repeat('22',32),'hex'))",
+		"SELECT mamony_identity.revoke_opaque_session(decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"INSERT INTO mamony_identity.password_login_grants (grant_digest) VALUES ('\\x00'::bytea)",
+		"UPDATE mamony_identity.password_login_grants SET consumed_at=now()",
+		"SELECT digest FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT mamony_identity.purge_expired_password_login_grants()",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_AUTH_GRANT_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("grant-stage role gained forbidden capability %q: err=%v out=%s", sql, err, out)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL", "TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_DELIVERY_URL", "TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c",
+			"SELECT mamony_identity.stage_password_auth_grant('invalid',decode(repeat('11',32),'hex'))")
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("non-grant role staged authentication: %s err=%v out=%s", role, err, out)
+		}
+	}
+	for _, role := range []string{"TEST_IDENTITY_SESSION_URL", "TEST_IDENTITY_AUTH_GRANT_URL"} {
+		out, err := invokePSQL(role, "-c",
+			"SELECT mamony_identity.issue_opaque_session('sub_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')")
+		if err == nil || !strings.Contains(out, "42883") {
+			t.Fatalf("removed subject-only function survived: %s err=%v out=%s", role, err, out)
+		}
 	}
 }
