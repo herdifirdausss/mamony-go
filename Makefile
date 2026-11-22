@@ -4,7 +4,6 @@ check: fmt-check vet unit architecture docs skills migrations-check build
 
 
 fmt-check:
-	@gofmt -d internal/modules/identity/authenticated_password_change_integration_test.go
 	@gofmt -l .
 	@test -z "`gofmt -l .`" || { echo "gofmt required"; exit 1; }
 
