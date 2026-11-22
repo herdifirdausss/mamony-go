@@ -132,6 +132,15 @@ func TestIdentityZAuthenticatedPasswordChange(t *testing.T) {
 	// Only this disposable fixture's admin creates a verified synthetic
 	// account. No production admin path or bypass is introduced.
 	subject := randomSyntheticID(t, "sub_")
+	t.Cleanup(func() {
+		cleanupCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		if _, err := admin.Exec(cleanupCtx,
+			"UPDATE mamony_identity.password_change_notices SET status='DEAD',lease_id=NULL,leased_until=NULL WHERE subject_id=$1 AND status='PENDING'",
+			subject); err != nil {
+			t.Errorf("failed to quarantine synthetic password notice: %v", err)
+		}
+	})
 	email := strings.ToLower(randomSyntheticID(t, "password_")) + "@example.test"
 	oldPassword := "synthetic old password for rotated credential"
 	nextPassword := "synthetic brand new password for rotated credential"
@@ -268,6 +277,15 @@ func TestIdentityZAuthenticatedPasswordChange(t *testing.T) {
 	}
 	if epoch() != before+1 || eventCount() != 1 {
 		t.Fatal("password change did not atomically advance epoch and record audit")
+	}
+	var pending int
+	if err := admin.QueryRow(ctx, `SELECT count(*)
+		FROM mamony_identity.password_change_notices n
+		JOIN mamony_identity.security_outbox o USING(event_id)
+		WHERE n.subject_id=$1 AND n.recipient=$2
+			AND o.event_type='PASSWORD_CHANGED' AND n.status='PENDING'`,
+		subject, email).Scan(&pending); err != nil || pending != 1 {
+		t.Fatal("successful password change did not transactionally enqueue one security notice")
 	}
 	if who, err := sessions.Resolve(ctx, bearer); who != "" ||
 		!errors.Is(err, usecase.ErrSessionInvalid) {
