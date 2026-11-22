@@ -48,7 +48,6 @@ func (s *RetentionStore) PurgeOneBatch(ctx context.Context) (int, int, error) {
 	return envelopes, counters, nil
 }
 
-
 // PurgeOneBatchWithSessions is the v10 operator path: the original 100
 // encrypted envelopes, 100 expired login buckets and 100 expired session
 // digests are removed together, or all rolled back on any error. The SQL
