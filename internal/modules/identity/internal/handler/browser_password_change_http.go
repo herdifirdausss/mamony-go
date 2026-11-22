@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	browserChangePasswordPath  = "/v1/identity/change-password"
+	browserRotatePath  = "/v1/identity/change-password"
 	browserChangePasswordBytes = 4096
 )
 
@@ -43,7 +43,7 @@ func (h *BrowserPasswordChangeHTTP) ServeHTTP(w http.ResponseWriter, r *http.Req
 		writeBrowserSessionProblem(w, http.StatusServiceUnavailable, "UNAVAILABLE")
 		return
 	}
-	if r.URL.Path != browserChangePasswordPath {
+	if r.URL.Path != browserRotatePath {
 		writeBrowserSessionProblem(w, http.StatusNotFound, "NOT_FOUND")
 		return
 	}
