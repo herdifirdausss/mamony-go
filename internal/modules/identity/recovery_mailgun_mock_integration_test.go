@@ -178,10 +178,10 @@ func TestIdentityMailgunMockRecoveryDelivery(t *testing.T) {
 	}
 	cfg := RecoveryDeliveryConfig{
 		DSN: workerDSN, Region: "US", Domain: "mg.example.test",
-		From: "Mamony Security <security@mg.example.test>",
-		MailgunKey: "synthetic-recovery-sending-key",
-		RecoveryURL: "https://app.example.test/account/recover-password",
-		ActiveKeyID: "recovery-fixture",
+		From:         "Mamony Security <security@mg.example.test>",
+		MailgunKey:   "synthetic-recovery-sending-key",
+		RecoveryURL:  "https://app.example.test/account/recover-password",
+		ActiveKeyID:  "recovery-fixture",
 		EnvelopeKeys: map[string][]byte{"recovery-fixture": secret},
 		PollInterval: 100 * time.Millisecond,
 		HTTPClient: &http.Client{Timeout: 2 * time.Second,
