@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrPasswordChangeDenied = errors.New("password change denied")
+	ErrPasswordChangeDenied      = errors.New("password change denied")
 	ErrPasswordChangeUnavailable = errors.New("password change unavailable")
 )
 
@@ -28,12 +28,12 @@ type PasswordChangeStore interface {
 // short-lived, one-use PASSWORD_CHANGE assertion.
 type AuthenticatedPasswordChange struct {
 	sessions *OpaqueSessionAuthority
-	current *PasswordLoginFlow
-	grants *AuthenticationGrantAuthority
-	hasher PasswordHasher
-	store PasswordChangeStore
-	policy domain.PasswordPolicy
-	random io.Reader
+	current  *PasswordLoginFlow
+	grants   *AuthenticationGrantAuthority
+	hasher   PasswordHasher
+	store    PasswordChangeStore
+	policy   domain.PasswordPolicy
+	random   io.Reader
 }
 
 func NewAuthenticatedPasswordChange(sessions *OpaqueSessionAuthority, current *PasswordLoginFlow,
@@ -43,10 +43,7 @@ func NewAuthenticatedPasswordChange(sessions *OpaqueSessionAuthority, current *P
 		store == nil || policy.IsBlocked == nil {
 		return nil, ErrPasswordChangeUnavailable
 	}
-	return &AuthenticatedPasswordChange{
-		sessions:sessions,current:current,grants:grants,hasher:hasher,
-		store:store,policy:policy,random:rand.Reader,
-	}, nil
+	return &AuthenticatedPasswordChange{sessions: sessions, current: current, grants: grants, hasher: hasher, store: store, policy: policy, random: rand.Reader}, nil
 }
 
 // Change deliberately issues NO replacement session. The previously
