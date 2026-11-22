@@ -125,8 +125,8 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		if _, err := conn.Exec(cleanupCtx, `UPDATE mamony_identity.password_recovery_deliveries
 		SET status='DEAD',lease_id=NULL,leased_until=NULL WHERE challenge_id=$1 AND status='PENDING'`,
 			challenge); err != nil {
-				t.Errorf("cleanup: %v", err)
-			}
+			t.Errorf("cleanup: %v", err)
+		}
 	})
 	next := "synthetic new recovered password credential"
 	if err := redeemer.Redeem(ctx, proof.ForTrustedDelivery(), email, next); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
@@ -235,8 +235,8 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		FROM mamony_identity.password_verifiers WHERE subject_id=$1`, subject).
 		Scan(&persisted.Version, &persisted.MemoryKiB, &persisted.Iterations,
 			&persisted.Parallelism, &persisted.Salt, &persisted.Digest); err != nil {
-				t.Fatal(err)
-			}
+		t.Fatal(err)
+	}
 	if valid, err := hasher.Verify(ctx, next, persisted); err != nil || !valid {
 		t.Fatal("new Argon2id password was not valid after reset")
 	}
@@ -274,12 +274,12 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			(subject_id,kdf_version,memory_kib,iterations,parallelism,salt,digest,created_at)
 			VALUES($1,1,65536,3,1,$2,$3,clock_timestamp())`,
 			s, initial.Salt, initial.Digest); err != nil {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
+		}
 		if _, err := admin.Exec(ctx,
 			"UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", s); err != nil {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
+		}
 		var current int64
 		if err := admin.QueryRow(ctx,
 			"SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", s).Scan(&current); err != nil {
@@ -348,12 +348,12 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		var eventCount int
 		if err := admin.QueryRow(ctx, `SELECT session_epoch FROM mamony_identity.subjects
 			WHERE subject_id=$1`, s).Scan(&current); err != nil {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
+		}
 		if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.security_outbox
 			WHERE subject_id=$1 AND event_type='PASSWORD_RECOVERED'`, s).Scan(&eventCount); err != nil {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
+		}
 		if winners != 1 || eventCount != 1 || current != before+1 {
 			t.Fatal("simultaneous recovery transactions produced duplicate authority")
 		}
@@ -363,8 +363,8 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_aliases
 			SET verified_at=clock_timestamp()+interval '1 second'
 			WHERE subject_id=$1`, s); err != nil {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
+		}
 		if err := redeemer.Redeem(ctx, bearer, alias, next); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
 			t.Fatal("stale contact epoch still authorized account reset")
 		}
@@ -383,8 +383,8 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			SET requested_at=clock_timestamp()-interval '16 minutes',
 			    expires_at=clock_timestamp()-interval '1 minute'
 			WHERE token_digest=$1`, digest[:]); err != nil {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
+		}
 		if err := redeemer.Redeem(ctx, bearer, alias, next); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
 			t.Fatal("expired recovery proof was accepted")
 		}
