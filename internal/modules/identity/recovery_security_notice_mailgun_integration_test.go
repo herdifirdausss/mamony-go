@@ -173,3 +173,71 @@ func TestIdentityMailgunMockRecoverySecurityNotice(t *testing.T) {
 		PollInterval:100*time.Millisecond,
 		HTTPClient:&http.Client{Timeout:2*time.Second,Transport:mockMailgunTransport{origin:mockOrigin}},
 	}
+
+	check:=func()(string,int,[]byte){
+		t.Helper()
+		var state string
+		var attempts int
+		var digest []byte
+		if err:=admin.QueryRow(ctx,`SELECT status,attempts,provider_message_digest
+			FROM mamony_identity.password_recovery_notices WHERE event_id=$1`,
+			event).Scan(&state,&attempts,&digest);err!=nil{
+			t.Fatal(err)
+		}
+		return state,attempts,digest
+	}
+	runUntil:=func(target string,wantAttempts int){
+		t.Helper()
+		runCtx,stop:=context.WithCancel(ctx)
+		done:=make(chan error,1)
+		go func(){done<-RunRecoverySecurityNotices(runCtx,cfg)}()
+		deadline:=time.Now().Add(7*time.Second)
+		for{
+			state,attempts,_:=check()
+			if state==target && attempts>=wantAttempts{break}
+			if time.Now().After(deadline){
+				stop()
+				t.Fatalf("recovery notice worker stuck: %s/%d want %s/%d",state,attempts,target,wantAttempts)
+			}
+			time.Sleep(25*time.Millisecond)
+		}
+		stop()
+		select{
+		case err:=<-done:
+			if err!=nil{t.Fatalf("recovery notice runner cancellation: %v",err)}
+		case <-time.After(3*time.Second):
+			t.Fatal("recovery notice runner did not stop")
+		}
+	}
+	runUntil("PENDING",1)
+	if calls.Load()!=1{t.Fatal("temporary Mailgun response must attempt once")}
+	health,err:=ReadRecoverySecurityNoticeHealth(ctx,monitorDSN)
+	if err!=nil || health.Retrying<1{t.Fatal("recovery notice count-only health did not observe retry")}
+	if _,err:=admin.Exec(ctx,`UPDATE mamony_identity.password_recovery_notices
+		SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE event_id=$1`,event);err!=nil{
+		t.Fatal(err)
+	}
+	statusCode.Store(200)
+	runUntil("ACCEPTED",2)
+	state,attempts,digest:=check()
+	expected:=sha256.Sum256([]byte("fixture-recovery-notice@mailgun.test"))
+	if state!="ACCEPTED" || attempts!=2 || calls.Load()!=2 ||
+		!bytes.Equal(digest,expected[:]){
+		t.Fatal("Mailgun acceptance was not durably correlated by message digest")
+	}
+	health,err=ReadRecoverySecurityNoticeHealth(ctx,monitorDSN)
+	if err!=nil || health.SubmittedUnconfirmed<1{
+		t.Fatal("recovery notice monitoring falsely omitted provider-submitted unknown delivery")
+	}
+	// An accepted HTTP response is not evidence of mailbox delivery.
+	if err:=RunRecoverySecurityNotices(ctx,RecoverySecurityNoticeConfig{
+		DSN:monitorDSN,Region:"US",Domain:"mg.example.test",
+		From:"security@mg.example.test",MailgunKey:"synthetic-recovery-alert-key",
+		PollInterval:100*time.Millisecond,HTTPClient:cfg.HTTPClient,
+	});err==nil{
+		t.Fatal("recovery notice worker accepted monitor-only credential")
+	}
+	if _,err:=ReadRecoverySecurityNoticeHealth(ctx,noticeDSN);err==nil{
+		t.Fatal("count-only monitor facade accepted sender DB role")
+	}
+}
