@@ -40,7 +40,7 @@ func TestIdentityZSessionIdleExpiry(t *testing.T) {
 		t.Cleanup(func() { _ = c.Close(context.Background()) })
 		return c
 	}
-	admin, grantConn, sessionConn := open(adminDSN), open(grantDSN), open(sessionDSN)
+	admin, grantConn, sessionConn, blocker := open(adminDSN), open(grantDSN), open(sessionDSN), open(adminDSN)
 	subject := randomSyntheticID(t, "sub_")
 	email := strings.ToLower(randomSyntheticID(t, "idle_")) + "@example.test"
 	if _, err := admin.Exec(ctx, "INSERT INTO mamony_identity.subjects (subject_id,created_at) VALUES ($1,clock_timestamp())", subject); err != nil {
@@ -158,6 +158,64 @@ func TestIdentityZSessionIdleExpiry(t *testing.T) {
 		}
 		if got := resolve(digest); got != "" {
 			t.Fatal("active-looking session bypassed fixed absolute expiry")
+		}
+	})
+
+	t.Run("resolver blocked behind expiry rechecks database clock after acquiring lock", func(t *testing.T) {
+		digest := issue("blocked-resolve")
+		var sessionPID, blockerPID int32
+		if err := sessionConn.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&sessionPID); err != nil {
+			t.Fatal(err)
+		}
+		if err := blocker.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&blockerPID); err != nil {
+			t.Fatal(err)
+		}
+		tx, err := blocker.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(context.Background()) }()
+		// Another transaction has advanced authoritative inactivity while
+		// retaining the row lock. A pending Resolve must NOT use a stale
+		// pre-wait timestamp to revalidate this now-expired credential.
+		if _, err := tx.Exec(ctx, `UPDATE mamony_identity.opaque_sessions
+			SET issued_at=clock_timestamp()-interval '40 minutes',
+			    last_seen_at=clock_timestamp()-interval '31 minutes'
+			WHERE token_digest=$1`, digest); err != nil {
+			t.Fatal(err)
+		}
+		type result struct {
+			subject string
+			err     error
+		}
+		ch := make(chan result, 1)
+		go func() {
+			var got string
+			err := sessionConn.QueryRow(ctx,
+				"SELECT coalesce(mamony_identity.resolve_opaque_session($1),'')",
+				digest).Scan(&got)
+			ch <- result{got, err}
+		}()
+		waitForSessionLock(t, ctx, admin, sessionPID, blockerPID)
+		select {
+		case got := <-ch:
+			t.Fatalf("resolver bypassed uncommitted inactivity lock: %+v", got)
+		default:
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case got := <-ch:
+			if got.err != nil || got.subject != "" {
+				t.Fatalf("resolver admitted expired session after lock wait: subject=%q err=%v",
+					got.subject, got.err)
+			}
+		case <-ctx.Done():
+			t.Fatal("resolver did not return after lock holder committed")
+		}
+		if time.Since(lastSeen(digest)) < 30*time.Minute {
+			t.Fatal("blocked expired resolution incorrectly refreshed last activity")
 		}
 	})
 
