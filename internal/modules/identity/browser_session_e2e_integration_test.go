@@ -228,7 +228,7 @@ func TestIdentityZBrowserSessionE2E(t *testing.T) {
 	// Production listeners remain health-only even when tests construct and
 	// exercise a completely separate, manually mounted TLS fixture mux.
 	for _, active := range []http.Handler{httpedge.PublicHandler(), httpedge.PrivateHandler()} {
-		for _, route := range []struct{method, path string}{
+		for _, route := range []struct{ method, path string }{
 			{http.MethodPost, "/v1/identity/login"},
 			{http.MethodGet, "/v1/identity/session"},
 			{http.MethodGet, "/v1/identity/csrf"},
