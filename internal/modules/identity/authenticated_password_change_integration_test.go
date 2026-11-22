@@ -281,8 +281,7 @@ func TestIdentityZAuthenticatedPasswordChange(t *testing.T) {
 	}
 	// An old password cannot log in after the change. A new credential
 	// consumes the next authorized pre-KDF admission slot and gets new epoch.
-	if secret, err := sessionLogin.Authenticate(ctx, email, oldPassword, peer);
-		secret.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
+	if secret, err := sessionLogin.Authenticate(ctx, email, oldPassword, peer); secret.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
 		t.Fatal("old password still authenticates after rotation")
 	}
 	relogin, err := sessionLogin.Authenticate(ctx, email, nextPassword, peer)
