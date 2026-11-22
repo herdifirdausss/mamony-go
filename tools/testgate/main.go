@@ -36,6 +36,7 @@ var requiredTests = []string{
 	"TestPostgresIdentityZMailgunWebhookRole",
 	"TestPostgresIdentityZNoticeMonitorRole",
 	"TestPostgresIdentityZRecoveryIssuerRole",
+	"TestPostgresIdentityZRecoveryDeliveryRole",
 	"TestPostgresIdentityDeliveryRole",
 	"TestPostgresIdentityAdmissionRole",
 	"TestPostgresIdentityMaintenanceRole",
@@ -53,6 +54,7 @@ var requiredTests = []string{
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
+	"TestIdentityMailgunMockRecoveryDelivery",
 	"TestIdentityMailgunMockSecurityNoticePipeline",
 	"TestIdentityMailgunMockWebhookReconciliation",
 	"TestIdentityMailgunNoticeMonitorRole",
@@ -64,6 +66,7 @@ var requiredTests = []string{
 	"TestIdentityResendAdmission",
 	"TestIdentityAnonymousAdmission",
 	"TestIdentityRecoveryIssuance",
+	"TestIdentityRecoveryDelivery",
 	"TestIdentityConfirmationAdmission",
 	"TestIdentityLoginAdmission",
 	"TestIdentityRetentionPurge",
@@ -95,6 +98,7 @@ func run() error {
 	identityAuthGrantDSN := os.Getenv("TEST_IDENTITY_AUTH_GRANT_URL")
 	identityPasswordChangeDSN := os.Getenv("TEST_IDENTITY_PASSWORD_CHANGE_URL")
 	identityRecoveryIssuerDSN := os.Getenv("TEST_IDENTITY_RECOVERY_ISSUER_URL")
+	identityRecoveryDeliveryDSN := os.Getenv("TEST_IDENTITY_RECOVERY_DELIVERY_URL")
 	identitySessionDSN := os.Getenv("TEST_IDENTITY_SESSION_URL")
 	identityDeliveryDSN := os.Getenv("TEST_IDENTITY_DELIVERY_URL")
 	identityNoticeDSN := os.Getenv("TEST_IDENTITY_SECURITY_NOTICE_URL")
@@ -127,6 +131,9 @@ func run() error {
 	}
 	if err := validateDSN(identityAuthGrantDSN, "mamony_identity_auth_grant_runtime"); err != nil {
 		return fmt.Errorf("identity grant fixture: %w", err)
+	}
+	if err := validateDSN(identityRecoveryDeliveryDSN, "mamony_identity_recovery_delivery_runtime"); err != nil {
+		return fmt.Errorf("identity recovery delivery fixture: %w", err)
 	}
 	if err := validateDSN(identityRecoveryIssuerDSN, "mamony_identity_recovery_issuer_runtime"); err != nil {
 		return fmt.Errorf("identity recovery issuer fixture: %w", err)
@@ -163,13 +170,14 @@ func run() error {
 	identityAuthGrantURL, _ := url.Parse(identityAuthGrantDSN)
 	identityPasswordChangeURL, _ := url.Parse(identityPasswordChangeDSN)
 	identityRecoveryIssuerURL, _ := url.Parse(identityRecoveryIssuerDSN)
+	identityRecoveryDeliveryURL, _ := url.Parse(identityRecoveryDeliveryDSN)
 	identitySessionURL, _ := url.Parse(identitySessionDSN)
 	identityDeliveryURL, _ := url.Parse(identityDeliveryDSN)
 	identityNoticeURL, _ := url.Parse(identityNoticeDSN)
 	identityWebhookURL, _ := url.Parse(identityWebhookDSN)
 	identityMonitorURL, _ := url.Parse(identityMonitorDSN)
 	identityMaintenanceURL, _ := url.Parse(identityMaintenanceDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}
