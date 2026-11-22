@@ -17,7 +17,7 @@ import (
 // intended to guess when a concurrent statement has started. It observes
 // PostgreSQL's actual Lock wait state using the disposable fixture superuser.
 // NEVER run this helper against a real database or with application roles.
-func waitForSessionLock(t *testing.T, ctx context.Context, observer *pgx.Conn, pid int32) {
+func waitForSessionLock(t *testing.T, ctx context.Context, observer *pgx.Conn, pid, expectedBlocker int32) {
 	t.Helper()
 	pollCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -25,18 +25,21 @@ func waitForSessionLock(t *testing.T, ctx context.Context, observer *pgx.Conn, p
 	defer ticker.Stop()
 	for {
 		var waitType, waitEvent string
-		err := observer.QueryRow(pollCtx, "SELECT coalesce(wait_event_type,''), coalesce(wait_event,'') FROM pg_catalog.pg_stat_activity WHERE pid=$1",
-			pid).Scan(&waitType, &waitEvent)
+		var blockedByExpected bool
+		err := observer.QueryRow(pollCtx, `SELECT coalesce(wait_event_type,''),
+			coalesce(wait_event,''), $2::integer = ANY(pg_catalog.pg_blocking_pids(pid))
+			FROM pg_catalog.pg_stat_activity WHERE pid=$1`,
+			pid, expectedBlocker).Scan(&waitType, &waitEvent, &blockedByExpected)
 		if err != nil {
 			t.Fatalf("cannot observe disposable PostgreSQL lock waiter: %v", err)
 		}
-		if waitType == "Lock" {
+		if waitType == "Lock" && blockedByExpected {
 			return
 		}
 		select {
 		case <-pollCtx.Done():
-			t.Fatalf("concurrent transaction never reached a genuine PostgreSQL lock wait (last wait=%s/%s): %v",
-				waitType, waitEvent, pollCtx.Err())
+			t.Fatalf("concurrent transaction never waited on the expected PostgreSQL backend (wait=%s/%s, blocker=%d): %v",
+				waitType, waitEvent, expectedBlocker, pollCtx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -133,7 +136,7 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 				subject, digest[:], eventID).Scan(&allowed)
 			resultCh <- sessionTxResult{allowed: allowed, err: err}
 		}()
-		waitForSessionLock(t, ctx, observer, sessionPID)
+		waitForSessionLock(t, ctx, observer, sessionPID, freezerPID)
 		select {
 		case result := <-resultCh:
 			t.Fatalf("issuer bypassed uncommitted freeze lock: allowed=%v err=%v", result.allowed, result.err)
@@ -190,7 +193,7 @@ func TestIdentityZSessionFreezeIssueInterleavings(t *testing.T) {
 				subject)
 			freezeCh <- err
 		}()
-		waitForSessionLock(t, ctx, observer, freezerPID)
+		waitForSessionLock(t, ctx, observer, freezerPID, sessionPID)
 		select {
 		case err := <-freezeCh:
 			t.Fatalf("freeze committed through uncommitted issuance lock: %v", err)
