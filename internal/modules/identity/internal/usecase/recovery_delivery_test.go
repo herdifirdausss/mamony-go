@@ -78,10 +78,10 @@ func TestRecoveryDeliveryWorkerOutcomeIsolation(t *testing.T) {
 		return w, store, opener, sender
 	}
 	for _, tc := range []struct {
-		name string
-		send error
-		open error
-		want ProofDeliveryOutcome
+		name  string
+		send  error
+		open  error
+		want  ProofDeliveryOutcome
 		calls int
 	}{
 		{"success", nil, nil, DeliveryAccepted, 1},
