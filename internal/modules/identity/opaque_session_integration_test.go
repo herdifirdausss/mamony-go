@@ -32,10 +32,11 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	regDSN := guardedDB(t, "TEST_IDENTITY_RUNTIME_URL", "mamony_identity_runtime")
 	proofDSN := guardedDB(t, "TEST_IDENTITY_VERIFIER_URL", "mamony_identity_verifier_runtime")
 	authDSN := guardedDB(t, "TEST_IDENTITY_AUTHENTICATOR_URL", "mamony_identity_authenticator_runtime")
+	grantDSN := guardedDB(t, "TEST_IDENTITY_AUTH_GRANT_URL", "mamony_identity_auth_grant_runtime")
 	sessionDSN := guardedDB(t, "TEST_IDENTITY_SESSION_URL", "mamony_identity_session_runtime")
 	maintenanceDSN := guardedDB(t, "TEST_IDENTITY_MAINTENANCE_URL", "mamony_identity_maintenance_runtime")
 	adminURL, _ := url.Parse(adminDSN)
-	for _, dsn := range []string{regDSN, proofDSN, authDSN, sessionDSN, maintenanceDSN} {
+	for _, dsn := range []string{regDSN, proofDSN, authDSN, grantDSN, sessionDSN, maintenanceDSN} {
 		u, _ := url.Parse(dsn)
 		if u.Host != adminURL.Host || u.Path != adminURL.Path {
 			t.Fatal("session E2E roles must target the same disposable database")
@@ -58,6 +59,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	regPool := open(regDSN, "mamony_identity_runtime")
 	proofPool := open(proofDSN, "mamony_identity_verifier_runtime")
 	authPool := open(authDSN, "mamony_identity_authenticator_runtime")
+	grantPool := open(grantDSN, "mamony_identity_auth_grant_runtime")
 	sessionPool := open(sessionDSN, "mamony_identity_session_runtime")
 	maintPool := open(maintenanceDSN, "mamony_identity_maintenance_runtime")
 	reg, err := identitypg.NewStore(regPool)
@@ -73,6 +75,14 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	sessionStore, err := identitypg.NewOpaqueSessionStore(sessionPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grantStore, err := identitypg.NewAuthenticationGrantStore(grantPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grantAuthority, err := usecase.NewAuthenticationGrantAuthority(grantStore)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +114,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sessionLogin, err := usecase.NewSessionLogin(composed, authority)
+	sessionLogin, err := usecase.NewSessionLogin(composed, grantAuthority, authority)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,8 +149,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	if session, err := sessionLogin.Authenticate(ctx, email, password, network); session.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
 		t.Fatal("unverified contact was issued a session")
 	}
-	if denied, err := authority.Issue(ctx, subject); denied.ForTrustedTransport() != "" ||
-		!errors.Is(err, usecase.ErrSessionDenied) {
+	if _, err := grantAuthority.Issue(ctx, subject); !errors.Is(err, usecase.ErrSessionDenied) {
 		t.Fatal("session DB function accepted unverified contact")
 	}
 	sealer, err := mailcrypto.NewKeyring("session-test", map[string][]byte{
@@ -162,7 +171,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Actual admission -> Argon2id -> session issuance, with an independent
+	// Actual admission -> Argon2id -> restricted grant -> session issuance, with a
 	// DB-side ACTIVE/verified recheck after the KDF has finished.
 	issued, err := sessionLogin.Authenticate(ctx, email, password, network)
 	if err != nil {
@@ -202,8 +211,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='FROZEN' WHERE subject_id=$1", subject); err != nil {
 		t.Fatal(err)
 	}
-	if stale, err := authority.Issue(ctx, subject); stale.ForTrustedTransport() != "" ||
-		!errors.Is(err, usecase.ErrSessionDenied) {
+	if _, err := grantAuthority.Issue(ctx, subject); !errors.Is(err, usecase.ErrSessionDenied) {
 		t.Fatal("stale password candidate minted after account freeze")
 	}
 	if resolved, err := authority.Resolve(ctx, secret); resolved != "" ||
@@ -225,7 +233,11 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 
 	// A fresh internal session may issue after ACTIVE is re-established;
 	// logout revocation is idempotent and audited exactly once.
-	fresh, err := authority.Issue(ctx, subject)
+	freshGrant, err := grantAuthority.Issue(ctx, subject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := authority.Issue(ctx, freshGrant)
 	if err != nil {
 		t.Fatal(err)
 	}
