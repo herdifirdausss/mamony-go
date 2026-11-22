@@ -502,3 +502,53 @@ func TestPostgresIdentityZMailgunWebhookRole(t *testing.T) {
 		t.Fatalf("maintenance monitoring role cannot access count-only health: %q %v", out, err)
 	}
 }
+
+func TestPostgresIdentityZNoticeMonitorRole(t *testing.T) {
+	// A monitoring process needs ONLY the aggregate health query, not the
+	// broader maintenance ability to delete data or inspect Identity tables.
+	const health = "SELECT * FROM mamony_identity.security_notice_health()"
+	if out, err := invokePSQL("TEST_IDENTITY_NOTICE_MONITOR_URL", "-c", health); err != nil || out == "" {
+		t.Fatalf("read-only health credential cannot view aggregate counts: %q %v", out, err)
+	}
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.notice_monitor_attack (x integer)",
+		"SELECT * FROM mamony_identity.password_change_notices",
+		"SELECT * FROM mamony_identity.security_notice_mailgun_receipts",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"UPDATE mamony_identity.password_change_notices SET status='DEAD'",
+		"DELETE FROM mamony_identity.security_notice_mailgun_receipts",
+		"SELECT mamony_identity.purge_old_mailgun_security_receipts()",
+		"SELECT mamony_identity.purge_old_password_change_notices()",
+		"SELECT mamony_identity.purge_expired_email_envelopes()",
+		"SELECT mamony_identity.claim_password_change_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.finalize_password_change_notice_v2('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','ACCEPTED',decode(repeat('11',32),'hex'))",
+		"SELECT mamony_identity.record_mailgun_security_notice_receipt(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),'DELIVERED',now())",
+		"SET ROLE mamony_identity_migrator",
+		"SET ROLE mamony_identity_maintenance_runtime",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_NOTICE_MONITOR_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("health credential escalated beyond aggregate EXECUTE: %q output=%q err=%v", stmt, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL", "TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL", "TEST_IDENTITY_PASSWORD_CHANGE_URL",
+		"TEST_IDENTITY_SECURITY_NOTICE_URL", "TEST_IDENTITY_NOTICE_WEBHOOK_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", health)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("role %s can read operator-only notice counts: %q %v", role, out, err)
+		}
+	}
+	out, err := invokePSQL("TEST_IDENTITY_NOTICE_MONITOR_URL", "-c",
+		"SELECT rolcanlogin::text || ':' || rolsuper::text || ':' || rolcreaterole::text || ':' || rolcreatedb::text || ':' || rolinherit::text || ':' || rolbypassrls::text FROM pg_roles WHERE rolname=current_user")
+	if err != nil || out != "true:false:false:false:false:false" {
+		t.Fatalf("notice monitoring role has elevated DB attributes: %q %v", out, err)
+	}
+}
