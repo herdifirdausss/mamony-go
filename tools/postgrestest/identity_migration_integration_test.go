@@ -972,7 +972,6 @@ func TestPostgresIdentityZRecoveryCodeManagerRole(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles proves the worker and
 // count-only observer have independent EXECUTE grants, no row-level PII,
 // and no authority to issue/reset password or offline recovery material.
