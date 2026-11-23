@@ -71,7 +71,7 @@ func TestIdentityZRecoveryFactorSignedChallenge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gate, err := usecase.NewLoginAdmission(admissionStore, bytes.Repeat([]byte{0xe8}, 32))
+	gate, err := usecase.NewLoginAdmission(admissionStore, bytes.Repeat([]byte{0xe9}, 32))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestIdentityZRecoveryFactorSignedChallenge(t *testing.T) {
 			t.Errorf("recovery challenge delivery cleanup: %v", err)
 		}
 	})
-	peer := netip.MustParseAddr("198.51.100.224")
+	peer := netip.MustParseAddr("198.51.100.225")
 	session, err := sessionLogin.Authenticate(ctx, email, currentPassword, peer)
 	if err != nil {
 		t.Fatal(err)
