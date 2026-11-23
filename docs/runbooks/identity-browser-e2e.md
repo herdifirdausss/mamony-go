@@ -77,3 +77,7 @@ Mandatory `TestIdentityZAuthenticatedPasswordChange` runs real disposable Postgr
 ## Draft #51 — security notification infrastructure evidence
 
 Required isolated PostgreSQL `TestIdentityZSecurityNoticeOutbox` checks v15 password-change event provenance, atomic queue creation, stale-contact suppression, 45-second leases, retries and fixed 7-day recipient erasure. `TestIdentityZAuthenticatedPasswordChange` now also asserts the notification obligation was inserted in the same transaction. This is NOT a browser password-change flow or live email-sending test. The existing real Chromium suites continue to check candidate verification and first-party cookie/CSRF/logout behavior without mounting a password-change endpoint. See [ADR-0014](../adr/0014-password-change-security-notices.md).
+
+## Draft #52 — independent Mailgun security-notice delivery evidence
+
+The mandatory `TestIdentityMailgunMockSecurityNoticePipeline` drives a real v15 SQL password change → v16 PENDING notice → security-notice runtime facade → **local HTTP Mailgun mock** 429/200 → persisted ACCEPTED, with a separate SQL credential and no public route. Provider ACCEPTED is not inbox delivery, and no real Mailgun network is contacted. The prior actual Chromium tests still cover only unmounted login/CSRF/logout and verification; there is no password-change browser handler or live email notification. See [ADR-0015](../adr/0015-mailgun-password-change-notice-worker.md).
