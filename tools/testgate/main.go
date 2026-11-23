@@ -40,6 +40,7 @@ var requiredTests = []string{
 	"TestPostgresIdentityZRecoveryRedeemerRole",
 	"TestPostgresIdentityZRecoveryAssuranceRole",
 	"TestPostgresIdentityZRecoveryCodeManagerRole",
+	"TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles",
 	"TestPostgresIdentityZRecoverySecurityNoticeRoles",
 	"TestPostgresIdentityZRecoveryNoticeWebhookRole",
 	"TestPostgresIdentityDeliveryRole",
@@ -64,6 +65,7 @@ var requiredTests = []string{
 	"TestIdentityMailgunMockPipeline",
 	"TestIdentityMailgunMockRecoveryDelivery",
 	"TestIdentityMailgunMockRecoverySecurityNotice",
+	"TestIdentityMailgunMockRecoveryCodeSecurityNotice",
 	"TestIdentityMailgunMockSecurityNoticePipeline",
 	"TestIdentityMailgunMockWebhookReconciliation",
 	"TestIdentityMailgunMockRecoveryNoticeWebhookReconciliation",
@@ -112,6 +114,8 @@ func run() error {
 	identityRecoveryRedeemerDSN := os.Getenv("TEST_IDENTITY_RECOVERY_REDEEMER_URL")
 	identityRecoveryAssuranceDSN := os.Getenv("TEST_IDENTITY_RECOVERY_ASSURANCE_URL")
 	identityRecoveryCodeManagerDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL")
+	identityRecoveryCodeNoticeDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL")
+	identityRecoveryCodeNoticeMonitorDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL")
 	identityRecoveryNoticeDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_URL")
 	identityRecoveryNoticeMonitorDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL")
 	identityRecoveryNoticeWebhookDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_WEBHOOK_URL")
@@ -156,6 +160,12 @@ func run() error {
 	}
 	if err := validateDSN(identityRecoveryNoticeMonitorDSN, "mamony_identity_recovery_notice_monitor_runtime"); err != nil {
 		return fmt.Errorf("identity recovery notice monitor fixture: %w", err)
+	}
+	if err := validateDSN(identityRecoveryCodeNoticeDSN, "mamony_identity_recovery_code_notice_runtime"); err != nil {
+		return fmt.Errorf("identity recovery code notice fixture: %w", err)
+	}
+	if err := validateDSN(identityRecoveryCodeNoticeMonitorDSN, "mamony_identity_recovery_code_notice_monitor_runtime"); err != nil {
+		return fmt.Errorf("identity recovery code notice monitor fixture: %w", err)
 	}
 	if err := validateDSN(identityRecoveryCodeManagerDSN, "mamony_identity_recovery_code_manager_runtime"); err != nil {
 		return fmt.Errorf("identity recovery code manager fixture: %w", err)
@@ -208,6 +218,8 @@ func run() error {
 	identityRecoveryRedeemerURL, _ := url.Parse(identityRecoveryRedeemerDSN)
 	identityRecoveryAssuranceURL, _ := url.Parse(identityRecoveryAssuranceDSN)
 	identityRecoveryCodeManagerURL, _ := url.Parse(identityRecoveryCodeManagerDSN)
+	identityRecoveryCodeNoticeURL, _ := url.Parse(identityRecoveryCodeNoticeDSN)
+	identityRecoveryCodeNoticeMonitorURL, _ := url.Parse(identityRecoveryCodeNoticeMonitorDSN)
 	identityRecoveryNoticeURL, _ := url.Parse(identityRecoveryNoticeDSN)
 	identityRecoveryNoticeMonitorURL, _ := url.Parse(identityRecoveryNoticeMonitorDSN)
 	identityRecoveryNoticeWebhookURL, _ := url.Parse(identityRecoveryNoticeWebhookDSN)
@@ -217,7 +229,7 @@ func run() error {
 	identityWebhookURL, _ := url.Parse(identityWebhookDSN)
 	identityMonitorURL, _ := url.Parse(identityMonitorDSN)
 	identityMaintenanceURL, _ := url.Parse(identityMaintenanceDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryCodeManagerURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryCodeManagerURL, identityRecoveryCodeNoticeURL, identityRecoveryCodeNoticeMonitorURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}
@@ -342,6 +354,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZPasswordRecoveryRedemption") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryOfflineAssurance") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryCodeEnrollmentRotation") ||
+						strings.HasPrefix(ev.Test, "TestIdentityMailgunMockRecoveryCodeSecurityNotice") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZSecurityNoticeOutbox"))) {
 				passed[ev.Test] = true
 			}

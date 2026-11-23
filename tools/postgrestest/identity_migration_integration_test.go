@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "25:false" {
-		t.Fatalf("identity migration should be at clean version 25: %q err=%v", out, err)
+	if err != nil || out != "26:false" {
+		t.Fatalf("identity migration should be at clean version 26: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "25" {
+	if err != nil || out != "26" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -968,6 +968,93 @@ func TestPostgresIdentityZRecoveryCodeManagerRole(t *testing.T) {
 		if err == nil || !strings.Contains(out, "42501") {
 			t.Fatalf("different authority replaced offline code set: role=%s out=%s err=%v",
 				role, out, err)
+		}
+	}
+}
+
+// TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles proves the worker and
+// count-only observer have independent EXECUTE grants, no row-level PII,
+// and no authority to issue/reset password or offline recovery material.
+func TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles(t *testing.T) {
+	const claim = "SELECT * FROM mamony_identity.claim_recovery_code_security_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')"
+	const monitor = "SELECT * FROM mamony_identity.recovery_code_security_notice_health()"
+	out, err := invokePSQL("TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL", "-c", claim)
+	if err != nil {
+		t.Fatalf("recovery-code sender cannot claim: %s %v", out, err)
+	}
+	out, err = invokePSQL("TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL", "-c", monitor)
+	if err != nil || out == "" {
+		t.Fatalf("count-only recovery-code monitor denied: %s %v", out, err)
+	}
+	denied := []string{
+		"SELECT * FROM mamony_identity.password_recovery_code_notices",
+		"SELECT * FROM mamony_identity.password_recovery_offline_codes",
+		"SELECT * FROM mamony_identity.password_recovery_code_enrollment_approvals",
+		"SELECT * FROM mamony_identity.password_recovery_assurance_grants",
+		"SELECT * FROM mamony_identity.password_recovery_challenges",
+		"SELECT * FROM mamony_identity.password_recovery_notices",
+		"SELECT * FROM mamony_identity.password_change_notices",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"CREATE TABLE mamony_identity.recovery_code_notice_escape(id integer)",
+		"DELETE FROM mamony_identity.password_recovery_code_notices",
+		"UPDATE mamony_identity.password_recovery_code_notices SET status='ACCEPTED'",
+		"SELECT mamony_identity.replace_password_recovery_offline_codes(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),ARRAY[decode(repeat('44',32),'hex')],'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.approve_password_recovery_offline_code(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.claim_password_recovery_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.claim_password_change_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.recovery_code_security_notice_health()",
+		"SELECT mamony_identity.purge_old_recovery_code_security_notices()",
+		"SET ROLE mamony_identity_migrator",
+	}
+	for _, sql := range denied {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("sender overprivileged: sql=%s out=%s err=%v", sql, out, err)
+		}
+	}
+	for _, sql := range []string{
+		claim,
+		"SELECT mamony_identity.finalize_recovery_code_security_notice('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','TEMPORARY',NULL)",
+		"SELECT * FROM mamony_identity.password_recovery_code_notices",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT mamony_identity.password_recovery_notice_health()",
+		"SELECT mamony_identity.purge_old_recovery_code_security_notices()",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("recovery code observer overprivileged: sql=%s out=%s err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_PASSWORD_CHANGE_URL",
+		"TEST_IDENTITY_RECOVERY_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_DELIVERY_URL",
+		"TEST_IDENTITY_RECOVERY_REDEEMER_URL",
+		"TEST_IDENTITY_RECOVERY_ASSURANCE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_WEBHOOK_URL",
+		"TEST_IDENTITY_SECURITY_NOTICE_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", claim)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unrelated role could claim code-change alert: role=%s out=%s err=%v", role, out, err)
+		}
+		out, err = invokePSQL(role, "-c", monitor)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unrelated role could monitor code-change alerts: role=%s out=%s err=%v", role, out, err)
 		}
 	}
 }
