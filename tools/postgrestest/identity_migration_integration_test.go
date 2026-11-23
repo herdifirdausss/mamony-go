@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "23:false" {
-		t.Fatalf("identity migration should be at clean version 23: %q err=%v", out, err)
+	if err != nil || out != "24:false" {
+		t.Fatalf("identity migration should be at clean version 24: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "23" {
+	if err != nil || out != "24" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -841,6 +841,62 @@ func TestPostgresIdentityZRecoveryNoticeWebhookRole(t *testing.T) {
 		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", "-c", sql)
 		if err != nil || out == "" {
 			t.Fatalf("read-only recovery monitor lost approved aggregate: sql=%s err=%v", sql, err)
+		}
+	}
+}
+
+// TestPostgresIdentityZRecoveryAssuranceRole proves v24's separate offline-
+// proof verifier can EXECUTE only the challenge-bound approval transaction.
+func TestPostgresIdentityZRecoveryAssuranceRole(t *testing.T) {
+	const approve = "SELECT mamony_identity.approve_password_recovery_offline_code(" +
+		"decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex')," +
+		"'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_RECOVERY_ASSURANCE_URL", "-c", approve)
+	if err != nil || out != "f" {
+		t.Fatalf("isolated assurance SQL principal cannot deny unknown proofs: out=%s err=%v", out, err)
+	}
+	for _, sql := range []string{
+		"CREATE TABLE mamony_identity.recovery_assurance_escape(id integer)",
+		"SELECT * FROM mamony_identity.password_recovery_offline_codes",
+		"SELECT * FROM mamony_identity.password_recovery_assurance_grants",
+		"SELECT * FROM mamony_identity.password_recovery_challenges",
+		"SELECT * FROM mamony_identity.password_recovery_deliveries",
+		"SELECT * FROM mamony_identity.password_recovery_notices",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"DELETE FROM mamony_identity.password_recovery_offline_codes",
+		"UPDATE mamony_identity.password_recovery_assurance_grants SET consumed_at=NULL",
+		"INSERT INTO mamony_identity.password_recovery_offline_codes(code_digest,subject_id,enrolled_epoch,contact_version,enrolled_at) VALUES(decode(repeat('11',32),'hex'),'sub_AAAAAAAAAAAAAAAAAAAAAA',1,1,clock_timestamp())",
+		"SELECT mamony_identity.redeem_password_recovery(decode(repeat('11',32),'hex'),'missing@example.test',decode(repeat('22',16),'hex'),decode(repeat('33',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.issue_password_recovery('missing@example.test','rcv_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'),'testkey',decode(repeat('22',71),'hex'))",
+		"SELECT * FROM mamony_identity.password_recovery_notice_health()",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_ASSURANCE_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("offline recovery assurance role gained SQL authority: sql=%s out=%s err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_PASSWORD_CHANGE_URL",
+		"TEST_IDENTITY_RECOVERY_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_DELIVERY_URL",
+		"TEST_IDENTITY_RECOVERY_REDEEMER_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_WEBHOOK_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", approve)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unauthorized role approved recovery assurance: role=%s out=%s err=%v", role, out, err)
 		}
 	}
 }

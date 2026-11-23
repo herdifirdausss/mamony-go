@@ -103,8 +103,8 @@ func TestIdentityMailgunMockRecoverySecurityNotice(t *testing.T) {
 	// An assurance grant is added by disposable test admin only. No
 	// production role may issue or mutate these approvals.
 	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_assurance_grants
-		(subject_id,subject_epoch,approved_at,expires_at)
-		VALUES($1,$2,clock_timestamp(),clock_timestamp()+interval '9 minutes')`, subject, epoch); err != nil {
+		(subject_id,subject_epoch,challenge_id,approved_at,expires_at)
+		VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '9 minutes')`, subject, epoch, challenge); err != nil {
 		t.Fatal(err)
 	}
 	allowed, err := redeemer.Redeem(ctx, token.Digest(), email, domain.PasswordVerifier{

@@ -138,8 +138,8 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 		t.Fatal("recovery bearer bypassed missing independent assurance")
 	}
 	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_assurance_grants
-	(subject_id,subject_epoch,approved_at,expires_at)
-	VALUES($1,$2,clock_timestamp(),clock_timestamp()+interval '9 minutes')`, subject, epoch); err != nil {
+	(subject_id,subject_epoch,challenge_id,approved_at,expires_at)
+	VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '9 minutes')`, subject, epoch, challenge); err != nil {
 		t.Fatal(err)
 	}
 	if err := redeemer.Redeem(ctx, proof.ForTrustedDelivery(), "another@example.test", next); !errors.Is(err, usecase.ErrPasswordRecoveryDenied) {
@@ -323,8 +323,8 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			}
 		})
 		if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_assurance_grants
-			(subject_id,subject_epoch,approved_at,expires_at)
-			VALUES($1,$2,clock_timestamp(),clock_timestamp()+interval '9 minutes')`, s, current); err != nil {
+			(subject_id,subject_epoch,challenge_id,approved_at,expires_at)
+			VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '9 minutes')`, s, current, id); err != nil {
 			t.Fatal(err)
 		}
 		return s, alias, fresh.ForTrustedDelivery(), fresh.Digest(), current
