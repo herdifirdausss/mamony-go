@@ -232,4 +232,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.read_passkey_activation_challenge(
 -- Pending credential status remains PENDING_ASSERTION as in v33.
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (34, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (34, '3452edcc82bfd809db0ff56ad783418e5e5048c05b0a1017eb7e9182437f51a8');
