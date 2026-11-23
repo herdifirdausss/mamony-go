@@ -11,11 +11,15 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_verifier_runtime') THEN
         CREATE ROLE mamony_identity_verifier_runtime LOGIN PASSWORD 'local-test-identity-verifier';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_delivery_runtime') THEN
+        CREATE ROLE mamony_identity_delivery_runtime LOGIN PASSWORD 'local-test-identity-delivery';
+    END IF;
 END
 $$;
 ALTER ROLE mamony_identity_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-migrator';
 ALTER ROLE mamony_identity_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-runtime';
 ALTER ROLE mamony_identity_verifier_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-verifier';
+ALTER ROLE mamony_identity_delivery_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-delivery';
 DROP SCHEMA IF EXISTS mamony_identity CASCADE;
 CREATE SCHEMA mamony_identity AUTHORIZATION mamony_identity_migrator;
 REVOKE ALL ON SCHEMA mamony_identity FROM PUBLIC;

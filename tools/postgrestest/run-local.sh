@@ -43,5 +43,6 @@ export TEST_IDENTITY_MIGRATION_URL="postgres://mamony_identity_migrator:local-te
 export TEST_IDENTITY_RUNTIME_URL="postgres://mamony_identity_runtime:local-test-identity-runtime@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 
 export TEST_IDENTITY_VERIFIER_URL="postgres://mamony_identity_verifier_runtime:local-test-identity-verifier@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_IDENTITY_DELIVERY_URL="postgres://mamony_identity_delivery_runtime:local-test-identity-delivery@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 
 make integration

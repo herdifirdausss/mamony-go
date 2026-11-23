@@ -36,9 +36,18 @@ func (f *fakeEmailProofPort) Consume(_ context.Context, digest []byte, event str
 	return f.consumeErr
 }
 
+type fakeEnvelopeSealer struct{ fail bool }
+
+func (s fakeEnvelopeSealer) Seal(_, _, _ string) (string, []byte, error) {
+	if s.fail {
+		return "", nil, errors.New("secret key access failed")
+	}
+	return "testkey", bytes.Repeat([]byte{0xA5}, 71), nil
+}
+
 func TestEmailProofPrepareAndConfirmNeverExposesPublicToken(t *testing.T) {
 	fake := &fakeEmailProofPort{}
-	s, err := NewEmailVerification(fake)
+	s, err := NewEmailVerification(fake, fakeEnvelopeSealer{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +58,8 @@ func TestEmailProofPrepareAndConfirmNeverExposesPublicToken(t *testing.T) {
 	email, secret := out.ForTrustedDelivery()
 	if email != "alice@example.test" || len(secret) != 43 || fake.issues != 1 ||
 		fake.issued.SubjectID != "sub_AAAAAAAAAAAAAAAAAAAAAA" ||
-		len(fake.issued.TokenDigest) != 32 || len(fake.issued.ChallengeID) != 26 {
+		len(fake.issued.TokenDigest) != 32 || len(fake.issued.ChallengeID) != 26 ||
+		len(fake.issued.SealedToken) != 71 || fake.issued.EnvelopeKeyID != "testkey" {
 		t.Fatal("issued proof missing durable scoped digest or contact target")
 	}
 	if bytes.Contains(fake.issued.TokenDigest, []byte(secret)) {
@@ -70,11 +80,11 @@ func TestEmailProofPrepareAndConfirmNeverExposesPublicToken(t *testing.T) {
 }
 
 func TestEmailProofFailClosed(t *testing.T) {
-	if _, err := NewEmailVerification(nil); err == nil {
+	if _, err := NewEmailVerification(nil, fakeEnvelopeSealer{}); err == nil {
 		t.Fatal("missing authority accepted")
 	}
 	store := &fakeEmailProofPort{}
-	s, _ := NewEmailVerification(store)
+	s, _ := NewEmailVerification(store, fakeEnvelopeSealer{})
 	for _, secret := range []string{"", "short", "zz/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="} {
 		if err := s.Confirm(context.Background(), secret); !errors.Is(err, ErrEmailProofInvalid) {
 			t.Fatalf("noncanonical bearer accepted: %q %v", secret, err)
@@ -88,6 +98,9 @@ func TestEmailProofFailClosed(t *testing.T) {
 	}
 	if store.issues != 0 {
 		t.Fatal("bad subject reached store")
+	}
+	if _, err := NewEmailVerification(store, nil); !errors.Is(err, ErrEmailProofUnavailable) {
+		t.Fatal("missing encryption key accepted")
 	}
 	store.issueErr = errors.New("raw SQL error")
 	if _, err := s.Prepare(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA"); !errors.Is(err, ErrEmailProofUnavailable) {

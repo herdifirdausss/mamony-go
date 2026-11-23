@@ -1,8 +1,8 @@
 # Identity enrollment: first implementation slice
 
-**Status:** DRAFT / stacked PRs #22–#24; SQL Identity storage and internal email-verification implementation now exist. **No public HTTP Identity route, email sender, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Status:** DRAFT / stacked PRs #22–#25; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, connected email provider/worker process, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
-The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Email proof and notification dispatch are still disabled.
+The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Real provider delivery, running worker and public HTTP activation are still disabled.
 
 ## Accepted direction vs remaining decisions
 
@@ -19,7 +19,7 @@ The first synthetic identity profile uses ASCII email addresses with normalized 
 3. **Browser admission/login:** explicit Origin+CSRF controls, duplicate-key rejection, bounded rate/KDF budget, opaque sessions, revocation, no public operator access. Real HTTP+SQL negative tests required before enabling.
 4. **Resource authorization:** default-deny subject/action/resource/tenant policy and BOLA tests. Profile A does not withstand arbitrary writes to the authoritative identity DB; Profile B independently trusted current heads remain deferred.
 
-Run `make check` and `make race` under Go 1.27.4 and record exact evidence per requirement. Current expected identity DB integration state: **NOT RUN**. Do not mark G5 complete or merge as release-ready based solely on unit tests.
+Run `make check` and `make race` under Go 1.27.4 and record exact evidence per requirement. Proof and delivery integration evidence must be tied to the exact PR commit; never assume PASS from earlier PRs. Do not mark G5 complete or merge as release-ready based solely on unit tests.
 
 ## Identity PostgreSQL storage (stacked draft PR)
 
@@ -49,3 +49,13 @@ The Identity runtime role receives only `USAGE` on its schema and `INSERT` on fo
 - Contact confirmation **only proves control of a registered email**, not password authentication, MFA, financial authority, customer due diligence or operator identity. Profile A trusts the authoritative Identity database.
 
 **Migration v2 privilege hardening:** relaxing the v1 `UNVERIFIED`/NULL-only constraints requires first removing v1 table-wide INSERT privileges from the registration runtime and granting **column-specific** INSERT on non-state fields only. New status/outbox `event_type` values come from immutable server defaults for registration. The verifier role alone has guarded column UPDATE rights. The real migration gate must reject a registration-role direct `ACTIVE` or `verified_at` INSERT. Run migration v2 **before** deploying the registration code that omits those protected columns; mixing v2 code with a v1 database fails closed (no implicit default for older status column).
+
+## Encrypted mail-delivery queue (stacked draft PR #25)
+
+The v3 migration adds `email_proof_deliveries` with challenge-bound encrypted bearer envelopes, claim leases, retry count/next-attempt timestamps, and `PENDING → ACCEPTED / DEAD` states. `ACCEPTED` means only a provider acknowledged submission, **not** inbox delivery. Issuing a new challenge must atomically write the challenge, its encrypted delivery payload, and the security obligation, or write none of them.
+
+An AES-256-GCM keyring is a repo-owned crypto adapter with an explicitly injected **external key source** (no hard-coded keys, DB key, default env fallback or implicit production mail provider). The envelope authenticates subject ID, challenge ID, and purpose; tokens remain random 32-byte URL-safe values with only a SHA-256 digest available to the verifier. Keys may be rotated by keeping old decrypt-only keys until the active queue is drained. A missing key fails closed; decrypted tokens must never be logged.
+
+A dedicated delivery DB role can claim ciphertext using `FOR UPDATE SKIP LOCKED`, fence work with a 45-second lease, retry temporary provider errors after 1/2/4/8 minutes, and stop after five attempts or the 20-minute token expiry. A real worker must give its provider a **stable challenge ID** for idempotency where supported. A crash or ambiguous provider timeout can cause duplicate deliveries; exactly-once delivery is **not guaranteed**. Expired, revoked, consumed or already-verified challenges must not be claimed.
+
+Do not enable public registration until a real provider adapter, configured execution process, secure sender domain/DKIM/SPF/DMARC and destination policy, bounded per-subject/per-IP rate limiting, provider timeout/rejection/bounce monitoring, expiry/retention cleanup, encryption key lifecycle and HTTP-level security tests exist. [Operational runbook](../runbooks/identity-delivery.md).

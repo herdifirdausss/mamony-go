@@ -48,3 +48,9 @@ Make these decisions when their respective features become real. They extend, ra
 | DEC-18 | Select runtime and CI secret sources, purpose-limited crypto/key permissions, emergency revocation, and release provenance as deployment needs arise. | Off-purpose key operation, runtime/migration separation, logged-secret and hostile workflow checks; verify effective platform settings. |
 
 Do not add a standalone security service, signing protocol, OAuth issuer, service mesh, SIEM or multi-region authority by default. Explain which threat, deployment guarantee and adversarial test would justify it.
+
+## DEC-ID-DELIVERY (draft — operational approval required)
+
+**Implemented as an internal candidate in stacked PR #25:** AES-256-GCM encrypted email-proof outbox, separate delivery database role, leased claim with `SKIP LOCKED`, bounded 5-attempt exponential retry and stable challenge-based provider idempotency key. Keys must come from an external purpose-scoped secret source; **not decided**: provider (SES/SMTP/etc.), key custody/rotation authority, trusted sender domain, bounce/complaint handling, final delivery audit retention, per-IP/subject abuse policy, email content URL policy, processing cadence and deployment rollback.
+
+The delivery handler is intentionally not wired into a production process or public API. A green integration test proves synthetic DB/Go mechanics, not sender deliverability or exactly-once behavior.
