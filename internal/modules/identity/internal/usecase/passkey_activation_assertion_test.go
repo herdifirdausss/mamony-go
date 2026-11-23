@@ -117,6 +117,12 @@ func TestPasskeyActivationAssertionProofRejectsUntrustedClaims(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			proto.result = base
+			// Zero/zero counters are valid for synced passkeys; the
+			// rejection case must begin from a stored nonzero counter.
+			store.record.SignCount = 0
+			if tc.name == "nonprogressing counter" {
+				store.record.SignCount = 1
+			}
 			tc.modify(&proto.result)
 			if got, err := v.VerifyOnly(context.Background(), bearer, id, raw); !errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
 				t.Fatalf("fake vendor proof bypassed usecase fence: %v", err)
