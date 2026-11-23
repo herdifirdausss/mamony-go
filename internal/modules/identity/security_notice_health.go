@@ -26,12 +26,23 @@ type SecurityNoticeHealthSnapshot struct {
 // mamony_identity_maintenance_runtime. It does not schedule monitoring,
 // publish a dashboard, send alerts or mount a public HTTP endpoint.
 func ReadSecurityNoticeHealth(ctx context.Context, dsn string) (SecurityNoticeHealthSnapshot, error) {
+	return readSecurityNoticeHealth(ctx, dsn, "mamony_identity_maintenance_runtime")
+}
+
+// ReadSecurityNoticeHealthAsMonitor executes ONLY the read-only, v18
+// security-notice-health SQL function under mamony_identity_notice_monitor_runtime.
+// This credential cannot purge data, send mail or record provider callbacks.
+func ReadSecurityNoticeHealthAsMonitor(ctx context.Context, dsn string) (SecurityNoticeHealthSnapshot, error) {
+	return readSecurityNoticeHealth(ctx, dsn, "mamony_identity_notice_monitor_runtime")
+}
+
+func readSecurityNoticeHealth(ctx context.Context, dsn, role string) (SecurityNoticeHealthSnapshot, error) {
 	var empty SecurityNoticeHealthSnapshot
 	if ctx == nil || ctx.Err() != nil {
 		return empty, ErrNoticeHealthUnavailable
 	}
 	pool, err := platformpg.Open(ctx, platformpg.Config{
-		DSN: dsn, RuntimeRole: "mamony_identity_maintenance_runtime", MaxConns: 1,
+		DSN: dsn, RuntimeRole: role, MaxConns: 1,
 	})
 	if err != nil {
 		return empty, ErrNoticeHealthUnavailable

@@ -47,6 +47,7 @@ export TEST_IDENTITY_AUTHENTICATOR_URL="postgres://mamony_identity_authenticator
 export TEST_IDENTITY_AUTH_GRANT_URL="postgres://mamony_identity_auth_grant_runtime:local-test-identity-auth-grant@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_PASSWORD_CHANGE_URL="postgres://mamony_identity_password_change_runtime:local-test-identity-password-change@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_SESSION_URL="postgres://mamony_identity_session_runtime:local-test-identity-session@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_IDENTITY_NOTICE_MONITOR_URL="postgres://mamony_identity_notice_monitor_runtime:local-test-identity-notice-monitor@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_NOTICE_WEBHOOK_URL="postgres://mamony_identity_notice_webhook_runtime:local-test-identity-notice-webhook@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_SECURITY_NOTICE_URL="postgres://mamony_identity_security_notice_runtime:local-test-identity-security-notice@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_DELIVERY_URL="postgres://mamony_identity_delivery_runtime:local-test-identity-delivery@127.0.0.1:$port/mamony_test_local?sslmode=disable"
