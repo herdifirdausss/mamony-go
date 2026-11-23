@@ -56,8 +56,12 @@ func TestIdentityZSessionIdleExpiry(t *testing.T) {
 		t.Helper()
 		grant := sha256.Sum256([]byte("test:idle:grant:" + subject + ":" + label))
 		token := sha256.Sum256([]byte("test:idle:session:" + subject + ":" + label))
+		var epoch int64
+		if err := admin.QueryRow(ctx, "SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", subject).Scan(&epoch); err != nil {
+			t.Fatal(err)
+		}
 		var allowed bool
-		if err := grantConn.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2)", subject, grant[:]).Scan(&allowed); err != nil || !allowed {
+		if err := grantConn.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)", subject, epoch, grant[:]).Scan(&allowed); err != nil || !allowed {
 			t.Fatalf("cannot stage synthetic grant: label=%s allowed=%t err=%v", label, allowed, err)
 		}
 		if err := sessionConn.QueryRow(ctx, "SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",

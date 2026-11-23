@@ -143,13 +143,21 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 			t.Errorf("synthetic session proof cleanup: %v", err)
 		}
 	})
+	currentEpoch := func() int64 {
+		t.Helper()
+		var epoch int64
+		if err := admin.QueryRow(ctx, "SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", subject).Scan(&epoch); err != nil {
+			t.Fatal(err)
+		}
+		return epoch
+	}
 	network := netip.MustParseAddr("198.51.100.233")
 	// No account with an unverified contact may mint through the composed
 	// login, even with the correct password and an available admission slot.
 	if session, err := sessionLogin.Authenticate(ctx, email, password, network); session.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
 		t.Fatal("unverified contact was issued a session")
 	}
-	if _, err := grantAuthority.Issue(ctx, subject); !errors.Is(err, usecase.ErrSessionDenied) {
+	if _, err := grantAuthority.Issue(ctx, subject, currentEpoch()); !errors.Is(err, usecase.ErrSessionDenied) {
 		t.Fatal("session DB function accepted unverified contact")
 	}
 	sealer, err := mailcrypto.NewKeyring("session-test", map[string][]byte{
@@ -211,7 +219,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='FROZEN' WHERE subject_id=$1", subject); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := grantAuthority.Issue(ctx, subject); !errors.Is(err, usecase.ErrSessionDenied) {
+	if _, err := grantAuthority.Issue(ctx, subject, currentEpoch()); !errors.Is(err, usecase.ErrSessionDenied) {
 		t.Fatal("stale password candidate minted after account freeze")
 	}
 	if resolved, err := authority.Resolve(ctx, secret); resolved != "" ||
@@ -233,7 +241,7 @@ func TestIdentityOpaqueSessions(t *testing.T) {
 
 	// A fresh internal session may issue after ACTIVE is re-established;
 	// logout revocation is idempotent and audited exactly once.
-	freshGrant, err := grantAuthority.Issue(ctx, subject)
+	freshGrant, err := grantAuthority.Issue(ctx, subject, currentEpoch())
 	if err != nil {
 		t.Fatal(err)
 	}

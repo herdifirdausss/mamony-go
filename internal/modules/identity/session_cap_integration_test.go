@@ -58,9 +58,13 @@ func TestIdentityZMaxActiveSessions(t *testing.T) {
 	stage := func(label string) []byte {
 		t.Helper()
 		proof := sha256.Sum256([]byte("synthetic:cap:grant:" + subject + ":" + label))
+		var epoch int64
+		if err := admin.QueryRow(ctx, "SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", subject).Scan(&epoch); err != nil {
+			t.Fatal(err)
+		}
 		var allowed bool
 		if err := granter.QueryRow(ctx,
-			"SELECT mamony_identity.stage_password_auth_grant($1,$2)", subject, proof[:]).Scan(&allowed); err != nil || !allowed {
+			"SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)", subject, epoch, proof[:]).Scan(&allowed); err != nil || !allowed {
 			t.Fatalf("could not stage grant %s: allowed=%t err=%v", label, allowed, err)
 		}
 		return proof[:]

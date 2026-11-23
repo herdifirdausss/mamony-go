@@ -56,12 +56,14 @@ type fakeAuthenticationGrantStore struct {
 	err     error
 	stages  int
 	subject string
+	epoch   int64
 	digest  []byte
 }
 
-func (f *fakeAuthenticationGrantStore) Stage(_ context.Context, subject string, digest []byte) (bool, error) {
+func (f *fakeAuthenticationGrantStore) Stage(_ context.Context, subject string, epoch int64, digest []byte) (bool, error) {
 	f.stages++
 	f.subject = subject
+	f.epoch = epoch
 	f.digest = append([]byte(nil), digest...)
 	return f.allow, f.err
 }

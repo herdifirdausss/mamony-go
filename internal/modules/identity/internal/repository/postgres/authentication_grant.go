@@ -21,15 +21,15 @@ func NewAuthenticationGrantStore(db Transactor) (*AuthenticationGrantStore, erro
 	return &AuthenticationGrantStore{db: db}, nil
 }
 
-func (s *AuthenticationGrantStore) Stage(ctx context.Context, subject string, digest []byte) (bool, error) {
+func (s *AuthenticationGrantStore) Stage(ctx context.Context, subject string, expectedEpoch int64, digest []byte) (bool, error) {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
-		len(subject) != 26 || len(digest) != 32 {
+		len(subject) != 26 || expectedEpoch <= 0 || len(digest) != 32 {
 		return false, usecase.ErrSessionUnavailable
 	}
 	var allowed bool
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2)",
-			subject, digest).Scan(&allowed)
+		return tx.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
+			subject, expectedEpoch, digest).Scan(&allowed)
 	})
 	if err != nil {
 		// Includes ambiguous commit; no caller can reuse a lost grant secret.

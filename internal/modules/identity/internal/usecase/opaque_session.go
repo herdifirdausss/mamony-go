@@ -168,7 +168,7 @@ func (s *SessionLogin) Authenticate(ctx context.Context, email, password string,
 	if s == nil || s.candidate == nil || s.grant == nil || s.issuer == nil || ctx == nil || ctx.Err() != nil {
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
-	subject, err := s.candidate.Authenticate(ctx, email, password, peer)
+	candidate, err := s.candidate.AuthenticateWithEpoch(ctx, email, password, peer)
 	if err != nil {
 		if errors.Is(err, ErrPasswordAuthenticationDenied) {
 			return OpaqueSession{}, ErrPasswordAuthenticationDenied
@@ -178,10 +178,10 @@ func (s *SessionLogin) Authenticate(ctx context.Context, email, password string,
 		}
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
-	if !validSessionSubject.MatchString(subject) {
+	if !validSessionSubject.MatchString(candidate.SubjectID) || candidate.SessionEpoch <= 0 {
 		return OpaqueSession{}, ErrSessionUnavailable
 	}
-	proof, err := s.grant.Issue(ctx, subject)
+	proof, err := s.grant.Issue(ctx, candidate.SubjectID, candidate.SessionEpoch)
 	if errors.Is(err, ErrSessionDenied) {
 		return OpaqueSession{}, ErrPasswordAuthenticationDenied
 	}

@@ -39,9 +39,12 @@ type browserPasswordPort struct {
 	calls   int
 }
 
-func (f *browserPasswordPort) Authenticate(_ context.Context, _, _ string) (string, error) {
+func (f *browserPasswordPort) AuthenticateWithEpoch(_ context.Context, _, _ string) (usecase.AuthenticatedSubject, error) {
 	f.calls++
-	return f.subject, f.err
+	if f.err != nil || f.subject == "" {
+		return usecase.AuthenticatedSubject{}, f.err
+	}
+	return usecase.AuthenticatedSubject{SubjectID: f.subject, SessionEpoch: 1}, nil
 }
 
 type browserSessionStore struct {
@@ -56,7 +59,10 @@ type browserSessionStore struct {
 	grants     map[string]string
 }
 
-func (f *browserSessionStore) Stage(_ context.Context, subject string, digest []byte) (bool, error) {
+func (f *browserSessionStore) Stage(_ context.Context, subject string, expectedEpoch int64, digest []byte) (bool, error) {
+	if expectedEpoch <= 0 {
+		return false, nil
+	}
 	if f.grants == nil {
 		f.grants = make(map[string]string)
 	}

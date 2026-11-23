@@ -211,7 +211,7 @@ type countedPasswordAuthenticator struct {
 	calls int
 }
 
-func (c *countedPasswordAuthenticator) Authenticate(ctx context.Context, email, password string) (string, error) {
+func (c *countedPasswordAuthenticator) AuthenticateWithEpoch(ctx context.Context, email, password string) (usecase.AuthenticatedSubject, error) {
 	c.calls++
-	return c.real.Authenticate(ctx, email, password)
+	return c.real.AuthenticateWithEpoch(ctx, email, password)
 }

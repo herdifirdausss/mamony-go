@@ -29,10 +29,13 @@ type loginPasswordFake struct {
 	password string
 }
 
-func (f *loginPasswordFake) Authenticate(_ context.Context, email, password string) (string, error) {
+func (f *loginPasswordFake) AuthenticateWithEpoch(_ context.Context, email, password string) (AuthenticatedSubject, error) {
 	f.calls++
 	f.email, f.password = email, password
-	return f.subject, f.err
+	if f.err != nil || f.subject == "" {
+		return AuthenticatedSubject{}, f.err
+	}
+	return AuthenticatedSubject{SubjectID: f.subject, SessionEpoch: 1}, nil
 }
 
 func TestPasswordLoginFlowMustAdmitBeforeAnyPasswordWork(t *testing.T) {
@@ -106,5 +109,22 @@ func TestPasswordLoginFlowMissingAuthorityAndCancellation(t *testing.T) {
 	if subject, err := absent.Authenticate(context.Background(), "a@example.test", "password", netip.MustParseAddr("127.0.0.1")); subject != "" ||
 		!errors.Is(err, ErrPasswordLoginUnavailable) {
 		t.Fatal("nil flow admitted password verification")
+	}
+}
+
+func TestPasswordLoginFlowRetainsEpochAfterAdmission(t *testing.T) {
+	gate := &loginGateFake{allowed: true}
+	password := &loginPasswordFake{subject: "sub_AAAAAAAAAAAAAAAAAAAAAA"}
+	flow, err := NewPasswordLoginFlow(gate, password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, err := flow.AuthenticateWithEpoch(context.Background(),
+		"alice@example.test", "synthetic password", netip.MustParseAddr("192.0.2.1"))
+	if err != nil || candidate.SubjectID != password.subject || candidate.SessionEpoch != 1 {
+		t.Fatalf("admitted login lost verified epoch: %+v %v", candidate, err)
+	}
+	if gate.calls != 1 || password.calls != 1 {
+		t.Fatal("login bypassed admission or password check")
 	}
 }

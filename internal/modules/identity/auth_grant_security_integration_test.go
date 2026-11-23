@@ -62,9 +62,13 @@ func TestIdentityZAuthenticationGrants(t *testing.T) {
 	grant := func(label string) []byte {
 		t.Helper()
 		d := sha256.Sum256([]byte("synthetic:auth:grant:" + subject + ":" + label))
+		var epoch int64
+		if err := admin.QueryRow(ctx, "SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", subject).Scan(&epoch); err != nil {
+			t.Fatal(err)
+		}
 		var allowed bool
-		err := granter.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2)",
-			subject, d[:]).Scan(&allowed)
+		err := granter.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
+			subject, epoch, d[:]).Scan(&allowed)
 		if err != nil || !allowed {
 			t.Fatalf("test grant stage failed (%s): allowed=%t err=%v", label, allowed, err)
 		}

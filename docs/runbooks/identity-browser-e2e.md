@@ -65,3 +65,7 @@ The session Chromium fixture now additionally configures `TEST_IDENTITY_AUTH_GRA
 ## Draft #48 — bounded active-session and lock-order evidence
 
 Mandatory disposable-PostgreSQL `TestIdentityZMaxActiveSessions` exercises five active session slots, sixth-login oldest revocation, separate identifier-only audit event, idle-expired slot reuse, rollback restoring both login and victim, and deterministic simultaneous distinct-grant issuers behind a subject lock. The existing real Chromium cookie/CSRF/logout test continues to assert the candidate first-party contract, but does not simulate six independent browser profiles. See [ADR-0011](../adr/0011-atomic-five-session-cap.md). All routes stay unmounted and CI evidence never substitutes for production load/perimeter testing.
+
+## Draft #49 — credential mutation race regression
+
+Required PostgreSQL `TestIdentityZAuthMaterialEpochFence` uses disposable role-separated SQL to verify that password and current contact changes transactionally invalidate previous opaque sessions and grants, including a deterministic grant-stage SQL wait behind a concurrent password rotation. Snapshot epoch is read with verifier before real Argon2id in existing browser E2E; one-use grant stage now requires the same epoch, so it cannot re-issue with a newly changed account epoch. No reset/password-change HTTP route is introduced or browser-tested. See [ADR-0012](../adr/0012-auth-material-epoch-grant-fence.md).

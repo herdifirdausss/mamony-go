@@ -20,9 +20,18 @@ var (
 // authorization grant. The owning repository must never expose it to HTTP.
 type AuthenticationCredential struct {
 	SubjectID     string
+	SessionEpoch  int64
 	Status        string
 	EmailVerified bool
 	Verifier      domain.PasswordVerifier
+}
+
+// AuthenticatedSubject is a password-authenticated INTERNAL candidate bound to
+// the exact session_epoch read alongside its verifier before Argon2id.
+// It is not a browser session, identity proof or authorization grant.
+type AuthenticatedSubject struct {
+	SubjectID    string
+	SessionEpoch int64
 }
 
 // AuthenticationCredentialReader runs only with the separate read-only
@@ -80,20 +89,25 @@ func dummyAuthenticationVerifier() domain.PasswordVerifier {
 // Malformed input fails generically; valid syntactic unknown accounts spend
 // one real Argon2id verification to reduce KDF-based user enumeration.
 func (a *PasswordAuthentication) Authenticate(ctx context.Context, email, password string) (string, error) {
+	candidate, err := a.AuthenticateWithEpoch(ctx, email, password)
+	return candidate.SubjectID, err
+}
+
+func (a *PasswordAuthentication) AuthenticateWithEpoch(ctx context.Context, email, password string) (AuthenticatedSubject, error) {
 	if a == nil || a.reader == nil || a.kdf == nil || ctx == nil || ctx.Err() != nil {
-		return "", ErrPasswordAuthenticationUnavailable
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationUnavailable
 	}
 	canonical, err := domain.CanonicalEmail(email)
 	if err != nil {
-		return "", ErrPasswordAuthenticationDenied
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationDenied
 	}
 	normalized, err := domain.NormalizeForVerification(password)
 	if err != nil || normalized == "" {
-		return "", ErrPasswordAuthenticationDenied
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationDenied
 	}
 	record, found, err := a.reader.LookupCredential(ctx, canonical)
 	if err != nil {
-		return "", ErrPasswordAuthenticationUnavailable
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationUnavailable
 	}
 	verifier := dummyAuthenticationVerifier()
 	if found {
@@ -103,11 +117,11 @@ func (a *PasswordAuthentication) Authenticate(ctx context.Context, email, passwo
 	if err != nil {
 		// An invalid stored verifier is an integrity/availability failure,
 		// not a hint that the caller supplied bad credentials.
-		return "", ErrPasswordAuthenticationUnavailable
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationUnavailable
 	}
 	if !found || !matches || record.SubjectID == "" ||
-		record.Status != "ACTIVE" || !record.EmailVerified {
-		return "", ErrPasswordAuthenticationDenied
+		record.Status != "ACTIVE" || !record.EmailVerified || record.SessionEpoch <= 0 {
+		return AuthenticatedSubject{}, ErrPasswordAuthenticationDenied
 	}
-	return record.SubjectID, nil
+	return AuthenticatedSubject{SubjectID: record.SubjectID, SessionEpoch: record.SessionEpoch}, nil
 }
