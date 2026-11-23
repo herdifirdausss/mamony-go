@@ -53,13 +53,27 @@ type browserSessionStore struct {
 	resolves   int
 	revokes    int
 	subjects   map[string]string
+	grants     map[string]string
 }
 
-func (f *browserSessionStore) Issue(_ context.Context, subject string, digest []byte, _ string) (bool, error) {
+func (f *browserSessionStore) Stage(_ context.Context, subject string, digest []byte) (bool, error) {
+	if f.grants == nil {
+		f.grants = make(map[string]string)
+	}
+	f.grants[string(digest)] = subject
+	return true, nil
+}
+
+func (f *browserSessionStore) Issue(_ context.Context, grantDigest, digest []byte, _ string) (bool, error) {
 	f.issues++
 	if f.issueErr != nil || !f.allowed {
 		return f.allowed, f.issueErr
 	}
+	subject := f.grants[string(grantDigest)]
+	if subject == "" {
+		return false, nil
+	}
+	delete(f.grants, string(grantDigest))
 	if f.subjects == nil {
 		f.subjects = make(map[string]string)
 	}
@@ -100,7 +114,11 @@ func browserFixture(t *testing.T) (*BrowserSessionHTTP, *browserLoginGate, *brow
 	if err != nil {
 		t.Fatal(err)
 	}
-	login, err := usecase.NewSessionLogin(passwordFlow, authority)
+	grant, err := usecase.NewAuthenticationGrantAuthority(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	login, err := usecase.NewSessionLogin(passwordFlow, grant, authority)
 	if err != nil {
 		t.Fatal(err)
 	}

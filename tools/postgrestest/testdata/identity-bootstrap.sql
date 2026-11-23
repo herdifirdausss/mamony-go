@@ -14,6 +14,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_authenticator_runtime') THEN
         CREATE ROLE mamony_identity_authenticator_runtime LOGIN PASSWORD 'local-test-identity-authenticator';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_auth_grant_runtime') THEN
+        CREATE ROLE mamony_identity_auth_grant_runtime LOGIN PASSWORD 'local-test-identity-auth-grant';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_session_runtime') THEN
         CREATE ROLE mamony_identity_session_runtime LOGIN PASSWORD 'local-test-identity-session';
     END IF;
@@ -29,6 +32,7 @@ ALTER ROLE mamony_identity_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NO
 ALTER ROLE mamony_identity_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-runtime';
 ALTER ROLE mamony_identity_verifier_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-verifier';
 ALTER ROLE mamony_identity_authenticator_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-authenticator';
+ALTER ROLE mamony_identity_auth_grant_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-auth-grant';
 ALTER ROLE mamony_identity_session_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-session';
 ALTER ROLE mamony_identity_delivery_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-delivery';
 ALTER ROLE mamony_identity_maintenance_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-maintenance';

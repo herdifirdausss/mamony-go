@@ -6,22 +6,20 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// TestIdentityZDirectSessionMintThreatFixture is evidence of a known v10
-// weakness, not a passing security control. A holder of ONLY the session
-// runtime SQL credential can mint an opaque session for an eligible subject
-// without calling PasswordAuthentication, PasswordLoginFlow or Argon2id.
-//
-// This test intentionally passes while the vulnerability exists. When the
-// boundary is redesigned, replace it with a *negative* role-capability test
-// that asserts the former direct SQL entrypoint is inaccessible.
+// TestIdentityZDirectSessionMintThreatFixture is a NEGATIVE regression after
+// forward migration v11. The previously demonstrated v10 SQL direct-mint
+// capability must be gone even for a known ACTIVE/verified subject with no
+// password verifier or successful login.
 func TestIdentityZDirectSessionMintThreatFixture(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -44,8 +42,6 @@ func TestIdentityZDirectSessionMintThreatFixture(t *testing.T) {
 	}
 	defer func() { _ = session.Close(context.Background()) }()
 
-	// Administrator-only synthetic fixture: ACTIVE + verified contact, but
-	// deliberately NO password-verifier row and NO successful login attempt.
 	subject := randomSyntheticID(t, "sub_")
 	email := strings.ToLower(randomSyntheticID(t, "direct_mint_")) + "@example.test"
 	if _, err := admin.Exec(ctx,
@@ -66,39 +62,50 @@ func TestIdentityZDirectSessionMintThreatFixture(t *testing.T) {
 	if err := admin.QueryRow(ctx,
 		"SELECT count(*) FROM mamony_identity.password_verifiers WHERE subject_id=$1",
 		subject).Scan(&verifiers); err != nil || verifiers != 0 {
-		t.Fatalf("threat fixture unexpectedly contains a password verifier: count=%d err=%v", verifiers, err)
+		t.Fatalf("fixture unexpectedly contains password verifier: count=%d err=%v", verifiers, err)
 	}
 
-	// Attacker chooses a 256-bit session bearer and supplies only its digest
-	// to the SQL function; this gives the attacker full knowledge of the
-	// browser bearer even though the DB never stores the bearer plaintext.
-	var bearer [32]byte
-	if _, err := rand.Read(bearer[:]); err != nil {
+	var attackerSecret [32]byte
+	if _, err := rand.Read(attackerSecret[:]); err != nil {
 		t.Fatal(err)
 	}
-	blob := append([]byte("mamony:identity:session-token:v1\x00"), bearer[:]...)
-	digest := sha256.Sum256(blob)
+	digest := sha256.Sum256(append([]byte("mamony:identity:session-token:v1\x00"), attackerSecret[:]...))
+	grantDigest := sha256.Sum256([]byte("attacker has no actual authenticated grant"))
 	eventID := randomSyntheticID(t, "evt_")
+
+	// The subject-selected API must not merely become a synonym/overload.
 	var issued bool
-	if err := session.QueryRow(ctx,
+	err = session.QueryRow(ctx,
 		"SELECT mamony_identity.issue_opaque_session($1,$2,$3)",
-		subject, digest[:], eventID).Scan(&issued); err != nil || !issued {
-		t.Fatalf("v10 direct-mint fixture unexpectedly denied known SQL capability: allowed=%t err=%v", issued, err)
-	}
-	var resolved string
-	if err := session.QueryRow(ctx,
-		"SELECT coalesce(mamony_identity.resolve_opaque_session($1),'')",
-		digest[:]).Scan(&resolved); err != nil || resolved != subject {
-		t.Fatal("directly minted digest did not authenticate as target subject")
-	}
-	var sessions, events int
-	if err := admin.QueryRow(ctx, `SELECT
-		(SELECT count(*) FROM mamony_identity.opaque_sessions WHERE token_digest=$1),
-		(SELECT count(*) FROM mamony_identity.security_outbox WHERE event_id=$2 AND event_type='SESSION_CREATED')`,
-		digest[:], eventID).Scan(&sessions, &events); err != nil || sessions != 1 || events != 1 {
-		t.Fatalf("attack fixture did not persist session and event: sessions=%d events=%d err=%v",
-			sessions, events, err)
+		subject, digest[:], eventID).Scan(&issued)
+	var pgErr *pgconn.PgError
+	if err == nil || !errors.As(err, &pgErr) ||
+		(pgErr.Code != "42883" && pgErr.Code != "42501") {
+		t.Fatalf("old subject-selected issuer remains accessible: %v", err)
 	}
 
-	t.Log("EXPECTED VULNERABILITY: session SQL EXECUTE alone minted an authenticated session without a password verifier or successful KDF")
+	// The session role must not be able to fabricate a matching grant.
+	err = session.QueryRow(ctx,
+		"SELECT mamony_identity.stage_password_auth_grant($1,$2)",
+		subject, grantDigest[:]).Scan(&issued)
+	if err == nil || !errors.As(err, &pgErr) || pgErr.Code != "42501" {
+		t.Fatalf("session SQL role could stage arbitrary authentication: %v", err)
+	}
+	// Without the separate grant authority's secret, arbitrary digest minting
+	// fails closed and cannot create outbox or session rows.
+	if err := session.QueryRow(ctx,
+		"SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+		grantDigest[:], digest[:], eventID).Scan(&issued); err != nil || issued {
+		t.Fatalf("session role minted without issued grant: issued=%t err=%v", issued, err)
+	}
+	var sessions, events, grants int
+	if err := admin.QueryRow(ctx, `SELECT
+		(SELECT count(*) FROM mamony_identity.opaque_sessions WHERE token_digest=$1),
+		(SELECT count(*) FROM mamony_identity.security_outbox WHERE event_id=$2),
+		(SELECT count(*) FROM mamony_identity.password_login_grants WHERE grant_digest=$3)`,
+		digest[:], eventID, grantDigest[:]).Scan(&sessions, &events, &grants); err != nil ||
+		sessions != 0 || events != 0 || grants != 0 {
+		t.Fatalf("unauthorized SQL changed authority state: sessions=%d events=%d grants=%d err=%v",
+			sessions, events, grants, err)
+	}
 }

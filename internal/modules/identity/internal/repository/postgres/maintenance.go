@@ -48,15 +48,15 @@ func (s *RetentionStore) PurgeOneBatch(ctx context.Context) (int, int, error) {
 	return envelopes, counters, nil
 }
 
-// PurgeOneBatchWithSessions is the v10 operator path: the original 100
-// encrypted envelopes, 100 expired login buckets and 100 expired session
-// digests are removed together, or all rolled back on any error. The SQL
-// functions have independent grants: only the maintenance role can call them.
+// PurgeOneBatchWithSessions is the v11 operator path: a bounded batch of
+// encrypted envelopes, expired login buckets, expired session digests and
+// expired/consumed proof grants are purged atomically. Existing return values
+// retain their meaning; grant count is internal until the operator contract is revised.
 func (s *RetentionStore) PurgeOneBatchWithSessions(ctx context.Context) (int, int, int, error) {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil {
 		return 0, 0, 0, ErrMaintenanceUnavailable
 	}
-	var envelopes, counters, sessions int
+	var envelopes, counters, sessions, grants int
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx,
 			"SELECT mamony_identity.purge_expired_email_envelopes()").Scan(&envelopes); err != nil {
@@ -70,8 +70,12 @@ func (s *RetentionStore) PurgeOneBatchWithSessions(ctx context.Context) (int, in
 			"SELECT mamony_identity.purge_expired_opaque_sessions()").Scan(&sessions); err != nil {
 			return err
 		}
+		if err := tx.QueryRow(ctx,
+			"SELECT mamony_identity.purge_expired_password_login_grants()").Scan(&grants); err != nil {
+			return err
+		}
 		if envelopes < 0 || envelopes > 100 || counters < 0 || counters > 100 ||
-			sessions < 0 || sessions > 100 {
+			sessions < 0 || sessions > 100 || grants < 0 || grants > 100 {
 			return ErrMaintenanceUnavailable
 		}
 		return nil

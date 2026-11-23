@@ -53,3 +53,7 @@ go test -tags=integration,browser_e2e \
 ```
 
 The test bridge is **not** a production DNS, TLS ingress or proxy test. A browser E2E passing does not resolve the `mamony_identity_session_runtime` direct-mint privilege, production CSRF key management, MFA, financial authorization or release gates. Keep #43 and #44 Draft and all candidate routes unmounted.
+
+## Draft #46 — grant-bound session E2E candidate
+
+The session Chromium fixture now additionally configures `TEST_IDENTITY_AUTH_GRANT_URL` for the separate disposable PostgreSQL role `mamony_identity_auth_grant_runtime`. A successful real Argon2id password comparison is followed by 30-second grant staging and v11 atomic grant consume, then the same real cookie, CSRF, logout and ambiguous-revocation tests. Existing `TestIdentityZBrowserVerificationE2E` is unchanged. The integration role matrix must establish no subject-only SQL mint remains; this is **not a claim** of production workload isolation or independent credential verification.
