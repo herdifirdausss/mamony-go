@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	ErrPasskeyActivationCommitDenied = errors.New("passkey possession commit denied")
+	ErrPasskeyActivationCommitDenied      = errors.New("passkey possession commit denied")
 	ErrPasskeyActivationCommitUnavailable = errors.New("passkey possession commit unavailable")
 )
 
@@ -19,10 +19,10 @@ var (
 // every expected value to freshly locked server rows before any transition.
 type PasskeyActivationFinishRequest struct {
 	SessionDigest [32]byte
-	ChallengeID string
-	Expected PasskeyActivationEvidence
-	Verified PasskeyActivationAssertionResult
-	EventID string
+	ChallengeID   string
+	Expected      PasskeyActivationEvidence
+	Verified      PasskeyActivationAssertionResult
+	EventID       string
 }
 
 // PasskeyActivationFinishStore is intentionally UNIMPLEMENTED by any runtime.
@@ -39,8 +39,8 @@ type PasskeyActivationFinishStore interface {
 // POSSESSION_VERIFIED or ACTIVE state exists yet. The implementation cannot
 // be used until the Critical design is accepted and independently reviewed.
 type PasskeyActivationCommitter struct {
-	proof *PasskeyActivationAssertionVerifier
-	store PasskeyActivationFinishStore
+	proof  *PasskeyActivationAssertionVerifier
+	store  PasskeyActivationFinishStore
 	random io.Reader
 }
 
@@ -112,10 +112,10 @@ func (c *PasskeyActivationCommitter) Finish(ctx context.Context,
 
 	ok, err := c.store.Finish(ctx, PasskeyActivationFinishRequest{
 		SessionDigest: digest,
-		ChallengeID: challengeID,
-		Expected: expected,
-		Verified: verified,
-		EventID: eventID,
+		ChallengeID:   challengeID,
+		Expected:      expected,
+		Verified:      verified,
+		EventID:       eventID,
 	})
 	if err != nil || ctx.Err() != nil {
 		// Includes uncertain SQL COMMIT acknowledgement. Never replay here.
