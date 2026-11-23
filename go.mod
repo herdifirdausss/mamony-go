@@ -3,6 +3,8 @@ module github.com/herdifirdausss/mamony-go
 go 1.27.0
 
 require (
+	github.com/fxamacker/cbor/v2 v2.9.4
+	github.com/go-webauthn/webauthn v0.18.2
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/jackc/pgx/v5 v5.13.0
 	golang.org/x/crypto v0.53.0
