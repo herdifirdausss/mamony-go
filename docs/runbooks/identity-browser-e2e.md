@@ -73,3 +73,7 @@ Required PostgreSQL `TestIdentityZAuthMaterialEpochFence` uses disposable role-s
 ## Draft #50 — internal password-change integration evidence
 
 Mandatory `TestIdentityZAuthenticatedPasswordChange` runs real disposable PostgreSQL role separation, pre-KDF admission, Argon2id verification, purpose-bound one-use `PASSWORD_CHANGE` grant, a session-bound password-verifier update and transactional audit/epoch invalidation. Adversarial checks reject ordinary login grants as change proof and change grants as login proof; a duplicate outbox event must roll back the password update. The existing Chromium suite continues to test the candidate login/CSRF/logout browser contract; **no public password-change form or browser route has been implemented**. See [ADR-0013](../adr/0013-authenticated-password-change.md).
+
+## Draft #51 — security notification infrastructure evidence
+
+Required isolated PostgreSQL `TestIdentityZSecurityNoticeOutbox` checks v15 password-change event provenance, atomic queue creation, stale-contact suppression, 45-second leases, retries and fixed 7-day recipient erasure. `TestIdentityZAuthenticatedPasswordChange` now also asserts the notification obligation was inserted in the same transaction. This is NOT a browser password-change flow or live email-sending test. The existing real Chromium suites continue to check candidate verification and first-party cookie/CSRF/logout behavior without mounting a password-change endpoint. See [ADR-0014](../adr/0014-password-change-security-notices.md).
