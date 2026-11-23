@@ -11,10 +11,10 @@ import (
 // RecoveryCodeSecurityNoticeJob is intentionally token-free and carries only
 // the immutable v25 event, recipient, lease and approved event type.
 type RecoveryCodeSecurityNoticeJob struct {
-	EventID    string
-	Recipient  string
-	Kind       string
-	LeaseID    string
+	EventID   string
+	Recipient string
+	Kind      string
+	LeaseID   string
 }
 
 type RecoveryCodeSecurityNoticeStore interface {
