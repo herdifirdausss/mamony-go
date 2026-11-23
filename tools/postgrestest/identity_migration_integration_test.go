@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "30:false" {
-		t.Fatalf("identity migration should be at clean version 30: %q err=%v", out, err)
+	if err != nil || out != "31:false" {
+		t.Fatalf("identity migration should be at clean version 31: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "30" {
+	if err != nil || out != "31" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -1287,5 +1287,63 @@ func TestPostgresIdentityZPasskeyRegistrationIssuerRole(t *testing.T) {
 		"SELECT to_regprocedure('mamony_identity.finish_passkey_registration_intent(bytea,text,bytea)') IS NULL")
 	if err != nil || out != "t" {
 		t.Fatalf("unexpected unreviewed passkey finish function: out=%s err=%v", out, err)
+	}
+}
+
+// TestPostgresIdentityZPasskeyRegistrationReaderRole requires that only the
+// independently provisioned reader may access current session-bound
+// WebAuthn registration context. Reading is NOT proof verification or binding.
+func TestPostgresIdentityZPasskeyRegistrationReaderRole(t *testing.T) {
+	const read = "SELECT * FROM mamony_identity.read_passkey_registration_intent(" +
+		"decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA')"
+	const issue = "SELECT mamony_identity.issue_passkey_registration_intent(" +
+		"decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA'," +
+		"decode(repeat('22',32),'hex'),'login.example.test','https://login.example.test')"
+	out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL", "-c", read)
+	if err != nil || out != "" {
+		t.Fatalf("missing session must not disclose registration evidence: out=%q err=%v", out, err)
+	}
+	for _, sql := range []string{
+		"SELECT * FROM mamony_identity.passkey_registration_intents",
+		"SELECT challenge FROM mamony_identity.passkey_registration_intents",
+		"UPDATE mamony_identity.passkey_registration_intents SET consumed_at=clock_timestamp()",
+		"DELETE FROM mamony_identity.passkey_registration_intents",
+		"INSERT INTO mamony_identity.passkey_registration_intents(subject_id) VALUES ('sub_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.recovery_code_factor_keys",
+		"SELECT * FROM mamony_identity.password_recovery_code_enrollment_approvals",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"CREATE TABLE mamony_identity.passkey_reader_escape(id integer)",
+		issue,
+		"SELECT mamony_identity.resolve_opaque_session(decode(repeat('11',32),'hex'))",
+		"SELECT mamony_identity.read_recovery_code_factor_challenge('fac_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("passkey evidence reader gained unrelated permission: query=%q out=%q err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", read)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unrelated role read registration evidence: role=%s out=%q err=%v", role, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
+		"SELECT to_regprocedure('mamony_identity.finish_passkey_registration_intent(bytea,text,bytea)') IS NULL")
+	if err != nil || out != "t" {
+		t.Fatalf("unreviewed passkey registration finisher exists: out=%q err=%v", out, err)
 	}
 }
