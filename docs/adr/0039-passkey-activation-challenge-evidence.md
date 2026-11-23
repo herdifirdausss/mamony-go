@@ -1,0 +1,35 @@
+# ADR-0039 — Isolated challenge and evidence for provisional passkey possession
+
+Status: **PROPOSED / stacked Draft #76** above Draft #75. No activation, browser route, passkey login, independent recovery-factor promotion or authenticated assertion verifier.
+
+## Problem and security boundary
+
+v33 stages a verified WebAuthn creation response as **PENDING_ASSERTION** after v30 nonce, v31 expected ceremony evidence, and v32 password-backed same-session admission. The staged COSE key is not itself proof that a *new authentication ceremony* can be completed with the corresponding private key. Immediate `ACTIVE` based on the v33 registration alone would therefore overstate device possession and bypass a separate activation lock. Even a later successful signature does not establish independence from the password-backed session or prove manufacturer attestation for `fmt:none`.
+
+A maintained WebAuthn assertion verifier (e.g. go-webauthn v0.18.2 `ValidateLogin`) needs a fresh server challenge, the exact RP ID/origin and user handle, and an immutable snapshot of the credential public key, ID, authenticator counter and backup flags. Browser creation options vs finish SessionData congruence and precise challenge correlation must be established before deploying any public routes. See [v0.18.2 package API](https://pkg.go.dev/github.com/go-webauthn/webauthn@v0.18.2/webauthn).
+
+## Decisions
+
+1. **v34 `passkey_activation_challenges`** has one outstanding challenge per subject: globally unique 32-byte nonce and opaque `pav_` ID, exact pending credential ID, original live session digest, subject epoch/contact version, pinned HTTPS RP ID/origin, policy generation=1, fixed `PASSKEY_ACTIVATION_ASSERTION` purpose, issued/expiry/consumed timestamps. Expiry is **at most 3 minutes** and also no later than **10 minutes from the credential's original staging**. A currently unexpired challenge **cannot** be silently replaced; an expired or consumed one may be superseded.
+2. **Dedicated issuer principal** `mamony_identity_passkey_activation_issuer_runtime`: EXECUTE-only on `issue_passkey_activation_challenge`. SQL independently resolves the subject from a digest-only opaque bearer; caller cannot choose subject or epoch. Under subject+verified alias → live session → pending credential locks, issue requires a credential owned by that subject with unchanged epoch, contact version, `PENDING_ASSERTION` state and `PASSWORD_REAUTH_ONLY` provenance. **Both** v30 registration nonce and v32 admission must have been consumed by v33, referencing this credential's **exact original intent ID and session digest**. Its stage audit event and recipient-verified pending notice must already exist. All DB-clock/idle/absolute-session/credential-age fences are rechecked after locks.
+3. **Dedicated evidence-reader principal** `mamony_identity_passkey_activation_reader_runtime`: EXECUTE-only on `read_passkey_activation_challenge`. Returns the expected nonce, exact COSE public key, credential ID/AAGUID, authenticator counter, BE/BS flags, subject+epoch, exact RP policy, **only** for the original active session and the current unexpired/unconsumed challenge. The reader again checks the original staged registration intent+admission and mandatory queued-notice relationship. It may not consume or activate anything. Go copies public key and credential ID buffers.
+4. **Intentionally no credential activation.** No update to the v33 credential `state='PENDING_ASSERTION'` CHECK, no transaction to consume v34 challenge, no WebAuthn assertion signature verification, no UPDATE of stored counter or flags, no session minting or independent-factor status. The challenge data is not an authentication result. Future activation MUST verify a genuine `webauthn.get` response via maintained library (challenge, type, origin, RP hash, UP/UV, signature, ID/user-handle, sign counter and BE/BS policy), then atomically consume the exact v34 challenge and bind the same pending credential/state/counter under locks. Merely receiving this evidence does not authorize writing.
+5. **Fail-closed lifecycle restriction.** v30 stores only one registration intent per subject and can overwrite a completed row on a later Begin. v34 deliberately requires the **original** v30 row still correspond to the staged credential, plus a matching v32 admission. If a newer registration overwrites it, the older pending credential cannot begin/finish activation; there is no fallback to password-only admission. Explicit cleanup/expiry of abandoned pending credentials is a later design requirement.
+6. **No public / production deployment.** Role isolation is not a substitute for browser CSRF/Origin checks, a coherent `navigator.credentials.get` options contract, user consent, abuse limits, a completed security notice delivery worker, metadata/trust policy or risk controls. The issuer/reader remain unmounted, separate from public HTTP credentials.
+
+## Evidence
+
+- Unit: deterministic test-only entropy; nonce+credential selector exact binding; defensive copies; expired/invalid sessions, malformed credential selector and challenge ID, wrong RP/subject/policy, corrupted public key, invalid flags, canceled context and ambiguous SQL COMMIT.
+- Real disposable PostgreSQL: authentic v33 SQL PENDING staging (test-only synthetic candidate; v33 separately uses the real go-webauthn parser), a second *valid* session of the same account denied, unknown credential denied, concurrent Begin produces **one** challenge and one denial, no fresh replacement while live, reader tied to exact original session/nonce/COSE/epoch/RP, DB-expired challenge denied, rotated nonce leaves the previous ID unusable, stale session epoch denies, no credential state mutation.
+- Mandatory testgate, migration integrity fingerprint and 34-migration file canary, all named role test credentials in local/CI, strict v34 EXECUTE-only issuer/reader isolation and negative SQL privilege checks.
+
+## Subsequent cuts
+
+**v35** maintained WebAuthn assertion verifier with strict `SessionData` reconstruction/matching and a **real positive ES256 signed assertion fixture** (the existing `fmt:none` creation fixture alone is insufficient), plus negative altered signature/challenge/origin/RP/UP/UV and key mismatch tests. **v36**, once reviewed, may add a separate atomic activation transaction with one-use nonce, counter and BE/BS policy, verified signature-derived evidence and receipt/audit/notice. Activation must not create password-independent recovery entitlement or imply email delivery. Any login capability must have its own independently reviewed policy and endpoint.
+
+## References
+
+- [ADR-0036](0036-webauthn-registration-protocol-verifier.md) — strict registration library verification.
+- [ADR-0037](0037-passkey-registration-password-reauth-admission.md) — password-backed session admission.
+- [ADR-0038](0038-webauthn-atomic-provisional-registration.md) — atomic nonactive staged credential and queued notice.
+- [go-webauthn v0.18.2](https://pkg.go.dev/github.com/go-webauthn/webauthn@v0.18.2/webauthn) — exact maintained assertion validation contract.
