@@ -51,11 +51,15 @@ func validAdmissionBucket(b usecase.AdmissionBucket) bool {
 // Windows are intentionally FIXED UTC-aligned bins; boundaries can permit
 // double-burst traffic. Deploy an edge WAF/global rate limiter separately.
 func (s *AdmissionStore) Spend(ctx context.Context, action usecase.AnonymousAction, budgets []usecase.AdmissionBucket) (bool, error) {
-	if s == nil || s.db == nil || (action != usecase.AnonymousRegister && action != usecase.AnonymousResend) ||
-		len(budgets) != 4 {
+	if s == nil || s.db == nil || (action != usecase.AnonymousRegister && action != usecase.AnonymousResend && action != usecase.AnonymousConfirm) ||
+		(action == usecase.AnonymousConfirm && len(budgets) != 2) ||
+		(action != usecase.AnonymousConfirm && len(budgets) != 4) {
 		return false, ErrStorageUnavailable
 	}
-	expected := [...]string{"CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
+	expected := []string{"CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
+	if action == usecase.AnonymousConfirm {
+		expected = expected[:2]
+	}
 	for i, budget := range budgets {
 		if budget.Scope != expected[i] || !validAdmissionBucket(budget) {
 			return false, ErrStorageUnavailable
