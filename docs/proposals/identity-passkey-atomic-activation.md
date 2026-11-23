@@ -180,7 +180,7 @@ All cases below are **PLANNED / NOT RUN**. Run against disposable PostgreSQL wit
 |---|---|---|
 | PKA-T01 | Signed ES256 assertion on matching staged credential + live original session/nonce | One `POSSESSION_VERIFIED` row, consumed challenge, one activation event and one pending activation notice |
 | PKA-T02 | Same signed assertion submitted again, even with signCount 0/0 | DENY, no second event/notice, no counter change |
-| PKA-T03 | **16 concurrent** finishes using pool with >=16 physical connections, synchronized at SQL admission | Exactly one commit; 15 denied/serialized; no deadlock or extra event |
+| PKA-T03 | **16 concurrent** finishes using pool with >=16 physical connections, synchronized at SQL admission | Exactly one commit; 15 non-success outcomes (denied, or sanitized unavailable for actual infrastructure failure); no unexpected deadlock or extra event |
 | PKA-T04 | Valid but different live session of same subject | DENY; no cross-session adoption |
 | PKA-T05 | A different subject (even if it knows the challenge ID/credential ID) | DENY; subject derives only from live session |
 | PKA-T06 | Session revoked, epoch rotated or subject frozen after signature verification but before commit | DENY under locks; no mutation |
@@ -194,7 +194,7 @@ All cases below are **PLANNED / NOT RUN**. Run against disposable PostgreSQL wit
 | PKA-T14 | Stage security event or registration notice missing/wrong subject | DENY; no late assertion privilege bypass |
 | PKA-T15 | Current RP/origin, policy generation or COSE key differs from original signed v35 evidence | DENY; byte-level binding |
 | PKA-T16 | Current stored signCount changed after v35 read | DENY (snapshot mismatch), even if signed counter would advance relative to the new value |
-| PKA-T17 | Counter transitions 0→0, 0→1 and 1→2 | ALLOW only with a **fresh challenge** each time as applicable; 0/0 explicitly has no clone detection |
+| PKA-T17 | Counter transitions 0→0, 0→1 and 1→2 | ALLOW in **separate newly staged credential fixtures**, each with its own one-use challenge; 0/0 explicitly has no clone detection |
 | PKA-T18 | Counter transitions 2→2, 2→1 or 0→nonadvancing nonzero | DENY; no persisted count regression |
 | PKA-T19 | Signed BE differs from staged BE, or BS=1 with BE=0 | DENY; a legal signed BS transition with stable BE is allowed |
 | PKA-T20 | Duplicate `evt_` identifier at late event insert | Entire transaction rolls back credential, nonce, counter and notice |
