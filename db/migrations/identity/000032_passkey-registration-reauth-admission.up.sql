@@ -34,7 +34,7 @@ CREATE FUNCTION mamony_identity.stage_passkey_registration_reauth_grant(
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,pg_temp AS $$
 DECLARE current_epoch bigint; stamp timestamptz;
-BEGIN
+BEGIN -- PL/pgSQL function block, not migration transaction
     IF session_user<>'mamony_identity_auth_grant_runtime' THEN
         RAISE EXCEPTION 'passkey reauth grant origin denied' USING ERRCODE='42501';
     END IF;
@@ -81,7 +81,7 @@ DECLARE
     expiry timestamptz;
     stamp timestamptz;
     affected integer;
-BEGIN
+BEGIN -- PL/pgSQL function block, not migration transaction
     IF session_user<>'mamony_identity_passkey_registration_admission_runtime' THEN
         RAISE EXCEPTION 'passkey admission origin denied' USING ERRCODE='42501';
     END IF;
@@ -199,4 +199,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.admit_passkey_registration_intent(
 -- only when future approved atomic credential binding is implemented.
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (32, '88d95b0d8d95c69706b269565dff2a0cb6a198ab0894f7ab102fedbd2132348b');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (32, 'a47345ea029ed44cf052502d9ec7531d48f7ea29bdad2bb8b2a8219e79fa0673');
