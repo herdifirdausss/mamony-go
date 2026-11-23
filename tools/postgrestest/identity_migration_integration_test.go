@@ -1134,7 +1134,6 @@ func TestPostgresIdentityZRecoveryCodeNoticeWebhookRole(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZRecoveryFactorRoles establishes that the issuer and
 // signature-verifying application have distinct SQL credentials; neither may
 // enroll/rebind cryptographic keys or directly create approvals.
@@ -1147,16 +1146,13 @@ func TestPostgresIdentityZRecoveryFactorRoles(t *testing.T) {
 		"'fac_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('44',32),'hex')," +
 		"decode(repeat('55',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')"
 	const fail = "SELECT mamony_identity.fail_recovery_code_factor_challenge('fac_AAAAAAAAAAAAAAAAAAAAAA')"
-	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL", "-c", issue);
-		err != nil || out != "f" {
+	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL", "-c", issue); err != nil || out != "f" {
 		t.Fatalf("issuer cannot safely deny unknown credential: %s %v", out, err)
 	}
-	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL", "-c", read);
-		err != nil {
+	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL", "-c", read); err != nil {
 		t.Fatalf("verifier cannot read only available factor challenge: %s %v", out, err)
 	}
-	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL", "-c", complete);
-		err != nil || out != "f" {
+	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL", "-c", complete); err != nil || out != "f" {
 		t.Fatalf("verifier cannot safely deny unknown signed proof: %s %v", out, err)
 	}
 	for _, role := range []string{
@@ -1186,21 +1182,21 @@ func TestPostgresIdentityZRecoveryFactorRoles(t *testing.T) {
 			}
 		}
 	}
-	for _, sql := range []string{read,fail,complete,
+	for _, sql := range []string{read, fail, complete,
 		"SELECT mamony_identity.replace_password_recovery_offline_codes(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),ARRAY[decode(repeat('44',32),'hex')],'evt_AAAAAAAAAAAAAAAAAAAAAA')",
 	} {
-		out,err:=invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL","-c",sql)
-		if err==nil || !strings.Contains(out,"42501") {
-			t.Fatalf("issuer invoked verifier/manager capability: sql=%s out=%s err=%v",sql,out,err)
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("issuer invoked verifier/manager capability: sql=%s out=%s err=%v", sql, out, err)
 		}
 	}
 	for _, sql := range []string{issue,
 		"SELECT mamony_identity.stage_recovery_code_rotation_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'))",
 		"SELECT mamony_identity.replace_password_recovery_offline_codes(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),ARRAY[decode(repeat('44',32),'hex')],'evt_AAAAAAAAAAAAAAAAAAAAAA')",
 	} {
-		out,err:=invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL","-c",sql)
-		if err==nil || !strings.Contains(out,"42501") {
-			t.Fatalf("verifier invoked issuer/manager capability: sql=%s out=%s err=%v",sql,out,err)
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("verifier invoked issuer/manager capability: sql=%s out=%s err=%v", sql, out, err)
 		}
 	}
 	for _, role := range []string{
@@ -1215,11 +1211,11 @@ func TestPostgresIdentityZRecoveryFactorRoles(t *testing.T) {
 		"TEST_IDENTITY_SESSION_URL",
 		"TEST_PLATFORM_RUNTIME_URL",
 	} {
-		for _, sql := range []string{issue,read,complete}{
-			out,err:=invokePSQL(role,"-c",sql)
-			if err==nil || !strings.Contains(out,"42501") {
+		for _, sql := range []string{issue, read, complete} {
+			out, err := invokePSQL(role, "-c", sql)
+			if err == nil || !strings.Contains(out, "42501") {
 				t.Fatalf("unrelated identity principal invoked factor authority: role=%s sql=%s out=%s err=%v",
-					role,sql,out,err)
+					role, sql, out, err)
 			}
 		}
 	}
