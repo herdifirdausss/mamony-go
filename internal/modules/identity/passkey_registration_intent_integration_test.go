@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -68,7 +69,7 @@ func TestIdentityZPasskeyRegistrationIntent(t *testing.T) {
 		t.Fatal(err)
 	}
 	subject := randomSyntheticID(t, "sub_")
-	email := randomSyntheticID(t, "pk_") + "@example.test"
+	email := strings.ToLower(randomSyntheticID(t, "pk_")) + "@example.test"
 	if _, err := admin.Exec(ctx, "INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", subject); err != nil {
 		t.Fatal(err)
 	}
