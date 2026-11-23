@@ -40,11 +40,11 @@ func passkeyProofFixture(t *testing.T) (*PasskeyRegistrationProofVerifier,
 	store := &stubPasskeyEvidenceStore{
 		found: true,
 		evidence: PasskeyRegistrationEvidence{
-			Subject: "sub_AAAAAAAAAAAAAAAAAAAAAA",
-			Epoch: 3,
-			Nonce: [32]byte{0xaa},
-			RPID: policy.RPID(),
-			Origin: policy.Origin(),
+			Subject:          "sub_AAAAAAAAAAAAAAAAAAAAAA",
+			Epoch:            3,
+			Nonce:            [32]byte{0xaa},
+			RPID:             policy.RPID(),
+			Origin:           policy.Origin(),
 			PolicyGeneration: 1,
 		},
 	}
