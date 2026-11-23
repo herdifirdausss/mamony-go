@@ -6,6 +6,7 @@
 |---|---|
 | `cmd/mamony` | Read listener addresses and handle process signals. |
 | `cmd/mamony-identity-mail-worker` | Independently launched, double-opt-in Mailgun delivery worker; strict private-file secrets, no public routes. |
+| `cmd/mamony-identity-maintain` | Separately opt-in, single-batch retention erasure; not deployed or scheduled. |
 | `internal/app` | Start and stop the two HTTP listeners. |
 | `internal/platform/httpedge` | Serve liveness and readiness. |
 | `internal/platform/migration` | Standalone versioned platform and Identity migration verification, with separate schema roles and migration histories; never invoked by HTTP startup. |
@@ -18,7 +19,7 @@
 
 Set `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to override the addresses. The private listener accepts `127.0.0.1` and `::1`. It maps `localhost` to `127.0.0.1`. Readiness reports only HTTP process readiness.
 
-| `internal/modules/identity` | Internal pending-registration policy, Argon2id adapter, PostgreSQL enrollment, plus draft one-use email-proof digest/activation store, AES-GCM envelope adapter, leased delivery queue/worker ports, database-serialized per-subject issuance/resend limits, and an unmounted HMAC-keyed anonymous admission layer (v5); public Identity HTTP routes, deployed Mailgun credentials and executing worker absent. |
+| `internal/modules/identity` | Internal pending-registration policy, Argon2id adapter, PostgreSQL enrollment, plus draft one-use email-proof digest/activation store, AES-GCM envelope adapter, leased delivery queue/worker ports, database-serialized per-subject issuance/resend limits, an unmounted HMAC-keyed anonymous admission layer (v5), and restricted retention cleanup (v6); public Identity HTTP routes, deployed Mailgun credentials and executing worker absent. |
 
 ## Capability packages
 

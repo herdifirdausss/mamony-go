@@ -4,7 +4,8 @@ check: fmt-check vet unit architecture docs skills migrations-check build
 
 
 fmt-check:
-	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+	@gofmt -l .
+	@test -z "`gofmt -l .`" || { echo "gofmt required"; exit 1; }
 
 vet:
 	go vet ./...

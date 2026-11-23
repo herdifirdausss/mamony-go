@@ -1,6 +1,6 @@
 # Identity email delivery — runbook and security boundary
 
-**Status:** internal proposed infrastructure (stacked Draft PRs #25–#29); a Mailgun HTTP API adapter and an opt-in worker command exist, but deployment secrets are not connected, the process is not deployed, and all HTTP integration tests use local mocks. No public Identity endpoint or real outbound email is configured. No real delivery claim may be made.
+**Status:** internal proposed infrastructure (stacked Draft PRs #25–#30); a Mailgun HTTP API adapter and an opt-in worker command exist, but deployment secrets are not connected, the process is not deployed, and all HTTP integration tests use local mocks. No public Identity endpoint or real outbound email is configured. No real delivery claim may be made.
 
 ## Ownership and secrets
 
@@ -18,7 +18,7 @@
 4. Temporary failures back off 1, 2, 4 and 8 minutes; the fifth attempt is terminal. A process death releases work after the lease expires. A worker with an expired/stolen lease cannot finalize another worker's claim.
 5. A provider can accept a message and time out before the client records that acceptance. Reclaim/retry may send a duplicate. **Exactly once is not guaranteed**, and provider idempotency cannot be assumed. Review a real provider's capabilities before declaring deduplication. `ACCEPTED` is submission acknowledgement, not inbox delivery/read proof.
 6. If a newer proof was issued during processing, the older token is invalid at the verifier even if a delayed email is sent. Delivery may be confusing but cannot activate a user via a stale token.
-7. Use separate periodic cleanup to erase encrypted envelopes and old contact records according to an approved privacy/retention policy. No retention/cleanup worker is deployed in this PR.
+7. Use separate periodic cleanup to erase encrypted envelopes and old contact records according to an approved privacy/retention policy. The new one-shot retention tool remains unconfigured and undeployed.
 
 ## Preflight and verification
 
@@ -36,7 +36,7 @@ Before public enablement, resolve and test: actual sender provider and domain au
 
 ## Deployment sequencing and rollback
 
-Apply v1, then v2, then **v3**, with the offline `mamony-identity-migrate` binary and a dedicated migrator credential. Provision the separate nonprivileged delivery role before v3. The v3 verifier implementation fails closed if the encrypted delivery table is missing; do not deploy the changed verifier against a v2-only database. Keep the worker paused until both the persisted envelope and external key source are verified. A code rollback must account for queue rows produced by the new version, and must not re-enable public endpoints.
+Apply immutable Identity v1 through **v6**, with the offline `mamony-identity-migrate` binary and a dedicated migrator credential. Provision the separate nonprivileged delivery role before v3. The v3 verifier implementation fails closed if the encrypted delivery table is missing; do not deploy the changed verifier against a v2-only database. Keep the worker paused until both the persisted envelope and external key source are verified. A code rollback must account for queue rows produced by the new version, and must not re-enable public endpoints.
 
 ## Mailgun adapter (stacked Draft PR #26) — mock-first contract
 
@@ -98,3 +98,19 @@ The **verifier**, not the provider worker or the HTTP app, enforces the followin
 Before any future registration/resend endpoint is deployed, it must invoke the unmounted Identity `AnonymousAdmission` gate **before** account lookup or credential KDF work. The gate uses HMAC-identified account/client budgets in PostgreSQL (v5), with four atomic fixed-window charges per action; it does **not** trust any default forwarded-header origin. Only a narrowly allowlisted private/loopback proxy sending one rewritten canonical XFF value may supply a forwarded client address. All else uses the TCP peer or fails closed; at deployment, explicitly prevent a client from reaching the backend behind an otherwise trusted proxy. No API registration/resend route or provider delivery has been enabled by this branch.
 
 Static demo values: 8 requests/min and 80/hour per client IPv4 or IPv6 /64, 3/hour and 5/day per canonical email; `REGISTER` and `RESEND` use distinct budgets. Fixed UTC-aligned bins are not true rolling windows; boundary bursts, shared IPs, botnets, global provider quotas and timing differences still need defense in depth. A sanitized 202 JSON response helper is identical for allowed/limited/known/unknown in test fixtures, but no account existence authorization or complete HTTP flow is claimed. **Outstanding before public release:** durable asynchronous admission command handling, IP trust deployment validation, HMAC key rotation, TTL/retention cleanup, timed response normalization, trusted proxies and multi-region limits, global abuse controls, CSRF/Origin and actual registration/resend authorization.
+
+## Draft v6 retention maintenance — stacked PR #30
+
+Two no-argument PostgreSQL SECURITY DEFINER functions erase sensitive data only after fixed server-clock eligibility, **100 records max per function per call**, with `FOR UPDATE SKIP LOCKED`. Expired proof envelopes are cleared (NULL `sealed_token` plus `purged_at`) at least **24 hours after challenge expiry** and outside a live lease; delivery metadata, contact verification digest and security events remain. Old anonymous HMAC admission buckets are deleted **48 hours after fixed-window start**, exceeding the longest 24-hour quota. The delivery claim explicitly rejects null ciphertext. Neither operation allows the caller to supply identifiers, SQL clauses, or an alternative retention period.
+
+Only `mamony_identity_maintenance_runtime` can EXECUTE these definer functions. PUBLIC EXECUTE is revoked. The role cannot directly read/update/delete Identity tables, and cannot assume migrator rights. The one-shot facade calls both in one transaction: failure rolls back both. It processes **one batch** only, and does not schedule repeat runs or activate public endpoints.
+
+The independent `cmd/mamony-identity-maintain` requires both `--purge-expired` and `MAMONY_IDENTITY_MAINTENANCE_APPROVAL=I_ACKNOWLEDGE_IDENTITY_RETENTION_PURGE`, with an absolute, nonsymlink, owner-private `MAMONY_IDENTITY_MAINTENANCE_DSN_FILE` holding a `mamony_identity_maintenance_runtime` PostgreSQL DSN with `sslmode=verify-full`. The binary denies CI and `mamony_test_*` databases. Approval flags are operational brakes, **not operator IAM**. A possible operator-managed command, **not authorized for execution against real data**, is:
+
+```sh
+MAMONY_IDENTITY_MAINTENANCE_APPROVAL=I_ACKNOWLEDGE_IDENTITY_RETENTION_PURGE \
+MAMONY_IDENTITY_MAINTENANCE_DSN_FILE=/run/secrets/identity_maintenance_dsn \
+go run ./cmd/mamony-identity-maintain --purge-expired
+```
+
+**Release requirements still open:** privacy/compliance approval of 24h/48h periods, operator auditing, scheduling, backup/WAL/PITR/replica lifecycle, key destruction, document and contact erasure, legal holds, security audit retention and deletion SLAs. Setting a database column to NULL is not physical or forensic erasure from backups. Real PostgreSQL tests `TestPostgresIdentityMaintenanceRole` and `TestIdentityRetentionPurge` are mandatory.

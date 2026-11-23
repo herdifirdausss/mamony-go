@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "5:false" {
-		t.Fatalf("identity migration should be at clean version 5: %q err=%v", out, err)
+	if err != nil || out != "6:false" {
+		t.Fatalf("identity migration should be at clean version 6: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "5" {
+	if err != nil || out != "6" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -141,5 +141,49 @@ func TestPostgresIdentityAdmissionRole(t *testing.T) {
 		if err == nil || !strings.Contains(out, "42501") {
 			t.Fatalf("untrusted Identity role must refuse %q: %v %s", tc.sql, err, out)
 		}
+	}
+}
+
+// TestPostgresIdentityMaintenanceRole proves the v6 role is allowed to call
+// only two bounded functions; even an SQL-injection in its one-shot process
+// cannot read proof material or manually delete anonymous budget rows.
+func TestPostgresIdentityMaintenanceRole(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT * FROM mamony_identity.email_proof_deliveries",
+		"SELECT * FROM mamony_identity.anonymous_admission_buckets",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.email_verification_challenges",
+		"DELETE FROM mamony_identity.anonymous_admission_buckets",
+		"UPDATE mamony_identity.email_proof_deliveries SET sealed_token=NULL",
+		"UPDATE mamony_identity.subjects SET status='ACTIVE'",
+		"DELETE FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		output, err := invokePSQL("TEST_IDENTITY_MAINTENANCE_URL", "-c", sql)
+		if err == nil || !strings.Contains(output, "42501") {
+			t.Fatalf("maintenance role must reject arbitrary query %q: %v %s", sql, err, output)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_DELIVERY_URL", "TEST_PLATFORM_RUNTIME_URL",
+	} {
+		for _, fun := range []string{
+			"purge_expired_email_envelopes", "purge_expired_anonymous_buckets",
+		} {
+			out, err := invokePSQL(role, "-c", "SELECT mamony_identity."+fun+"()")
+			if err == nil || !strings.Contains(out, "42501") {
+				t.Fatalf("non-maintenance role used maintenance definer function: role=%s fn=%s err=%v output=%s",
+					role, fun, err, out)
+			}
+		}
+	}
+	output, err := invokePSQL("TEST_IDENTITY_MAINTENANCE_URL", "-c", `SELECT
+		(current_user='mamony_identity_maintenance_runtime'
+		AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+		AND NOT rolbypassrls)::text FROM pg_roles WHERE rolname=current_user`)
+	if err != nil || output != "true" {
+		t.Fatalf("maintenance runtime role must be unprivileged: %v %s", err, output)
 	}
 }
