@@ -219,8 +219,8 @@ func TestIdentityEmailVerification(t *testing.T) {
 		}
 		// Reusing the issuance event ID intentionally fails the final outbox
 		// INSERT, after token consumption and status change were attempted.
-		if err := proofs.Consume(ctx, req.TokenDigest, req.EventID); err == nil {
-			t.Fatal("duplicate outbox event must abort verification")
+		if err := proofs.Consume(ctx, req.TokenDigest, req.EventID); !errors.Is(err, usecase.ErrEmailProofUnavailable) {
+			t.Fatalf("failed outbox must roll back activation and report sanitized authority outage: %v", err)
 		}
 		verifyPending(t, pending.SubjectID, "UNVERIFIED")
 		var consumed bool

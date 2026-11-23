@@ -110,8 +110,30 @@ func TestEmailProofFailClosed(t *testing.T) {
 	out, _ := s.Prepare(context.Background(), "sub_AAAAAAAAAAAAAAAAAAAAAA")
 	_, secret := out.ForTrustedDelivery()
 	store.consumeErr = errors.New("secret SQL error")
-	if err := s.Confirm(context.Background(), secret); !errors.Is(err, ErrEmailProofInvalid) {
-		t.Fatal("database consume details leaked")
+	if err := s.Confirm(context.Background(), secret); !errors.Is(err, ErrEmailProofUnavailable) ||
+		err.Error() != ErrEmailProofUnavailable.Error() {
+		t.Fatal("database consume error not classified or leaked sensitive details")
+	}
+	store.consumeErr = ErrEmailProofInvalid
+	if err := s.Confirm(context.Background(), secret); !errors.Is(err, ErrEmailProofInvalid) ||
+		err.Error() != ErrEmailProofInvalid.Error() {
+		t.Fatal("invalid proof did not preserve generic invalid classification")
+	}
+	store.consumeErr = ErrEmailProofThrottled
+	if err := s.Confirm(context.Background(), secret); !errors.Is(err, ErrEmailProofUnavailable) {
+		t.Fatal("unexpected proof-store failure must fail closed as unavailable")
+	}
+	store.consumeErr = nil
+	before := store.consumed
+	canceled, stop := context.WithCancel(context.Background())
+	stop()
+	if err := s.Confirm(canceled, secret); !errors.Is(err, ErrEmailProofUnavailable) ||
+		store.consumed != before {
+		t.Fatal("canceled confirmation reached verifier database")
+	}
+	var absent *EmailVerification
+	if err := absent.Confirm(context.Background(), secret); !errors.Is(err, ErrEmailProofUnavailable) {
+		t.Fatal("nil verifier was treated as invalid token")
 	}
 }
 

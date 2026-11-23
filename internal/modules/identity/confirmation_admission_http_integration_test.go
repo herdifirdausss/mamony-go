@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,7 +25,7 @@ type syntheticConfirmationRejection struct{ calls atomic.Int64 }
 
 func (f *syntheticConfirmationRejection) Confirm(context.Context, string) error {
 	f.calls.Add(1)
-	return errors.New("synthetic unknown proof, no verifier credentials")
+	return usecase.ErrEmailProofInvalid
 }
 
 // TestIdentityZConfirmationAdmissionHTTPDB uses real admission database writes
