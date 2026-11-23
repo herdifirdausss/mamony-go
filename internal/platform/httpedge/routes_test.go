@@ -57,6 +57,12 @@ func TestIdentitySessionCandidateMethodsRemainUnmounted(t *testing.T) {
 		{http.MethodGet, "/v1/identity/session"},
 		{http.MethodGet, "/v1/identity/csrf"},
 		{http.MethodPost, "/v1/identity/logout"},
+		// No passkey self-enrollment before a reviewed independent binding
+		// authority, durable WebAuthn ceremony and RP/origin verification.
+		{http.MethodPost, "/v1/identity/passkeys/register/begin"},
+		{http.MethodPost, "/v1/identity/passkeys/register/finish"},
+		{http.MethodPost, "/v1/identity/passkeys/authenticate/begin"},
+		{http.MethodPost, "/v1/identity/passkeys/authenticate/finish"},
 	}
 	for _, listener := range []struct {
 		name string
