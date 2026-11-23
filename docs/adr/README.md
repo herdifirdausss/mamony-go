@@ -11,5 +11,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0005 — Pre-Argon2id login admission](0005-login-admission-before-argon2id.md) | Candidate only; durable global/client/alias quotas before KDF, no login/session route. |
 | [ADR-0006 — Opaque session authority](0006-opaque-session-authority.md) | Candidate only; atomic eligibility recheck, epoch-bound opaque bearer, no public routes. |
 | [ADR-0007 — First-party browser session HTTP contract](0007-first-party-browser-session-http-contract.md) | Proposed only; cookie/CSRF/login/logout behavior, lock-order evidence, still unmounted. |
+| [ADR-0008 — Unmounted first-party browser session handler](0008-unmounted-browser-session-http-candidate.md) | Candidate handler + HMAC CSRF and httptest; routes still unmounted, no production launch. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
