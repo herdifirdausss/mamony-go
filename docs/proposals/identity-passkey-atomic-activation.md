@@ -195,7 +195,7 @@ All cases below are **PLANNED / NOT RUN**. Run against disposable PostgreSQL wit
 | PKA-T15 | Current RP/origin, policy generation or COSE key differs from original signed v35 evidence | DENY; byte-level binding |
 | PKA-T16 | Current stored signCount changed after v35 read | DENY (snapshot mismatch), even if signed counter would advance relative to the new value |
 | PKA-T17 | Counter transitions 0→0, 0→1 and 1→2 | ALLOW in **separate newly staged credential fixtures**, each with its own one-use challenge; 0/0 explicitly has no clone detection |
-| PKA-T18 | Counter transitions 2→2, 2→1 or 0→nonadvancing nonzero | DENY; no persisted count regression |
+| PKA-T18 | Counter transitions 2→2 or 2→1 (fresh credential fixtures) | DENY; no persisted count regression |
 | PKA-T19 | Signed BE differs from staged BE, or BS=1 with BE=0 | DENY; a legal signed BS transition with stable BE is allowed |
 | PKA-T20 | Duplicate `evt_` identifier at late event insert | Entire transaction rolls back credential, nonce, counter and notice |
 | PKA-T21 | Test-only DB owner injects failure at activation-notice INSERT/trigger | Entire transaction rolls back; after removing fault a new intentional attempt may succeed **only if still unexpired** |
