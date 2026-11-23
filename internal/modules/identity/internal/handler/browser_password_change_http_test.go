@@ -145,6 +145,10 @@ func TestBrowserPasswordChangeCandidateRejectsUnsafeInputsBeforeKDF(t *testing.T
 		{"nested password", `{"email":"alice@example.test","currentPassword":{"token":"old"},"nextPassword":"next"}`, nil, 400},
 		{"trailing document", browserChangeBody() + browserChangeBody(), nil, 400},
 		{"oversize", strings.Repeat("A", 5000), nil, 413},
+		{"chunked oversized JSON", `{"email":"alice@example.test","currentPassword":"old","nextPassword":"` + strings.Repeat("A", 5000) + `"}`, func(r *http.Request) {
+			r.ContentLength = -1
+			r.TransferEncoding = []string{"chunked"}
+		}, 413},
 		{"untrusted peer", browserChangeBody(), func(r *http.Request) { r.RemoteAddr = "bad peer" }, 503},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

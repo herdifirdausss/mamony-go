@@ -22,5 +22,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0016 — Mailgun notice webhook reconciliation](0016-mailgun-security-notice-webhook-reconciliation.md) | PROPOSED: v17 digest-only provider message correlation, signed unmounted webhook, replay dedup, count-only failure monitoring; no live ingress. |
 | [ADR-0017 — Read-only notice health probe](0017-read-only-notice-health-probe.md) | PROPOSED: v18 least-privilege aggregate-only monitoring role and explicit thresholded one-shot JSON/exit-code probe; no scheduler or deployment. |
 | [ADR-0018 — Browser password-change HTTP candidate](0018-first-party-password-change-http-candidate.md) | PROPOSED: explicit unmounted first-party password-change handler reusing session-bound CSRF and internal credential proof; no public route. |
+| [ADR-0019 — Browser password-change PostgreSQL E2E](0019-browser-password-change-postgres-e2e.md) | PROPOSED: real Chromium cookie/CSRF, Argon2id, PostgreSQL epoch/audit/notice and lost-response behavior under disposable TLS fixture; no live route. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
