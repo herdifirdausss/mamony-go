@@ -145,6 +145,10 @@ func TestIdentityZBrowserPasswordChangeE2E(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pageHandler, err := handler.NewPasswordChangePage(browser)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	accounts := []browserRotationAccount{
 		{subject: randomSyntheticID(t, "sub_"),
@@ -212,6 +216,7 @@ func TestIdentityZBrowserPasswordChangeE2E(t *testing.T) {
 	mux.Handle("GET /v1/identity/csrf", browser)
 	mux.Handle("POST /v1/identity/logout", browser)
 	mux.Handle("POST /v1/identity/change-password", browserChange)
+	mux.Handle("GET /account/change-password", pageHandler)
 	mux.HandleFunc("GET /__test__/password-browser", func(w http.ResponseWriter, r *http.Request) {
 		if r.TLS == nil || r.Host != "app.example.test" {
 			http.Error(w, "wrong test origin", http.StatusForbidden)
@@ -292,11 +297,16 @@ func TestIdentityZBrowserPasswordChangeE2E(t *testing.T) {
 		}
 	}
 	for _, active := range []http.Handler{httpedge.PublicHandler(), httpedge.PrivateHandler()} {
-		rr := httptest.NewRecorder()
-		active.ServeHTTP(rr, httptest.NewRequest(http.MethodPost,
-			"https://app.example.test/v1/identity/change-password", nil))
-		if rr.Code != http.StatusNotFound {
-			t.Fatal("password-change candidate leaked into an application router")
+		for _, route := range []struct{ method, path string }{
+			{http.MethodPost, "/v1/identity/change-password"},
+			{http.MethodGet, "/account/change-password"},
+		} {
+			rr := httptest.NewRecorder()
+			active.ServeHTTP(rr, httptest.NewRequest(route.method,
+				"https://app.example.test"+route.path, nil))
+			if rr.Code != http.StatusNotFound {
+				t.Fatal("browser password-change candidate leaked into an application router")
+			}
 		}
 	}
 	t.Log(fmt.Sprintf("real Chromium password rotation E2E: subjects=%d, exactly one event+notice each", len(accounts)))
