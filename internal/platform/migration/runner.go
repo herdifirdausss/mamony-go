@@ -16,18 +16,35 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const migrationRole = "mamony_platform_migrator"
+// Migration targets are fixed by code, never constructed from HTTP or an
+// untrusted database value. The two roles must not own each other's schema.
+type target struct {
+	schema string
+	role   string
+	lockID int64
+}
 
-// A session lock makes manifest preflight, golang-migrate execution, and
-// postflight one serialized operation among callers of this command.
-// It is not a replacement for golang-migrate's own database advisory lock.
-const manifestLockID int64 = 731198465908223
+var (
+	platformTarget = target{schema: "mamony_platform", role: "mamony_platform_migrator", lockID: 731198465908223}
+	identityTarget = target{schema: "mamony_identity", role: "mamony_identity_migrator", lockID: 731198465908224}
+)
 
+// A session lock serializes manifest preflight and postflight for each target.
+// golang-migrate also owns its own independent lock.
 func Run(ctx context.Context, dsn, dir string) error {
+	return runTarget(ctx, dsn, dir, platformTarget)
+}
+
+// RunIdentity uses a different owned schema, role and advisory lock.
+func RunIdentity(ctx context.Context, dsn, dir string) error {
+	return runTarget(ctx, dsn, dir, identityTarget)
+}
+
+func runTarget(ctx context.Context, dsn, dir string, target target) error {
 	if dsn == "" {
 		return errors.New("migration credentials not provided")
 	}
-	files, err := Load(dir)
+	files, err := loadForSchema(dir, target.schema)
 	if err != nil {
 		return err
 	}
@@ -36,12 +53,12 @@ func Run(ctx context.Context, dsn, dir string) error {
 		return fmt.Errorf("connect as migration role: %w", err)
 	}
 	defer func() { _ = conn.Close(context.Background()) }()
-	if err := checkRole(ctx, conn); err != nil {
+	if err := checkRoleFor(ctx, conn, target); err != nil {
 		return err
 	}
 
 	var locked bool
-	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock($1)", manifestLockID).Scan(&locked); err != nil {
+	if err := conn.QueryRow(ctx, "SELECT pg_try_advisory_lock($1)", target.lockID).Scan(&locked); err != nil {
 		return fmt.Errorf("acquire fingerprint lock: %w", err)
 	}
 	if !locked {
@@ -49,10 +66,10 @@ func Run(ctx context.Context, dsn, dir string) error {
 	}
 	defer func() {
 		var unlocked bool
-		_ = conn.QueryRow(context.Background(), "SELECT pg_advisory_unlock($1)", manifestLockID).Scan(&unlocked)
+		_ = conn.QueryRow(context.Background(), "SELECT pg_advisory_unlock($1)", target.lockID).Scan(&unlocked)
 	}()
 
-	if err := Verify(ctx, conn, files); err != nil {
+	if err := verifyFor(ctx, conn, files, target.schema); err != nil {
 		return fmt.Errorf("before migration: %w", err)
 	}
 
@@ -64,7 +81,7 @@ func Run(ctx context.Context, dsn, dir string) error {
 	db.SetMaxOpenConns(2)
 	db.SetConnMaxLifetime(2 * time.Minute)
 	driver, err := migratepgx.WithInstance(db, &migratepgx.Config{
-		SchemaName:       "mamony_platform",
+		SchemaName:       target.schema,
 		MigrationsTable:  "schema_migrations",
 		StatementTimeout: 45 * time.Second,
 		// False ensures each SQL file is executed in one server-side
@@ -88,14 +105,14 @@ func Run(ctx context.Context, dsn, dir string) error {
 		return fmt.Errorf("migration failed (manual dirty-state review required): %w", err)
 	}
 	// Files must not change between the preflight read and execution.
-	reloaded, err := Load(dir)
+	reloaded, err := loadForSchema(dir, target.schema)
 	if err != nil || !sameFiles(files, reloaded) {
 		return errors.New("migration SQL changed during execution; inspect applied state")
 	}
-	if err := Verify(ctx, conn, files); err != nil {
+	if err := verifyFor(ctx, conn, files, target.schema); err != nil {
 		return fmt.Errorf("after migration: %w", err)
 	}
-	fmt.Printf("Migrations verified: %d (platform schema)\n", files[len(files)-1].Version)
+	fmt.Printf("Migrations verified: %d (%s schema)\n", files[len(files)-1].Version, target.schema)
 	return nil
 }
 
@@ -111,7 +128,7 @@ func sameFiles(a, b []File) bool {
 	return true
 }
 
-func checkRole(ctx context.Context, conn *pgx.Conn) error {
+func checkRoleFor(ctx context.Context, conn *pgx.Conn, target target) error {
 	var name string
 	var safe bool
 	err := conn.QueryRow(ctx, `SELECT rolname,
@@ -120,16 +137,16 @@ func checkRole(ctx context.Context, conn *pgx.Conn) error {
 	if err != nil {
 		return fmt.Errorf("inspect migration role: %w", err)
 	}
-	if name != migrationRole || !safe {
-		return errors.New("migration connection must use the dedicated unprivileged platform migrator role")
+	if name != target.role || !safe {
+		return errors.New("migration connection must use the dedicated unprivileged schema migrator role")
 	}
 	var schemaOwner string
-	err = conn.QueryRow(ctx, "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'mamony_platform'").Scan(&schemaOwner)
+	err = conn.QueryRow(ctx, "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = $1", target.schema).Scan(&schemaOwner)
 	if err != nil {
 		return fmt.Errorf("platform schema not provisioned by admin: %w", err)
 	}
-	if strings.TrimSpace(schemaOwner) != migrationRole {
-		return errors.New("platform schema owner is not the migration role")
+	if strings.TrimSpace(schemaOwner) != target.role {
+		return errors.New("schema owner is not the authorized migration role")
 	}
 	return nil
 }
@@ -138,9 +155,18 @@ func checkRole(ctx context.Context, conn *pgx.Conn) error {
 // Missing or inconsistent history fails closed, including after an interrupted
 // migration. It does not repair dirty versions or detect superuser tampering.
 func Verify(ctx context.Context, conn *pgx.Conn, files []File) error {
+	return verifyFor(ctx, conn, files, platformTarget.schema)
+}
+
+// VerifyIdentity checks identity migration fingerprints with the same rules.
+func VerifyIdentity(ctx context.Context, conn *pgx.Conn, files []File) error {
+	return verifyFor(ctx, conn, files, identityTarget.schema)
+}
+
+func verifyFor(ctx context.Context, conn *pgx.Conn, files []File, schema string) error {
 	var hasVersion, hasHistory bool
-	err := conn.QueryRow(ctx, `SELECT to_regclass('mamony_platform.schema_migrations') IS NOT NULL,
-		to_regclass('mamony_platform.migration_fingerprints') IS NOT NULL`).Scan(&hasVersion, &hasHistory)
+	err := conn.QueryRow(ctx, `SELECT to_regclass($1) IS NOT NULL, to_regclass($2) IS NOT NULL`,
+		schema+".schema_migrations", schema+".migration_fingerprints").Scan(&hasVersion, &hasHistory)
 	if err != nil {
 		return fmt.Errorf("read migration catalogs: %w", err)
 	}
@@ -150,7 +176,7 @@ func Verify(ctx context.Context, conn *pgx.Conn, files []File) error {
 		}
 		return nil // Fresh schema; only provisioning exists.
 	}
-	rows, err := conn.Query(ctx, "SELECT version, dirty FROM mamony_platform.schema_migrations")
+	rows, err := conn.Query(ctx, fmt.Sprintf("SELECT version, dirty FROM %s.schema_migrations", schema))
 	if err != nil {
 		return fmt.Errorf("read schema version: %w", err)
 	}
@@ -196,7 +222,7 @@ func Verify(ctx context.Context, conn *pgx.Conn, files []File) error {
 	if !foundCurrent {
 		return fmt.Errorf("applied schema version %d missing from local migration files", version)
 	}
-	recordRows, err := conn.Query(ctx, "SELECT version, sha256 FROM mamony_platform.migration_fingerprints")
+	recordRows, err := conn.Query(ctx, fmt.Sprintf("SELECT version, sha256 FROM %s.migration_fingerprints", schema))
 	if err != nil {
 		return fmt.Errorf("query fingerprint history: %w", err)
 	}

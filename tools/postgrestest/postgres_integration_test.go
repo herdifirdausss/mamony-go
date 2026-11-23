@@ -28,6 +28,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "Platform fixture setup failed: %v; output: %s\n", err, output)
 		os.Exit(1)
 	}
+	if output, err := invokePSQL("TEST_DATABASE_ADMIN_URL", "-f", filepath.Join("testdata", "identity-bootstrap.sql")); err != nil {
+		fmt.Fprintf(os.Stderr, "Identity fixture setup failed: %v; output: %s\n", err, output)
+		os.Exit(1)
+	}
 	os.Exit(m.Run())
 }
 
@@ -40,6 +44,8 @@ func safeFixture() error {
 		{"TEST_DATABASE_URL", "mamony_test_runtime"},
 		{"TEST_PLATFORM_MIGRATION_URL", "mamony_platform_migrator"},
 		{"TEST_PLATFORM_RUNTIME_URL", "mamony_platform_runtime"},
+		{"TEST_IDENTITY_MIGRATION_URL", "mamony_identity_migrator"},
+		{"TEST_IDENTITY_RUNTIME_URL", "mamony_identity_runtime"},
 	} {
 		raw := os.Getenv(pair.key)
 		u, err := url.Parse(raw)

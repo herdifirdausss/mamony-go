@@ -1,6 +1,7 @@
-.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration integration-local migrations-check migrate-platform
+.PHONY: check fmt-check vet unit architecture docs skills archlint test-report build race lint security run test-repeat coverage integration integration-local migrations-check migrate-platform migrate-identity
 
 check: fmt-check vet unit architecture docs skills migrations-check build
+
 
 fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './vendor/*'))"; if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
@@ -77,3 +78,7 @@ migrations-check:
 # MAMONY_MIGRATION_DSN must come from a provisioned migration secret source.
 migrate-platform:
 	go run ./cmd/mamony-migrate
+
+# Identity migrations use separate credentials and never run at HTTP startup.
+migrate-identity:
+	go run ./cmd/mamony-identity-migrate

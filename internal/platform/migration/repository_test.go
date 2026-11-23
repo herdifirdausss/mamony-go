@@ -17,3 +17,11 @@ func TestRepositoryMigrationFiles(t *testing.T) {
 		t.Fatal("no committed SQL migrations")
 	}
 }
+
+func TestRepositoryIdentityMigrationFiles(t *testing.T) {
+	t.Parallel()
+	files, err := LoadIdentity(filepath.Join("..", "..", "..", "db", "migrations", "identity"))
+	if err != nil || len(files) != 1 {
+		t.Fatalf("committed identity SQL must pass fingerprint verification: files=%v err=%v", files, err)
+	}
+}

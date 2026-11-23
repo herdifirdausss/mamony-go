@@ -29,7 +29,12 @@ type File struct {
 // Load rejects malformed or altered migrations before any database write.
 // A changed old file and recalculated trailer will still be rejected against
 // the fingerprint previously committed inside PostgreSQL.
-func Load(dir string) ([]File, error) {
+func Load(dir string) ([]File, error) { return loadForSchema(dir, "mamony_platform") }
+
+// LoadIdentity verifies migrations for the separately owned Identity schema.
+func LoadIdentity(dir string) ([]File, error) { return loadForSchema(dir, "mamony_identity") }
+
+func loadForSchema(dir, schema string) ([]File, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return nil, fmt.Errorf("open migration directory: %w", err)
@@ -68,7 +73,7 @@ func Load(dir string) ([]File, error) {
 			return nil, fmt.Errorf("%q: explicit transaction control is forbidden", name)
 		}
 		digest := fmt.Sprintf("%x", sha256.Sum256([]byte(body)))
-		trailer := fmt.Sprintf("%sINSERT INTO mamony_platform.migration_fingerprints (version, sha256) VALUES (%d, '%s');\n", marker, version, digest)
+		trailer := fmt.Sprintf("%sINSERT INTO %s.migration_fingerprints (version, sha256) VALUES (%d, '%s');\n", marker, schema, version, digest)
 		if string(b[idx:]) != trailer {
 			return nil, fmt.Errorf("%q: integrity trailer mismatch; historical SQL cannot be silently rewritten", name)
 		}

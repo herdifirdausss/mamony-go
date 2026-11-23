@@ -33,6 +33,8 @@ components:
     in: modules/identity/internal/usecase/**
   identity_credential:
     in: modules/identity/internal/repository/credential/**
+  identity_postgres:
+    in: modules/identity/internal/repository/postgres/**
 deps:
   app:
     mayDependOn:
@@ -60,3 +62,10 @@ deps:
       - identity_domain
     canUse:
       - identity_argon2
+  identity_postgres:
+    mayDependOn:
+      - identity_domain
+      - identity_usecase
+      - platform
+    canUse:
+      - pgx
