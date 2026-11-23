@@ -14,5 +14,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0008 — Unmounted first-party browser session handler](0008-unmounted-browser-session-http-candidate.md) | Candidate handler + HMAC CSRF and httptest; routes still unmounted, no production launch. |
 | [ADR-0009 — Authentication-to-session issuance trust boundary](0009-authentication-to-session-issuance-boundary.md) | PROPOSED: v11 grant-bound issuer in stacked Draft #46, role-capability/negative tests; no production approval or route activation. |
 | [ADR-0010 — Server-side session idle expiry](0010-server-side-session-idle-expiry.md) | PROPOSED: v12 30-minute DB-clock inactivity expiry; 12-hour absolute unaffected, no public routing. |
+| [ADR-0011 — Atomic five-session cap](0011-atomic-five-session-cap.md) | PROPOSED: v13 grant-bound mint atomically evicts oldest live session when five slots are occupied; consistent SQL lock order, no public routing. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
