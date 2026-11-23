@@ -1,6 +1,6 @@
 # Identity email delivery — runbook and security boundary
 
-**Status:** internal proposed infrastructure (stacked Draft PRs #25–#27); a Mailgun HTTP API adapter and an opt-in worker command exist, but deployment secrets are not connected, the process is not deployed, and all HTTP integration tests use local mocks. No public Identity endpoint or real outbound email is configured. No real delivery claim may be made.
+**Status:** internal proposed infrastructure (stacked Draft PRs #25–#28); a Mailgun HTTP API adapter and an opt-in worker command exist, but deployment secrets are not connected, the process is not deployed, and all HTTP integration tests use local mocks. No public Identity endpoint or real outbound email is configured. No real delivery claim may be made.
 
 ## Ownership and secrets
 
@@ -84,3 +84,11 @@ The command logs only coarse startup/shutdown messages; errors returned through 
 **Mock-only automated verification:** `TestDeliveryRunnerPollsSeriallyAndStopsOnShutdown` and `cmd/mamony-identity-mail-worker` tests cover cancellation, unsafe startup, CI guard, symlinks/permissions/invalid keyring. The named `TestIdentityMailgunMockPipeline` also exercises `RunDelivery` using an isolated real PostgreSQL fixture and **local HTTP mock transport**. No CI job supplies the live approval flag or external Mailgun credential. It cannot accidentally send real email.
 
 **Still pending before deploying live:** operator approval for account/domain/region; externally managed secret and rotation policy; audited egress restriction and provider quota; abuse/resend limits at the registration API; complaint/bounce/webhook signature verification; encrypted-envelope retention cleanup; frontend safe token handling; deploy rollback, metrics, readiness and alerting. No user-facing register/verify endpoint is exposed.
+
+## Internal resend admission budgets — stacked Draft PR #28
+
+The **verifier**, not the provider worker or the HTTP app, enforces the following fixed policy for the synthetic first-party Identity profile: **one new proof per 60 seconds, three per rolling hour, five per rolling 24 hours per subject**. This applies to the first issuance as well as any resend. A historical challenge counts whether its proof was revoked, expired or mailed; otherwise repeatedly rotating tokens would bypass the budget. All thresholds use an authoritative PostgreSQL timestamp and are evaluated **after** locking the current subject/alias but **before** revoking the existing proof, inserting a new digest, encrypted delivery or security event. An over-budget attempt fails closed without changing any persistent state.
+
+`EmailVerification.Resend` returns no bearer, only a trusted-internal outcome. The public API is absent and must NEVER return a distinct account-existence/rejected-by-quota response without a reviewed anti-enumeration strategy. The privilege-restricted verifier role has SELECT on historical challenges for this query; no new role permissions are granted in v4. The additive v4 migration adds `email_verify_budget_by_subject` to support bounded history scans (and keeps the earlier v1–v3 fingerprints unchanged).
+
+**Important incompleteness:** This is **not** general rate limiting for anonymous callers or all accounts. Network/IP budgets, trusted proxy policy, abuse of nonexistent accounts and bulk account creation, global Mailgun quota, resend URL authorization, expiry cleanup, and request timing/response normalization remain unimplemented. Never equate this internally enforced per-subject guard with production readiness. Required tagged test: `TestIdentityResendAdmission` (hour/day boundary, 10 parallel reissues, old-token preservation and denied-outbox rollback), in addition to the existing contact/worker checks.

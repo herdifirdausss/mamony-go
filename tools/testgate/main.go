@@ -33,6 +33,7 @@ var requiredTests = []string{
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
+	"TestIdentityResendAdmission",
 }
 
 type testEvent struct {

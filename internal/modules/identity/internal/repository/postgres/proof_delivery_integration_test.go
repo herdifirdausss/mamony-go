@@ -91,6 +91,11 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 		if err != nil || count != 1 {
 			t.Fatalf("durable envelope not linked: count=%d err=%v", count, err)
 		}
+		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_verification_challenges
+			SET requested_at=clock_timestamp()-interval '65 seconds'
+			WHERE subject_id=$1`, p.SubjectID); err != nil {
+			t.Fatal(err)
+		}
 		// Simulate failure of the LAST audit insert; the envelope and challenge
 		// must not survive the same failed issuance transaction.
 		conflict := usecase.EmailProofRequest{
@@ -193,6 +198,11 @@ func TestIdentityProofDeliveryOutbox(t *testing.T) {
 	t.Run("revoked or consumed proof never enters claim", func(t *testing.T) {
 		p := newPending(t)
 		old := newIssue(t, p.SubjectID, 0xd5)
+		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_verification_challenges
+			SET requested_at=clock_timestamp()-interval '65 seconds'
+			WHERE subject_id=$1`, p.SubjectID); err != nil {
+			t.Fatal(err)
+		}
 		_, err := issuer.Issue(ctx, usecase.EmailProofRequest{
 			SubjectID: p.SubjectID, ChallengeID: randomID(t, "vch_"),
 			EventID: randomID(t, "evt_"), TokenDigest: bytes.Repeat([]byte{0xd6}, 32),

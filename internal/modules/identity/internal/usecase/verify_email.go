@@ -15,9 +15,22 @@ var (
 	ErrEmailProofUnavailable = errors.New("email verification unavailable")
 	ErrEmailProofInvalid     = errors.New("email verification invalid")
 	ErrEmailProofIneligible  = errors.New("email proof cannot be issued")
+	// Internal-only admission outcome. A future public handler MUST collapse it
+	// to the same outward response used for missing/active accounts.
+	ErrEmailProofThrottled = errors.New("email proof issuance limited")
 )
 
 const proofPrefix = "mamony:email-proof:v1:"
+
+// Internal defaults for first-party Profile A email proof issuance. All
+// issuance (first proof and reissue) passes through the same DB-time budgets.
+// These are NOT IP or anonymous-account controls: ingress protection remains
+// a separate prerequisite before any public endpoint is enabled.
+const (
+	EmailProofCooldownSeconds = 60
+	EmailProofHourlyLimit     = 3
+	EmailProofDailyLimit      = 5
+)
 
 // EmailProofRequest is a trusted, single-transaction repository command.
 // The token digest must never be used as a bearer or logged.
@@ -119,10 +132,24 @@ func (v *EmailVerification) Prepare(ctx context.Context, subjectID string) (Prep
 		EventID: eventID, TokenDigest: tokenDigest(secret),
 		EnvelopeKeyID: keyID, SealedToken: sealed,
 	})
+	if errors.Is(err, ErrEmailProofThrottled) {
+		// Caller is an already-authorized internal issuer, never an HTTP
+		// endpoint. Public handlers must not expose this distinct outcome.
+		return PreparedEmailProof{}, ErrEmailProofThrottled
+	}
 	if err != nil || target.ContactVersion < 1 || target.CanonicalEmail == "" {
 		return PreparedEmailProof{}, ErrEmailProofUnavailable
 	}
 	return PreparedEmailProof{recipient: target.CanonicalEmail, token: secret}, nil
+}
+
+// Resend always creates a NEW single-use token, revoking the old token only
+// on successful commit. No token is returned to its caller: only the trusted
+// encrypted delivery outbox receives the proof. This is internal-only; the
+// future ingress must authenticate/authorize the subject and normalize errors.
+func (v *EmailVerification) Resend(ctx context.Context, subjectID string) error {
+	_, err := v.Prepare(ctx, subjectID)
+	return err
 }
 
 // Confirm accepts exactly one canonical 32-byte random bearer, and does not

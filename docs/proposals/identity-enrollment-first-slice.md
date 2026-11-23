@@ -1,6 +1,6 @@
 # Identity enrollment: first implementation slice
 
-**Status:** DRAFT / stacked PRs #22–#27; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Status:** DRAFT / stacked PRs #22–#28; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
 The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Real provider delivery, running worker and public HTTP activation are still disabled.
 
@@ -69,3 +69,11 @@ All outgoing HTTP tests use local `httptest` mocks. A separate tagged real-Postg
 ## Dedicated worker runtime (stacked Draft PR #27)
 
 A public Identity facade owns the bounded `RunDelivery` wiring: nonprivileged PostgreSQL delivery pool, AES-GCM envelope keyring, Mailgun sender and a serialized polling runner. The separate `cmd/mamony-identity-mail-worker` binary requires dual opt-in, private secret files and TLS-verified non-fixture database credentials. It has no HTTP handler and is not started by `cmd/mamony`. Unit tests cover deny-by-default; tagged integration tests execute the facade against disposable real PostgreSQL and a loopback-only HTTP Mailgun mock. There is **no live provider access or production deployment**. See [delivery runbook](../runbooks/identity-delivery.md).
+
+## Internal issuance admission / resend (stacked Draft PR #28)
+
+Every issuance (including `EmailVerification.Prepare` and token-free `EmailVerification.Resend`) is checked in the verifier's authoritative PostgreSQL transaction, with the same subject and alias `FOR UPDATE` locks as contact binding and prior-token revocation. The fixed internal budgets are **60 seconds minimum between issuances, at most 3 in any 1-hour window, and at most 5 in any 24-hour window per subject**. Historical challenge rows remain counted even when revoked or expired. Denials occur **before** revoking the previous proof and cannot create an encrypted delivery row or audit event. No separate client clock, Redis best-effort counter or provider-side rate limit is the authority for this subject budget.
+
+The new additive SQL migration v4 only adds the `(subject_id, requested_at DESC)` partial index needed for historical budget queries; no role grants or history revisions are changed. Real-PostgreSQL integration tests must prove cooldown, hourly/daily windows, denial rollback, expiry of windows and one winner among 10 concurrent requests. Unit tests confirm the resend interface never returns the bearer. The migration is part of the offline Identity migration sequence.
+
+**Release boundary:** This is a trusted-actor **subject** budget only. Before exposing a route, implement and test an ingress-owned subject authorization model, distinct quotas for unknown accounts and untrusted IP/forwarded headers, privacy-safe keyed identity budgets, uniform existence-blind responses and a global Mailgun/provider quota. The future route must not pass an arbitrary `subjectID` from anonymous request JSON to `Resend`. No live email or public endpoint is enabled by this PR.
