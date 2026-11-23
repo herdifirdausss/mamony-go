@@ -36,7 +36,7 @@ func SyntheticRegistrationResponse(nonce, credentialID []byte) ([]byte, error) {
 	}
 	rpHash := sha256.Sum256([]byte("login.example.test"))
 	authData := append([]byte(nil), rpHash[:]...)
-	authData = append(authData, 0x45) // UP + UV + AT
+	authData = append(authData, 0x45)                // UP + UV + AT
 	authData = append(authData, make([]byte, 20)...) // count + AAGUID
 	// Credential ID length is bounded before converting any width.
 	var idLength uint16
@@ -55,9 +55,9 @@ func SyntheticRegistrationResponse(nonce, credentialID []byte) ([]byte, error) {
 		return nil, err
 	}
 	clientData, err := json.Marshal(map[string]any{
-		"type": "webauthn.create",
-		"origin": "https://login.example.test",
-		"challenge": base64.RawURLEncoding.EncodeToString(nonce),
+		"type":        "webauthn.create",
+		"origin":      "https://login.example.test",
+		"challenge":   base64.RawURLEncoding.EncodeToString(nonce),
 		"crossOrigin": false,
 	})
 	if err != nil {
@@ -67,7 +67,7 @@ func SyntheticRegistrationResponse(nonce, credentialID []byte) ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"id": id, "rawId": id, "type": "public-key",
 		"response": map[string]any{
-			"clientDataJSON": base64.RawURLEncoding.EncodeToString(clientData),
+			"clientDataJSON":    base64.RawURLEncoding.EncodeToString(clientData),
 			"attestationObject": base64.RawURLEncoding.EncodeToString(attestation),
 		},
 	})
