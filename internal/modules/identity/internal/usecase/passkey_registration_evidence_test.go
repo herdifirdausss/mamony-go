@@ -94,7 +94,7 @@ func TestPasskeyRegistrationEvidenceFailsClosed(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
+		name   string
 		mutate func(*PasskeyRegistrationEvidence)
 	}{
 		{"other subject", func(x *PasskeyRegistrationEvidence) { x.Subject = "sub_BBBBBBBBBBBBBBBBBBBBBB" }},
