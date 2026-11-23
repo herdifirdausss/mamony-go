@@ -257,8 +257,7 @@ func TestIdentityZPasskeyActivationChallenge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if verified, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), signedResponse);
-		err != nil || !verified.UserPresent || !verified.UserVerified ||
+	if verified, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), signedResponse); err != nil || !verified.UserPresent || !verified.UserVerified ||
 		verified.Counter != 1 || !bytes.Equal(verified.CredentialID, credentialID) {
 		t.Fatalf("v35 signed activation assertion with DB-owned key rejected: %v", err)
 	}
@@ -267,8 +266,7 @@ func TestIdentityZPasskeyActivationChallenge(t *testing.T) {
 	if _, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), signedResponse); err != nil {
 		t.Fatalf("read-only v35 verifier unexpectedly consumed challenge: %v", err)
 	}
-	if _, err := assertionVerifier.VerifyOnly(ctx, otherBearer, issued.ChallengeID(), signedResponse);
-		!errors.Is(err, usecase.ErrPasskeyAssertionDenied) {
+	if _, err := assertionVerifier.VerifyOnly(ctx, otherBearer, issued.ChallengeID(), signedResponse); !errors.Is(err, usecase.ErrPasskeyAssertionDenied) {
 		t.Fatal("other live session was able to verify credential assertion")
 	}
 	badNonce := evidence.Nonce
@@ -277,11 +275,10 @@ func TestIdentityZPasskeyActivationChallenge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), wrongResponse);
-		!errors.Is(err, usecase.ErrPasskeyAssertionDenied) {
+	if _, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), wrongResponse); !errors.Is(err, usecase.ErrPasskeyAssertionDenied) {
 		t.Fatal("v35 verified signature over a wrong challenge")
 	}
-	
+
 	if _, err := reader.Read(ctx, otherBearer, issued.ChallengeID()); !errors.Is(err, usecase.ErrPasskeyActivationDenied) {
 		t.Fatalf("second live session read original activation evidence: %v", err)
 	}
