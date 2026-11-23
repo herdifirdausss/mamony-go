@@ -26,6 +26,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_notice_monitor_runtime') THEN
         CREATE ROLE mamony_identity_recovery_notice_monitor_runtime LOGIN PASSWORD 'local-test-identity-recovery-notice-monitor';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_code_notice_webhook_runtime') THEN
+        CREATE ROLE mamony_identity_recovery_code_notice_webhook_runtime LOGIN PASSWORD 'local-test-identity-recovery-code-notice-webhook';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_code_notice_runtime') THEN
         CREATE ROLE mamony_identity_recovery_code_notice_runtime LOGIN PASSWORD 'local-test-identity-recovery-code-notice';
     END IF;
@@ -78,6 +81,7 @@ ALTER ROLE mamony_identity_auth_grant_runtime LOGIN NOSUPERUSER NOCREATEDB NOCRE
 ALTER ROLE mamony_identity_recovery_notice_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice';
 ALTER ROLE mamony_identity_recovery_notice_webhook_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice-webhook';
 ALTER ROLE mamony_identity_recovery_notice_monitor_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice-monitor';
+ALTER ROLE mamony_identity_recovery_code_notice_webhook_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-code-notice-webhook';
 ALTER ROLE mamony_identity_recovery_code_notice_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-code-notice';
 ALTER ROLE mamony_identity_recovery_code_notice_monitor_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-code-notice-monitor';
 ALTER ROLE mamony_identity_recovery_code_manager_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-code-manager';
