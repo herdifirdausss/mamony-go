@@ -33,9 +33,9 @@ func stageFixture(t *testing.T) (*PasskeyRegistrationStager,
 	t.Helper()
 	proof, expected, protocol, bearer := passkeyProofFixture(t)
 	protocol.candidate = PasskeyRegistrationCandidate{
-		CredentialID: bytes.Repeat([]byte{0x61}, 32),
+		CredentialID:  bytes.Repeat([]byte{0x61}, 32),
 		PublicKeyCOSE: bytes.Repeat([]byte{0xa3}, 64),
-		AAGUID: make([]byte, 16), UserPresent: true, UserVerified: true,
+		AAGUID:        make([]byte, 16), UserPresent: true, UserVerified: true,
 		AttestationFormat: "none", AttestationType: "none",
 	}
 	store := &stubPasskeyStageStore{ok: true}
