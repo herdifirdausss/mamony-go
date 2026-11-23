@@ -8,5 +8,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0002 — Ledger and data ownership](0002-ledger-and-data-ownership.md) | Contract baseline. PostgreSQL work is pending. |
 | [ADR-0003 — Public HTTP contract](0003-public-http-contract.md) | Contract baseline. The wire-amount decision is open. |
 | [ADR-0004 — Internal password-authentication foundation](0004-password-authentication-foundation.md) | Candidate only; read-only authenticator, no login/session route. |
+| [ADR-0005 — Pre-Argon2id login admission](0005-login-admission-before-argon2id.md) | Candidate only; durable global/client/alias quotas before KDF, no login/session route. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.

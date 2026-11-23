@@ -25,9 +25,27 @@ func NewAdmissionStore(db Transactor) (*AdmissionStore, error) {
 	return &AdmissionStore{db: db}, nil
 }
 
-func validAdmissionBucket(b usecase.AdmissionBucket) bool {
+func validAdmissionBucket(action usecase.AnonymousAction, b usecase.AdmissionBucket) bool {
 	if b.Key == ([32]byte{}) {
 		return false
+	}
+	// LOGIN has a separate domain and deliberately different alias quotas.
+	// All other actions preserve their immutable v5-v7 accounting policy.
+	if action == usecase.AnonymousLogin {
+		switch b.Scope {
+		case "GLOBAL_MINUTE":
+			return b.WindowSeconds == 60 && b.Limit == 80
+		case "CLIENT_MINUTE":
+			return b.WindowSeconds == 60 && b.Limit == 8
+		case "CLIENT_HOUR":
+			return b.WindowSeconds == 3600 && b.Limit == 80
+		case "EMAIL_HOUR":
+			return b.WindowSeconds == 3600 && b.Limit == 5
+		case "EMAIL_DAY":
+			return b.WindowSeconds == 86400 && b.Limit == 20
+		default:
+			return false
+		}
 	}
 	switch b.Scope {
 	case "CLIENT_MINUTE":
@@ -51,17 +69,27 @@ func validAdmissionBucket(b usecase.AdmissionBucket) bool {
 // Windows are intentionally FIXED UTC-aligned bins; boundaries can permit
 // double-burst traffic. Deploy an edge WAF/global rate limiter separately.
 func (s *AdmissionStore) Spend(ctx context.Context, action usecase.AnonymousAction, budgets []usecase.AdmissionBucket) (bool, error) {
-	if s == nil || s.db == nil || (action != usecase.AnonymousRegister && action != usecase.AnonymousResend && action != usecase.AnonymousConfirm) ||
-		(action == usecase.AnonymousConfirm && len(budgets) != 2) ||
-		(action != usecase.AnonymousConfirm && len(budgets) != 4) {
+	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil {
 		return false, ErrStorageUnavailable
 	}
-	expected := []string{"CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
-	if action == usecase.AnonymousConfirm {
-		expected = expected[:2]
+	// Exact ordered scopes enforce an action-specific, static policy. Do
+	// not permit callers to omit a GLOBAL or per-alias bucket.
+	var expected []string
+	switch action {
+	case usecase.AnonymousRegister, usecase.AnonymousResend:
+		expected = []string{"CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
+	case usecase.AnonymousConfirm:
+		expected = []string{"CLIENT_MINUTE", "CLIENT_HOUR"}
+	case usecase.AnonymousLogin:
+		expected = []string{"GLOBAL_MINUTE", "CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
+	default:
+		return false, ErrStorageUnavailable
+	}
+	if len(budgets) != len(expected) {
+		return false, ErrStorageUnavailable
 	}
 	for i, budget := range budgets {
-		if budget.Scope != expected[i] || !validAdmissionBucket(budget) {
+		if budget.Scope != expected[i] || !validAdmissionBucket(action, budget) {
 			return false, ErrStorageUnavailable
 		}
 	}

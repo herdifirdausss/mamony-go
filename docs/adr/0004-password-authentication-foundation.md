@@ -29,3 +29,7 @@ All denied credentials (unknown alias, bad password, `UNVERIFIED`, `SUSPENDED`, 
 ## Tests
 
 Unit tests cover known/unknown aliases, correct and wrong password, unverified/suspended/frozen/deleted accounts, KDF on unknown aliases, impossible dummy-verifier activation, malformed inputs, cancellation, unknown SQL/KDF errors and failure redaction. Disposable PostgreSQL integration tests use a real Argon2id credential for a freshly registered pending subject, then actual email-proof activation before accepting its subject candidate; they reject unknown/wrong/inactive credentials and verify wrong-role DB denial. SQL privilege tests assert exact allowed SELECT columns and rejection of privilege escalation, writes, cross-role credential reads, security event access, challenge/admission/envelope reads, and migration history. The testgate mandates the named role and real DB tests. No CI result justifies mounting a public login.
+
+## Continuation: required pre-KDF admission — Draft PR #40
+
+ADR-0005 introduces `PasswordLoginFlow`, which composes the internal verifier from this ADR **behind a separate durable LOGIN admission port**. It charges account-independent global/client/alias budgets before the authentication reader or Argon2id can run. It does not retrofit an HTTP handler, session or permission. Future public login code must depend on the composed flow, never call the raw `PasswordAuthentication` as its public entrypoint. See [ADR-0005](0005-login-admission-before-argon2id.md) for hard limits, HMAC privacy, fixed-window edge cases and rollout blockers.

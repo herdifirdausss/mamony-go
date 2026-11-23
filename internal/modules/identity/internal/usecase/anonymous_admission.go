@@ -23,6 +23,7 @@ const (
 	AnonymousRegister AnonymousAction = "REGISTER"
 	AnonymousResend   AnonymousAction = "RESEND"
 	AnonymousConfirm  AnonymousAction = "CONFIRM"
+	AnonymousLogin    AnonymousAction = "LOGIN"
 )
 
 // AdmissionBucket is an allowlisted database accounting obligation. Keys are
