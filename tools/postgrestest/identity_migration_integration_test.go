@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "21:false" {
-		t.Fatalf("identity migration should be at clean version 21: %q err=%v", out, err)
+	if err != nil || out != "22:false" {
+		t.Fatalf("identity migration should be at clean version 22: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "21" {
+	if err != nil || out != "22" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -702,6 +702,80 @@ func TestPostgresIdentityZRecoveryRedeemerRole(t *testing.T) {
 		out, err := invokePSQL(role, "-c", redeem)
 		if err == nil || !strings.Contains(out, "42501") {
 			t.Fatalf("unapproved role gained recovery redemption: %s out=%s err=%v", role, out, err)
+		}
+	}
+}
+
+// TestPostgresIdentityZRecoverySecurityNoticeRoles enforces v22's independent
+// sender and count-only monitor credentials, without direct table authority.
+func TestPostgresIdentityZRecoverySecurityNoticeRoles(t *testing.T) {
+	const lease = "lse_AAAAAAAAAAAAAAAAAAAAAA"
+	const event = "evt_AAAAAAAAAAAAAAAAAAAAAA"
+	const claim = "SELECT * FROM mamony_identity.claim_password_recovery_notice('" + lease + "')"
+	const finalize = "SELECT mamony_identity.finalize_password_recovery_notice('" +
+		event + "','" + lease + "','TEMPORARY',NULL)"
+	out, err := invokePSQL("TEST_IDENTITY_RECOVERY_NOTICE_URL", "-c", finalize)
+	if err != nil || out != "f" {
+		t.Fatalf("recovery notice sender cannot call finalize: %s %v", out, err)
+	}
+	out, err = invokePSQL("TEST_IDENTITY_RECOVERY_NOTICE_URL", "-c", claim)
+	if err != nil {
+		t.Fatalf("recovery notice sender cannot claim queue: %s %v", out, err)
+	}
+	out, err = invokePSQL("TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", "-c",
+		"SELECT * FROM mamony_identity.password_recovery_notice_health()")
+	if err != nil {
+		t.Fatalf("count-only recovery monitor denied health: %s %v", out, err)
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RECOVERY_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL",
+	} {
+		for _, sql := range []string{
+			"CREATE TABLE mamony_identity.recovery_notice_escape(id integer)",
+			"SELECT * FROM mamony_identity.password_recovery_notices",
+			"SELECT * FROM mamony_identity.password_change_notices",
+			"SELECT * FROM mamony_identity.password_recovery_challenges",
+			"SELECT * FROM mamony_identity.password_recovery_assurance_grants",
+			"SELECT * FROM mamony_identity.password_verifiers",
+			"SELECT * FROM mamony_identity.email_aliases",
+			"SELECT * FROM mamony_identity.subjects",
+			"SELECT * FROM mamony_identity.opaque_sessions",
+			"SELECT * FROM mamony_identity.security_outbox",
+			"SELECT * FROM mamony_identity.schema_migrations",
+			"SELECT * FROM mamony_identity.migration_fingerprints",
+			"UPDATE mamony_identity.password_recovery_notices SET status='ACCEPTED'",
+			"SELECT * FROM mamony_identity.claim_password_change_notice('" + lease + "')",
+			"SELECT * FROM mamony_identity.claim_password_recovery_delivery('" + lease + "')",
+			"SELECT mamony_identity.redeem_password_recovery(decode(repeat('11',32),'hex'),'owner@example.test',decode(repeat('22',16),'hex'),decode(repeat('33',32),'hex'),'" + event + "')",
+			"SET ROLE mamony_identity_migrator",
+		} {
+			out, err := invokePSQL(role, "-c", sql)
+			if err == nil || !strings.Contains(out, "42501") {
+				t.Fatalf("v22 notice role exceeded EXECUTE-only boundary: role=%s sql=%s out=%s err=%v", role, sql, out, err)
+			}
+		}
+	}
+	for _, tc := range []struct {
+		role string
+		sql  string
+	}{
+		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", claim},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", finalize},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_URL", "SELECT * FROM mamony_identity.password_recovery_notice_health()"},
+		{"TEST_IDENTITY_SECURITY_NOTICE_URL", claim},
+		{"TEST_IDENTITY_SECURITY_NOTICE_URL", finalize},
+		{"TEST_IDENTITY_RECOVERY_ISSUER_URL", claim},
+		{"TEST_IDENTITY_RECOVERY_REDEEMER_URL", finalize},
+		{"TEST_IDENTITY_RUNTIME_URL", claim},
+		{"TEST_PLATFORM_RUNTIME_URL", "SELECT * FROM mamony_identity.password_recovery_notice_health()"},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_URL", "SELECT mamony_identity.purge_old_password_recovery_notices()"},
+		{"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL", "SELECT mamony_identity.purge_old_password_recovery_notices()"},
+	} {
+		out, err := invokePSQL(tc.role, "-c", tc.sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("cross-purpose v22 EXECUTE succeeded: role=%s sql=%s out=%s err=%v",
+				tc.role, tc.sql, out, err)
 		}
 	}
 }

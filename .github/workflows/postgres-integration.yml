@@ -37,6 +37,8 @@ jobs:
       TEST_IDENTITY_VERIFIER_URL: postgres://mamony_identity_verifier_runtime:local-test-identity-verifier@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_AUTHENTICATOR_URL: postgres://mamony_identity_authenticator_runtime:local-test-identity-authenticator@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_AUTH_GRANT_URL: postgres://mamony_identity_auth_grant_runtime:local-test-identity-auth-grant@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_RECOVERY_NOTICE_URL: postgres://mamony_identity_recovery_notice_runtime:local-test-identity-recovery-notice@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL: postgres://mamony_identity_recovery_notice_monitor_runtime:local-test-identity-recovery-notice-monitor@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_RECOVERY_REDEEMER_URL: postgres://mamony_identity_recovery_redeemer_runtime:local-test-identity-recovery-redeemer@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_RECOVERY_DELIVERY_URL: postgres://mamony_identity_recovery_delivery_runtime:local-test-identity-recovery-delivery@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_RECOVERY_ISSUER_URL: postgres://mamony_identity_recovery_issuer_runtime:local-test-identity-recovery-issuer@127.0.0.1:5432/mamony_test_ci?sslmode=disable
