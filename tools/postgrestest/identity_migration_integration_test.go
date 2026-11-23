@@ -1347,3 +1347,88 @@ func TestPostgresIdentityZPasskeyRegistrationReaderRole(t *testing.T) {
 		t.Fatalf("unreviewed passkey registration finisher exists: out=%q err=%v", out, err)
 	}
 }
+
+
+// TestPostgresIdentityZPasskeyRegistrationAdmissionRole verifies the v32
+// admission principal may consume only a purpose-bound fresh-password grant
+// against an already issued, session-bound passkey intent. It cannot stage
+// Argon2id assertions, inspect identity tables or bind credentials.
+func TestPostgresIdentityZPasskeyRegistrationAdmissionRole(t *testing.T) {
+	const stage = "SELECT mamony_identity.stage_passkey_registration_reauth_grant(" +
+		"'sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'))"
+	const admit = "SELECT mamony_identity.admit_passkey_registration_intent(" +
+		"decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA'," +
+		"decode(repeat('22',32),'hex'))"
+	out, err := invokePSQL("TEST_IDENTITY_AUTH_GRANT_URL", "-c", stage)
+	if err != nil || out != "f" {
+		t.Fatalf("grant role must deny unknown subject reauth: out=%q err=%v", out, err)
+	}
+	out, err = invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL", "-c", admit)
+	if err != nil || out != "f" {
+		t.Fatalf("admission role must deny nonexistent grant: out=%q err=%v", out, err)
+	}
+	for _, stmt := range []string{
+		stage,
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT * FROM mamony_identity.passkey_registration_admissions",
+		"SELECT * FROM mamony_identity.passkey_registration_intents",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.recovery_code_factor_keys",
+		"SELECT * FROM mamony_identity.password_recovery_code_enrollment_approvals",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"UPDATE mamony_identity.passkey_registration_admissions SET consumed_at=clock_timestamp()",
+		"DELETE FROM mamony_identity.passkey_registration_admissions",
+		"INSERT INTO mamony_identity.passkey_registration_admissions(subject_id) VALUES ('sub_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.issue_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'login.example.test','https://login.example.test')",
+		"SELECT * FROM mamony_identity.read_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.issue_opaque_session_with_grant(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"CREATE TABLE mamony_identity.passkey_admission_escape(id integer)",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("passkey admission role escaped EXECUTE-only boundary: stmt=%q out=%q err=%v", stmt, out, err)
+		}
+	}
+	for _, env := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(env, "-c", admit)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unrelated role gained passkey admission power: role=%s out=%q err=%v", env, out, err)
+		}
+	}
+	for _, env := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(env, "-c", stage)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("untrusted role staged passkey fresh-password assertion: role=%s out=%q err=%v", env, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL", "-c", `SELECT
+		(NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+		AND NOT rolreplication AND NOT rolbypassrls)::text
+		FROM pg_roles WHERE rolname=current_user`)
+	if err != nil || out != "true" {
+		t.Fatalf("passkey admission principal elevated: out=%q err=%v", out, err)
+	}
+}
