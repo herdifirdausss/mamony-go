@@ -145,18 +145,18 @@ func TestIdentityZPasskeyRegistrationAdmission(t *testing.T) {
 	if _, err := admin.Exec(ctx,
 		"INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())",
 		subject); err != nil {
-			t.Fatal(err)
-		}
+		t.Fatal(err)
+	}
 	if _, err := admin.Exec(ctx,
 		"INSERT INTO mamony_identity.email_aliases(canonical_email,subject_id,verified_at,created_at) VALUES($1,$2,clock_timestamp(),clock_timestamp())",
 		email, subject); err != nil {
-			t.Fatal(err)
-		}
+		t.Fatal(err)
+	}
 	if _, err := admin.Exec(ctx,
 		"INSERT INTO mamony_identity.password_verifiers(subject_id,kdf_version,memory_kib,iterations,parallelism,salt,digest,created_at) VALUES($1,1,65536,3,1,$2,$3,clock_timestamp())",
 		subject, verifier.Salt, verifier.Digest); err != nil {
-			t.Fatal(err)
-		}
+		t.Fatal(err)
+	}
 	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", subject); err != nil {
 		t.Fatal(err)
 	}
@@ -181,8 +181,8 @@ func TestIdentityZPasskeyRegistrationAdmission(t *testing.T) {
 		if err := admin.QueryRow(ctx,
 			"SELECT count(*) FROM mamony_identity.passkey_registration_admissions WHERE subject_id=$1",
 			subject).Scan(&count); err != nil {
-				t.Fatal(err)
-			}
+			t.Fatal(err)
+		}
 		return count
 	}
 	if countAdmissions() != 0 {
@@ -248,8 +248,8 @@ func TestIdentityZPasskeyRegistrationAdmission(t *testing.T) {
 	if err := admin.QueryRow(ctx, "SELECT grant_digest FROM mamony_identity.password_login_grants "+
 		"WHERE subject_id=$1 AND purpose='PASSKEY_REGISTRATION_REAUTH' AND consumed_at IS NOT NULL "+
 		"ORDER BY issued_at DESC LIMIT 1", subject).Scan(&previousRaw); err != nil {
-			t.Fatal(err)
-		}
+		t.Fatal(err)
+	}
 	var previous [32]byte
 	if len(previousRaw) != 32 {
 		t.Fatal("invalid proof digest")
@@ -261,8 +261,8 @@ func TestIdentityZPasskeyRegistrationAdmission(t *testing.T) {
 	if _, err := admin.Exec(ctx,
 		"UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1",
 		subject); err != nil {
-			t.Fatal(err)
-		}
+		t.Fatal(err)
+	}
 	if err := reauth.Admit(ctx, bearer, intent.IntentID(),
 		email, secret, peer); !errors.Is(err, usecase.ErrPasskeyAdmissionDenied) {
 		t.Fatal("stale session epoch admitted passkey")
