@@ -39,6 +39,7 @@ var requiredTests = []string{
 	"TestPostgresIdentityZRecoveryDeliveryRole",
 	"TestPostgresIdentityZRecoveryRedeemerRole",
 	"TestPostgresIdentityZRecoveryAssuranceRole",
+	"TestPostgresIdentityZRecoveryCodeManagerRole",
 	"TestPostgresIdentityZRecoverySecurityNoticeRoles",
 	"TestPostgresIdentityZRecoveryNoticeWebhookRole",
 	"TestPostgresIdentityDeliveryRole",
@@ -56,6 +57,7 @@ var requiredTests = []string{
 	"TestIdentityZAuthenticatedPasswordChange",
 	"TestIdentityZPasswordRecoveryRedemption",
 	"TestIdentityZRecoveryOfflineAssurance",
+	"TestIdentityZRecoveryCodeEnrollmentRotation",
 	"TestIdentityZSecurityNoticeOutbox",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
@@ -109,6 +111,7 @@ func run() error {
 	identityRecoveryDeliveryDSN := os.Getenv("TEST_IDENTITY_RECOVERY_DELIVERY_URL")
 	identityRecoveryRedeemerDSN := os.Getenv("TEST_IDENTITY_RECOVERY_REDEEMER_URL")
 	identityRecoveryAssuranceDSN := os.Getenv("TEST_IDENTITY_RECOVERY_ASSURANCE_URL")
+	identityRecoveryCodeManagerDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL")
 	identityRecoveryNoticeDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_URL")
 	identityRecoveryNoticeMonitorDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL")
 	identityRecoveryNoticeWebhookDSN := os.Getenv("TEST_IDENTITY_RECOVERY_NOTICE_WEBHOOK_URL")
@@ -153,6 +156,9 @@ func run() error {
 	}
 	if err := validateDSN(identityRecoveryNoticeMonitorDSN, "mamony_identity_recovery_notice_monitor_runtime"); err != nil {
 		return fmt.Errorf("identity recovery notice monitor fixture: %w", err)
+	}
+	if err := validateDSN(identityRecoveryCodeManagerDSN, "mamony_identity_recovery_code_manager_runtime"); err != nil {
+		return fmt.Errorf("identity recovery code manager fixture: %w", err)
 	}
 	if err := validateDSN(identityRecoveryAssuranceDSN, "mamony_identity_recovery_assurance_runtime"); err != nil {
 		return fmt.Errorf("identity recovery assurance fixture: %w", err)
@@ -201,6 +207,7 @@ func run() error {
 	identityRecoveryDeliveryURL, _ := url.Parse(identityRecoveryDeliveryDSN)
 	identityRecoveryRedeemerURL, _ := url.Parse(identityRecoveryRedeemerDSN)
 	identityRecoveryAssuranceURL, _ := url.Parse(identityRecoveryAssuranceDSN)
+	identityRecoveryCodeManagerURL, _ := url.Parse(identityRecoveryCodeManagerDSN)
 	identityRecoveryNoticeURL, _ := url.Parse(identityRecoveryNoticeDSN)
 	identityRecoveryNoticeMonitorURL, _ := url.Parse(identityRecoveryNoticeMonitorDSN)
 	identityRecoveryNoticeWebhookURL, _ := url.Parse(identityRecoveryNoticeWebhookDSN)
@@ -210,7 +217,7 @@ func run() error {
 	identityWebhookURL, _ := url.Parse(identityWebhookDSN)
 	identityMonitorURL, _ := url.Parse(identityMonitorDSN)
 	identityMaintenanceURL, _ := url.Parse(identityMaintenanceDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryCodeManagerURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}
@@ -228,7 +235,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -334,6 +341,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZAuthenticatedPasswordChange") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZPasswordRecoveryRedemption") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryOfflineAssurance") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryCodeEnrollmentRotation") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZSecurityNoticeOutbox"))) {
 				passed[ev.Test] = true
 			}

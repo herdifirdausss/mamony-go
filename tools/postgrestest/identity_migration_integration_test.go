@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "24:false" {
-		t.Fatalf("identity migration should be at clean version 24: %q err=%v", out, err)
+	if err != nil || out != "25:false" {
+		t.Fatalf("identity migration should be at clean version 25: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "24" {
+	if err != nil || out != "25" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -897,6 +897,77 @@ func TestPostgresIdentityZRecoveryAssuranceRole(t *testing.T) {
 		out, err := invokePSQL(role, "-c", approve)
 		if err == nil || !strings.Contains(out, "42501") {
 			t.Fatalf("unauthorized role approved recovery assurance: role=%s out=%s err=%v", role, out, err)
+		}
+	}
+}
+
+// TestPostgresIdentityZRecoveryCodeManagerRole enforces v25's EXECUTE-only
+// enrollment/rotation principal and distinct one-use reauthentication purpose.
+func TestPostgresIdentityZRecoveryCodeManagerRole(t *testing.T) {
+	const issue = "SELECT mamony_identity.stage_recovery_code_rotation_grant(" +
+		"'sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'))"
+	const replace = "SELECT mamony_identity.replace_password_recovery_offline_codes(" +
+		"decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex')," +
+		"decode(repeat('33',32),'hex')," +
+		"ARRAY[decode(repeat('44',32),'hex'),decode(repeat('55',32),'hex')," +
+		"decode(repeat('66',32),'hex'),decode(repeat('77',32),'hex')," +
+		"decode(repeat('88',32),'hex')],'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_AUTH_GRANT_URL", "-c", issue)
+	if err != nil || out != "f" {
+		t.Fatalf("auth grant runtime cannot safely reject unknown recovery subject: %s %v", out, err)
+	}
+	out, err = invokePSQL("TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL", "-c", replace)
+	if err != nil || out != "f" {
+		t.Fatalf("recovery manager cannot safely reject unknown session: %s %v", out, err)
+	}
+	for _, sql := range []string{
+		"CREATE TABLE mamony_identity.offline_manager_escape(id integer)",
+		"SELECT * FROM mamony_identity.password_recovery_offline_codes",
+		"SELECT * FROM mamony_identity.password_recovery_code_enrollment_approvals",
+		"SELECT * FROM mamony_identity.password_recovery_code_notices",
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.password_recovery_assurance_grants",
+		"SELECT * FROM mamony_identity.password_recovery_challenges",
+		"SELECT * FROM mamony_identity.password_recovery_deliveries",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"UPDATE mamony_identity.password_recovery_offline_codes SET consumed_at=NULL",
+		"DELETE FROM mamony_identity.password_recovery_code_notices",
+		"INSERT INTO mamony_identity.password_recovery_code_enrollment_approvals(subject_id,subject_epoch,proof_digest,approved_at,expires_at) VALUES('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'),clock_timestamp(),clock_timestamp()+interval '5 minutes')",
+		issue,
+		"SELECT mamony_identity.approve_password_recovery_offline_code(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.stage_password_change_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'))",
+		"SELECT mamony_identity.rotate_password_verifier(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',16),'hex'),decode(repeat('44',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("recovery code manager exceeded EXECUTE-only role: sql=%s out=%s err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_PASSWORD_CHANGE_URL",
+		"TEST_IDENTITY_RECOVERY_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_DELIVERY_URL",
+		"TEST_IDENTITY_RECOVERY_REDEEMER_URL",
+		"TEST_IDENTITY_RECOVERY_ASSURANCE_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_WEBHOOK_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_MONITOR_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", replace)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("different authority replaced offline code set: role=%s out=%s err=%v",
+				role, out, err)
 		}
 	}
 }
