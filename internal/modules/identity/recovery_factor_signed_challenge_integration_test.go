@@ -185,109 +185,117 @@ func TestIdentityZRecoveryFactorSignedChallenge(t *testing.T) {
 		}
 	}
 	issueStore, err := identitypg.NewRecoveryFactorIssuerStore(open(issuerDSN, "mamony_identity_recovery_factor_issuer_runtime"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	verificationStore, err := identitypg.NewRecoveryFactorVerifierStore(open(verifierDSN, "mamony_identity_recovery_factor_verifier_runtime"))
-	if err != nil { t.Fatal(err) }
-	issuer, err := usecase.NewRecoveryFactorChallengeIssuer(sessions,loginFlow,codeGrants,issueStore)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer, err := usecase.NewRecoveryFactorChallengeIssuer(sessions, loginFlow, codeGrants, issueStore)
+	if err != nil {
+		t.Fatal(err)
+	}
 	authority, err := usecase.NewRecoveryFactorApprovalVerifier(verificationStore)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	// A valid session/password is INSUFFICIENT without a separately,
 	// previously provisioned independent signing key.
-	if denied,err:=issuer.Issue(ctx,bearer,email,currentPassword,peer);
-		!errors.Is(err,usecase.ErrRecoveryFactorDenied) || denied.ChallengeID()!="" {
+	if denied, err := issuer.Issue(ctx, bearer, email, currentPassword, peer); !errors.Is(err, usecase.ErrRecoveryFactorDenied) || denied.ChallengeID() != "" {
 		t.Fatal("unprovisioned factor issued a bootstrap challenge")
 	}
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.recovery_code_factor_keys
 		(subject_id,public_key,bound_epoch,bound_contact_version,bound_at)
-		VALUES($1,$2,$3,1,clock_timestamp())`,subject,[]byte(publicKey),epoch); err != nil {
+		VALUES($1,$2,$3,1,clock_timestamp())`, subject, []byte(publicKey), epoch); err != nil {
 		t.Fatal(err)
 	}
 	// The factor cannot be provisioned through either production SQL role,
 	// nor through the anonymous recovery flows (verified separately).
-	challenge,err:=issuer.Issue(ctx,bearer,email,currentPassword,peer)
-	if err!=nil || len(challenge.ChallengeID())!=26 ||
-		len(challenge.ForTrustedAuthenticator())<100 {
-		t.Fatalf("valid pre-provisioned factor challenge denied: %v",err)
+	challenge, err := issuer.Issue(ctx, bearer, email, currentPassword, peer)
+	if err != nil || len(challenge.ChallengeID()) != 26 ||
+		len(challenge.ForTrustedAuthenticator()) < 100 {
+		t.Fatalf("valid pre-provisioned factor challenge denied: %v", err)
 	}
 	_, attackerKey, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil { t.Fatal(err) }
-	badSignature:=ed25519.Sign(attackerKey,challenge.ForTrustedAuthenticator())
-	if denied,err:=authority.Verify(ctx,challenge.ChallengeID(),badSignature);
-		!errors.Is(err,usecase.ErrRecoveryFactorDenied) ||
-		denied.ForTrustedEnrollment()!="" {
+	if err != nil {
+		t.Fatal(err)
+	}
+	badSignature := ed25519.Sign(attackerKey, challenge.ForTrustedAuthenticator())
+	if denied, err := authority.Verify(ctx, challenge.ChallengeID(), badSignature); !errors.Is(err, usecase.ErrRecoveryFactorDenied) ||
+		denied.ForTrustedEnrollment() != "" {
 		t.Fatal("attacker's key issued independent factor approval")
 	}
 	var failures int
-	if err:=admin.QueryRow(ctx,`SELECT failed_attempts FROM mamony_identity.recovery_code_factor_challenges
-		WHERE challenge_id=$1`,challenge.ChallengeID()).Scan(&failures);
-		err!=nil || failures!=1 {
+	if err := admin.QueryRow(ctx, `SELECT failed_attempts FROM mamony_identity.recovery_code_factor_challenges
+		WHERE challenge_id=$1`, challenge.ChallengeID()).Scan(&failures); err != nil || failures != 1 {
 		t.Fatal("bad signed proof was not charged against the challenge")
 	}
-	realSignature:=ed25519.Sign(privateKey,challenge.ForTrustedAuthenticator())
-	approval,err:=authority.Verify(ctx,challenge.ChallengeID(),realSignature)
-	if err!=nil || len(approval.ForTrustedEnrollment())!=43 {
-		t.Fatalf("independent factor signature not accepted: %v",err)
+	realSignature := ed25519.Sign(privateKey, challenge.ForTrustedAuthenticator())
+	approval, err := authority.Verify(ctx, challenge.ChallengeID(), realSignature)
+	if err != nil || len(approval.ForTrustedEnrollment()) != 43 {
+		t.Fatalf("independent factor signature not accepted: %v", err)
 	}
-	if fmt.Sprintf("%v",approval)==approval.ForTrustedEnrollment() {
+	if fmt.Sprintf("%v", approval) == approval.ForTrustedEnrollment() {
 		t.Fatal("independent approval leaked in default formatting")
 	}
-	if out,err:=json.Marshal(approval);err==nil||len(out)!=0{
+	if out, err := json.Marshal(approval); err == nil || len(out) != 0 {
 		t.Fatal("independent approval allowed JSON bearer serialization")
 	}
-	var approvedCount,auditCount int
-	if err:=admin.QueryRow(ctx,`SELECT count(*) FROM mamony_identity.password_recovery_code_enrollment_approvals
+	var approvedCount, auditCount int
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_recovery_code_enrollment_approvals
 		WHERE subject_id=$1 AND consumed_at IS NULL AND expires_at>clock_timestamp()`,
-		subject).Scan(&approvedCount);err!=nil||approvedCount!=1 {
+		subject).Scan(&approvedCount); err != nil || approvedCount != 1 {
 		t.Fatal("valid signature did not commit one-use v25 bootstrap approval")
 	}
-	if err:=admin.QueryRow(ctx,`SELECT count(*) FROM mamony_identity.security_outbox
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.security_outbox
 		WHERE subject_id=$1 AND event_type='RECOVERY_FACTOR_APPROVED'`,
-		subject).Scan(&auditCount);err!=nil||auditCount!=1{
+		subject).Scan(&auditCount); err != nil || auditCount != 1 {
 		t.Fatal("factor proof approval was not identifier-only audited")
 	}
-	if _,err:=authority.Verify(ctx,challenge.ChallengeID(),realSignature);
-		!errors.Is(err,usecase.ErrRecoveryFactorDenied) {
+	if _, err := authority.Verify(ctx, challenge.ChallengeID(), realSignature); !errors.Is(err, usecase.ErrRecoveryFactorDenied) {
 		t.Fatal("replay of a valid signature created another approval")
 	}
-	batch,err:=manager.Enroll(ctx,bearer,email,currentPassword,approval.ForTrustedEnrollment(),peer)
-	if err!=nil || batch.ForTrustedDisplay()[0]=="" {
-		t.Fatalf("genuine v25 enrollment refused newly verified cryptographic factor: %v",err)
+	batch, err := manager.Enroll(ctx, bearer, email, currentPassword, approval.ForTrustedEnrollment(), peer)
+	if err != nil || batch.ForTrustedDisplay()[0] == "" {
+		t.Fatalf("genuine v25 enrollment refused newly verified cryptographic factor: %v", err)
 	}
 	var codes int
-	if err:=admin.QueryRow(ctx,`SELECT count(*) FROM mamony_identity.password_recovery_offline_codes
-		WHERE subject_id=$1 AND consumed_at IS NULL`,subject).Scan(&codes);err!=nil||codes!=5 {
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_recovery_offline_codes
+		WHERE subject_id=$1 AND consumed_at IS NULL`, subject).Scan(&codes); err != nil || codes != 5 {
 		t.Fatal("signed approval did not atomically enroll five saved recovery codes")
 	}
 	var consumed bool
-	if err:=admin.QueryRow(ctx,`SELECT consumed_at IS NOT NULL FROM mamony_identity.password_recovery_code_enrollment_approvals
-		WHERE subject_id=$1`,subject).Scan(&consumed);err!=nil||!consumed{
+	if err := admin.QueryRow(ctx, `SELECT consumed_at IS NOT NULL FROM mamony_identity.password_recovery_code_enrollment_approvals
+		WHERE subject_id=$1`, subject).Scan(&consumed); err != nil || !consumed {
 		t.Fatal("enrollment did not consume one-use cryptographic approval")
 	}
 	// Even a still-valid session and pre-provisioned signer cannot bootstrap
 	// again once recovery codes were enrolled; rotation needs an old code.
-	if later,err:=issuer.Issue(ctx,bearer,email,currentPassword,peer);
-		!errors.Is(err,usecase.ErrRecoveryFactorDenied) || later.ChallengeID()!=""{
+	if later, err := issuer.Issue(ctx, bearer, email, currentPassword, peer); !errors.Is(err, usecase.ErrRecoveryFactorDenied) || later.ChallengeID() != "" {
 		t.Fatal("existing code set permitted a fresh bootstrap ceremony")
 	}
 	// Pre-existing challenges go stale after credential/contact epoch moves.
-	stale := randomSyntheticID(t,"fac_")
-	nonce := make([]byte,32)
-	if _,err:=rand.Read(nonce);err!=nil{t.Fatal(err)}
-	if _,err:=admin.Exec(ctx,`INSERT INTO mamony_identity.recovery_code_factor_challenges
+	stale := randomSyntheticID(t, "fac_")
+	nonce := make([]byte, 32)
+	if _, err := rand.Read(nonce); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.recovery_code_factor_challenges
 		(challenge_id,subject_id,subject_epoch,nonce,issued_at,expires_at)
 		VALUES($1,$2,$3,$4,clock_timestamp(),clock_timestamp()+interval '2 minutes')`,
-		stale,subject,epoch,nonce);err!=nil{
+		stale, subject, epoch, nonce); err != nil {
 		t.Fatal(err)
 	}
-	if _,err:=admin.Exec(ctx,`UPDATE mamony_identity.subjects
-		SET session_epoch=session_epoch+1 WHERE subject_id=$1`,subject);err!=nil{
+	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.subjects
+		SET session_epoch=session_epoch+1 WHERE subject_id=$1`, subject); err != nil {
 		t.Fatal(err)
 	}
-	if evidence,found,err:=verificationStore.Read(ctx,stale);
-		err!=nil||found||evidence.Subject!=""{
+	if evidence, found, err := verificationStore.Read(ctx, stale); err != nil || found || evidence.Subject != "" {
 		t.Fatal("epoch-stale cryptographic challenge was readable")
 	}
 }
