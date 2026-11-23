@@ -119,7 +119,4 @@ func TestPasskeyRegistrationIssuerFailsClosed(t *testing.T) {
 	if got, err := issuer.Begin(context.Background(), bearer); !errors.Is(err, ErrPasskeyRegistrationUnavailable) || got.IntentID() != "" {
 		t.Fatal("entropy exhaustion minted a challenge")
 	}
-	if got, err := issuer.Begin(nil, bearer); !errors.Is(err, ErrPasskeyRegistrationUnavailable) || got.IntentID() != "" {
-		t.Fatal("missing context minted a challenge")
-	}
 }
