@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "7:false" {
-		t.Fatalf("identity migration should be at clean version 7: %q err=%v", out, err)
+	if err != nil || out != "8:false" {
+		t.Fatalf("identity migration should be at clean version 8: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "7" {
+	if err != nil || out != "8" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -185,5 +185,61 @@ func TestPostgresIdentityMaintenanceRole(t *testing.T) {
 		AND NOT rolbypassrls)::text FROM pg_roles WHERE rolname=current_user`)
 	if err != nil || output != "true" {
 		t.Fatalf("maintenance runtime role must be unprivileged: %v %s", err, output)
+	}
+}
+
+// TestPostgresIdentityZAuthenticatorRole runs after the dedicated Identity
+// migration fixture and verifies password-read authority cannot be reused for
+// registration, proof operations, outbox edits or privilege escalation.
+func TestPostgresIdentityZAuthenticatorRole(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT subject_id, status FROM mamony_identity.subjects LIMIT 1",
+		"SELECT canonical_email, subject_id, verified_at FROM mamony_identity.email_aliases LIMIT 1",
+		"SELECT subject_id, kdf_version, memory_kib, iterations, parallelism, salt, digest FROM mamony_identity.password_verifiers LIMIT 1",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_AUTHENTICATOR_URL", "-c", sql)
+		if err != nil {
+			t.Fatalf("read-only authentication role lost approved credential read: %v %s", err, out)
+		}
+	}
+	for _, sql := range []string{
+		"CREATE TABLE mamony_identity.illegal (id integer)",
+		"SELECT * FROM mamony_identity.email_verification_challenges",
+		"SELECT * FROM mamony_identity.email_proof_deliveries",
+		"SELECT * FROM mamony_identity.anonymous_admission_buckets",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT created_at FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"SELECT * FROM mamony_identity.schema_migrations",
+		"UPDATE mamony_identity.subjects SET status='ACTIVE'",
+		"UPDATE mamony_identity.email_aliases SET verified_at=now()",
+		"UPDATE mamony_identity.password_verifiers SET digest='\\x00'::bytea",
+		"DELETE FROM mamony_identity.password_verifiers",
+		"INSERT INTO mamony_identity.security_outbox (event_id) VALUES ('bad')",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_AUTHENTICATOR_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("authenticator role must reject %q: err=%v output=%s", sql, err, out)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_DELIVERY_URL",
+	} {
+		out, err := invokePSQL(role, "-c",
+			"SELECT digest FROM mamony_identity.password_verifiers LIMIT 1")
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("non-authenticator role read password digest: %s err=%v output=%s", role, err, out)
+		}
+	}
+	out, err := invokePSQL("TEST_IDENTITY_AUTHENTICATOR_URL", "-c", `SELECT
+		(NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+		AND NOT rolreplication AND NOT rolbypassrls)::text
+		FROM pg_roles WHERE rolname=current_user`)
+	if err != nil || out != "true" {
+		t.Fatalf("authenticator must not inherit elevated DB privilege: %v %s", err, out)
 	}
 }

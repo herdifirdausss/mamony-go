@@ -54,6 +54,7 @@ deps:
       - identity_handler
       - identity_domain
       - identity_usecase
+      - identity_credential
       - identity_mailcrypto
       - identity_mailgun
       - identity_postgres
