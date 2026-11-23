@@ -27,6 +27,14 @@ vendors:
   identity_unicode:
     in:
       - golang.org/x/text/unicode/norm
+  identity_passkey_library:
+    in:
+      - github.com/go-webauthn/webauthn/protocol
+      - github.com/go-webauthn/webauthn/protocol/**
+      - github.com/go-webauthn/webauthn/webauthn
+  identity_passkey_fixture:
+    in:
+      - github.com/fxamacker/cbor/v2
 components:
   identity_facade:
     in: modules/identity
@@ -46,6 +54,8 @@ components:
     in: modules/identity/internal/repository/mailcrypto/**
   identity_mailgun:
     in: modules/identity/internal/repository/mailgun/**
+  identity_webauthn:
+    in: modules/identity/internal/repository/webauthn/**
   identity_postgres:
     in: modules/identity/internal/repository/postgres/**
 deps:
@@ -57,6 +67,7 @@ deps:
       - identity_credential
       - identity_mailcrypto
       - identity_mailgun
+      - identity_webauthn
       - identity_postgres
       - platform
     canUse:
@@ -97,6 +108,12 @@ deps:
   identity_mailgun:
     mayDependOn:
       - identity_usecase
+  identity_webauthn:
+    mayDependOn:
+      - identity_usecase
+    canUse:
+      - identity_passkey_library
+      - identity_passkey_fixture
   identity_postgres:
     mayDependOn:
       - identity_domain
