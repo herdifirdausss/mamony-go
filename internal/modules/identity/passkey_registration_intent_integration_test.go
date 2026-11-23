@@ -29,8 +29,9 @@ func TestIdentityZPasskeyRegistrationIntent(t *testing.T) {
 	adminDSN := guardedDB(t, "TEST_DATABASE_ADMIN_URL", "mamony_test_admin")
 	sessionDSN := guardedDB(t, "TEST_IDENTITY_SESSION_URL", "mamony_identity_session_runtime")
 	issuerDSN := guardedDB(t, "TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL", "mamony_identity_passkey_registration_issuer_runtime")
+	readerDSN := guardedDB(t, "TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL", "mamony_identity_passkey_registration_reader_runtime")
 	base, _ := url.Parse(adminDSN)
-	for _, raw := range []string{sessionDSN, issuerDSN} {
+	for _, raw := range []string{sessionDSN, issuerDSN, readerDSN} {
 		u, _ := url.Parse(raw)
 		if u.Host != base.Host || u.Path != base.Path {
 			t.Fatal("passkey challenge test must use one disposable database")
@@ -68,6 +69,15 @@ func TestIdentityZPasskeyRegistrationIntent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	readStore, err := identitypg.NewPasskeyRegistrationEvidenceStore(
+		open(readerDSN, "mamony_identity_passkey_registration_reader_runtime"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := usecase.NewPasskeyRegistrationEvidenceReader(sessions, readStore, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
 	subject := randomSyntheticID(t, "sub_")
 	email := strings.ToLower(randomSyntheticID(t, "pk_")) + "@example.test"
 	if _, err := admin.Exec(ctx, "INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", subject); err != nil {
@@ -97,6 +107,30 @@ func TestIdentityZPasskeyRegistrationIntent(t *testing.T) {
 	intent, err := issuer.Begin(ctx, bearer)
 	if err != nil || len(intent.Challenge()) != 32 || len(intent.IntentID()) != 26 {
 		t.Fatalf("session-bound registration challenge not staged: %v", err)
+	}
+	current, err := reader.Read(ctx, bearer, intent.IntentID())
+	if err != nil || current.Subject != subject || current.Epoch != epoch ||
+		!bytes.Equal(current.Nonce[:], intent.Challenge()) ||
+		current.RPID != policy.RPID() || current.Origin != policy.Origin() ||
+		current.PolicyGeneration != 1 {
+		t.Fatalf("reader failed same-session current evidence: %v", err)
+	}
+	if wrong, err := reader.Read(ctx, bearer, "wrg_BBBBBBBBBBBBBBBBBBBBBB"); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || wrong.Subject != "" {
+		t.Fatal("unrelated intent exposed registration evidence")
+	}
+	if wrong, err := reader.Read(ctx, base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x2a}, 32)), intent.IntentID()); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || wrong.Subject != "" {
+		t.Fatal("session mismatch exposed registration evidence")
+	}
+	wrongRP, err := usecase.NewPasskeyRelyingParty("wrong.example.test", "https://wrong.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongReader, err := usecase.NewPasskeyRegistrationEvidenceReader(sessions, readStore, wrongRP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wrong, err := wrongReader.Read(ctx, bearer, intent.IntentID()); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || wrong.Subject != "" {
+		t.Fatal("stale/different trusted RP configuration accepted stored challenge")
 	}
 	var count int
 	var foundID, rpID, origin, purpose string
@@ -145,9 +179,18 @@ func TestIdentityZPasskeyRegistrationIntent(t *testing.T) {
 		SET expires_at=issued_at+interval '1 millisecond' WHERE subject_id=$1`, subject); err != nil {
 		t.Fatal(err)
 	}
+	if expired, err := reader.Read(ctx, bearer, intent.IntentID()); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || expired.Subject != "" {
+		t.Fatal("expired challenge remained readable")
+	}
 	second, err := issuer.Begin(ctx, bearer)
 	if err != nil || second.IntentID() == intent.IntentID() || bytes.Equal(second.Challenge(), intent.Challenge()) {
 		t.Fatalf("expired pending intent was not safely replaced: %v", err)
+	}
+	if old, err := reader.Read(ctx, bearer, intent.IntentID()); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || old.Subject != "" {
+		t.Fatal("superseded challenge returned previous attestation context")
+	}
+	if latest, err := reader.Read(ctx, bearer, second.IntentID()); err != nil || latest.Subject != subject || !bytes.Equal(latest.Nonce[:], second.Challenge()) {
+		t.Fatalf("newly issued nonce unavailable through isolated reader: %v", err)
 	}
 	// Epoch advancement invalidates even an otherwise live prior session.
 	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1", subject); err != nil {
@@ -155,6 +198,9 @@ func TestIdentityZPasskeyRegistrationIntent(t *testing.T) {
 	}
 	if stale, err := issuer.Begin(ctx, bearer); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || stale.IntentID() != "" {
 		t.Fatal("stale session epoch minted registration intent")
+	}
+	if stale, err := reader.Read(ctx, bearer, second.IntentID()); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || stale.Subject != "" {
+		t.Fatal("stale session epoch exposed registration challenge")
 	}
 	// No WebAuthn credential, independent factor approval, or audit of a
 	// successful registration can be issued by this code path.
