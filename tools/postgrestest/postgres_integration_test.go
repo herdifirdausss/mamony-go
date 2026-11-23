@@ -50,6 +50,7 @@ func safeFixture() error {
 		{"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL", "mamony_identity_passkey_registration_issuer_runtime"},
 		{"TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL", "mamony_identity_passkey_registration_reader_runtime"},
 		{"TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL", "mamony_identity_passkey_registration_admission_runtime"},
+		{"TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL", "mamony_identity_passkey_registration_stage_runtime"},
 		{"TEST_IDENTITY_DELIVERY_URL", "mamony_identity_delivery_runtime"},
 		{"TEST_IDENTITY_MAINTENANCE_URL", "mamony_identity_maintenance_runtime"},
 	} {

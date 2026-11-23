@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "32:false" {
-		t.Fatalf("identity migration should be at clean version 32: %q err=%v", out, err)
+	if err != nil || out != "33:false" {
+		t.Fatalf("identity migration should be at clean version 33: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "32" {
+	if err != nil || out != "33" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -1429,5 +1429,76 @@ func TestPostgresIdentityZPasskeyRegistrationAdmissionRole(t *testing.T) {
 		FROM pg_roles WHERE rolname=current_user`)
 	if err != nil || out != "true" {
 		t.Fatalf("passkey admission principal elevated: out=%q err=%v", out, err)
+	}
+}
+
+// TestPostgresIdentityZPasskeyRegistrationStageRole proves the v33 runtime
+// can invoke ONLY the origin-gated, nonactivating atomic staging function.
+// It cannot stage password proofs, read account credentials or mutate tables.
+func TestPostgresIdentityZPasskeyRegistrationStageRole(t *testing.T) {
+	const stage = "SELECT mamony_identity.stage_verified_passkey_credential(" +
+		"decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA'," +
+		"decode(repeat('22',32),'hex'),1,'login.example.test'," +
+		"'https://login.example.test',decode(repeat('33',32),'hex')," +
+		"decode(repeat('44',64),'hex'),decode(repeat('55',16),'hex')," +
+		"'none','none',true,true,false,false,0,'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL", "-c", stage)
+	if err != nil || out != "f" {
+		t.Fatalf("stage function must deny missing session: out=%q err=%v", out, err)
+	}
+	for _, stmt := range []string{
+		"SELECT * FROM mamony_identity.passkey_credentials",
+		"SELECT * FROM mamony_identity.passkey_registration_notices",
+		"SELECT * FROM mamony_identity.passkey_registration_admissions",
+		"SELECT * FROM mamony_identity.passkey_registration_intents",
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.recovery_code_factor_keys",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"UPDATE mamony_identity.passkey_credentials SET state='PENDING_ASSERTION'",
+		"DELETE FROM mamony_identity.passkey_credentials",
+		"INSERT INTO mamony_identity.passkey_credentials(subject_id) VALUES ('sub_AAAAAAAAAAAAAAAAAAAAAA')",
+		"UPDATE mamony_identity.passkey_registration_intents SET consumed_at=clock_timestamp()",
+		"UPDATE mamony_identity.passkey_registration_admissions SET consumed_at=clock_timestamp()",
+		"SELECT mamony_identity.stage_passkey_registration_reauth_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('77',32),'hex'))",
+		"SELECT mamony_identity.admit_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'))",
+		"SELECT * FROM mamony_identity.read_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.issue_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'login.example.test','https://login.example.test')",
+		"SELECT mamony_identity.issue_opaque_session_with_grant(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"CREATE TABLE mamony_identity.passkey_staging_escape(x integer)",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("staging role escaped EXECUTE-only boundary: sql=%q out=%q err=%v", stmt, out, err)
+		}
+	}
+	for _, env := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(env, "-c", stage)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unrelated role staged passkey: role=%s out=%q err=%v", env, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL", "-c", `SELECT
+		(NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+		AND NOT rolreplication AND NOT rolbypassrls)::text
+		FROM pg_roles WHERE rolname=current_user`)
+	if err != nil || out != "true" {
+		t.Fatalf("passkey staging role unexpectedly elevated: out=%q err=%v", out, err)
 	}
 }

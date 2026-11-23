@@ -58,38 +58,51 @@ func NewPasskeyRegistrationProofVerifier(expected *PasskeyRegistrationEvidenceRe
 // Rereading a pending intent is NOT one-use proof: atomic finish is missing.
 func (v *PasskeyRegistrationProofVerifier) VerifyOnly(ctx context.Context,
 	bearer, intentID string, responseJSON []byte) (PasskeyRegistrationCandidate, error) {
+	_, candidate, err := v.verifyForStage(ctx, bearer, intentID, responseJSON)
+	return candidate, err
+}
+
+// verifyForStage returns the EXACT v31 nonce and RP context that the library
+// validated in this call, not a second, potentially replaced intent read.
+// A separate v33 transaction MUST compare it under locks before any write.
+// This method is intentionally package-private and has no HTTP export.
+func (v *PasskeyRegistrationProofVerifier) verifyForStage(ctx context.Context,
+	bearer, intentID string, responseJSON []byte) (PasskeyRegistrationEvidence,
+	PasskeyRegistrationCandidate, error) {
+	zero := PasskeyRegistrationEvidence{}
 	if v == nil || v.expected == nil || v.protocol == nil ||
 		ctx == nil || ctx.Err() != nil {
-		return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
+		return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
 	}
 	if len(responseJSON) == 0 || len(responseJSON) > maxPasskeyRegistrationResponseBytes {
-		return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
+		return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
 	}
 	expected, err := v.expected.Read(ctx, bearer, intentID)
 	if errors.Is(err, ErrPasskeyRegistrationDenied) {
-		return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
+		return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
 	}
 	if err != nil {
-		return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
+		return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
 	}
 	result, err := v.protocol.VerifyRegistration(ctx, expected, responseJSON)
 	if err != nil {
 		if errors.Is(err, ErrPasskeyProtocolDenied) {
-			return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
+			return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
 		}
-		return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
+		return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
 	}
 	if ctx.Err() != nil {
-		return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
+		return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolUnavailable
 	}
 	if len(result.CredentialID) == 0 || len(result.CredentialID) > 1023 ||
 		len(result.PublicKeyCOSE) == 0 || len(result.PublicKeyCOSE) > 2048 ||
-		len(result.AAGUID) != 16 || !result.UserPresent || !result.UserVerified {
-		return PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
+		len(result.AAGUID) != 16 || !result.UserPresent || !result.UserVerified ||
+		(result.BackupState && !result.BackupEligible) {
+		return zero, PasskeyRegistrationCandidate{}, ErrPasskeyProtocolDenied
 	}
-	// Do not alias the protocol library's potentially reused buffers.
+	// Never alias buffers from the protocol library or a faked port.
 	result.CredentialID = append([]byte(nil), result.CredentialID...)
 	result.PublicKeyCOSE = append([]byte(nil), result.PublicKeyCOSE...)
 	result.AAGUID = append([]byte(nil), result.AAGUID...)
-	return result, nil
+	return expected, result, nil
 }
