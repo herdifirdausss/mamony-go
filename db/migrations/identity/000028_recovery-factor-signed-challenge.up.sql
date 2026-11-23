@@ -173,6 +173,12 @@ BEGIN -- PL/pgSQL function block, not a migration transaction
        AND k.revoked_at IS NULL FOR UPDATE OF k;
     IF NOT FOUND THEN RETURN false; END IF;
     stamp:=clock_timestamp();
+    -- Denial must not burn a valid challenge or replace an active approval.
+    IF EXISTS(SELECT 1 FROM mamony_identity.password_recovery_offline_codes c
+        WHERE c.subject_id=account_subject) THEN RETURN false; END IF;
+    IF EXISTS(SELECT 1 FROM mamony_identity.password_recovery_code_enrollment_approvals a
+        WHERE a.subject_id=account_subject AND a.consumed_at IS NULL
+          AND a.expires_at>stamp) THEN RETURN false; END IF;
     UPDATE mamony_identity.recovery_code_factor_challenges c
        SET consumed_at=stamp
      WHERE c.challenge_id=p_id AND c.subject_id=account_subject
@@ -180,8 +186,6 @@ BEGIN -- PL/pgSQL function block, not a migration transaction
        AND c.consumed_at IS NULL AND c.failed_attempts<5;
     GET DIAGNOSTICS updated=ROW_COUNT;
     IF updated<>1 THEN RETURN false; END IF;
-    IF EXISTS(SELECT 1 FROM mamony_identity.password_recovery_offline_codes c
-        WHERE c.subject_id=account_subject) THEN RETURN false; END IF;
     INSERT INTO mamony_identity.password_recovery_code_enrollment_approvals
         (subject_id,subject_epoch,proof_digest,approved_at,expires_at)
     VALUES(account_subject,current_epoch,p_approval_digest,stamp,stamp+interval '5 minutes')
@@ -194,7 +198,9 @@ BEGIN -- PL/pgSQL function block, not a migration transaction
     WHERE mamony_identity.password_recovery_code_enrollment_approvals.consumed_at IS NOT NULL
        OR mamony_identity.password_recovery_code_enrollment_approvals.expires_at<=stamp;
     GET DIAGNOSTICS updated=ROW_COUNT;
-    IF updated<>1 THEN RETURN false; END IF;
+    IF updated<>1 THEN
+        RAISE EXCEPTION 'factor approval conflict' USING ERRCODE='23505';
+    END IF;
     INSERT INTO mamony_identity.security_outbox
         (event_id,subject_id,event_type,occurred_at)
     VALUES(p_event,account_subject,'RECOVERY_FACTOR_APPROVED',stamp);
