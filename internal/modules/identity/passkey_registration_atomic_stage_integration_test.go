@@ -45,7 +45,7 @@ func stagedPasskeyResponse(t *testing.T, nonce []byte, credentialID []byte) []by
 	}
 	rpHash := sha256.Sum256([]byte("login.example.test"))
 	authData := append([]byte(nil), rpHash[:]...)
-	authData = append(authData, 0x45) // user-present, user-verified, attested credential data
+	authData = append(authData, 0x45)                // user-present, user-verified, attested credential data
 	authData = append(authData, make([]byte, 20)...) // counter + AAGUID
 	if len(credentialID) > 65535 {
 		t.Fatal("test credential ID cannot fit in WebAuthn ACD")
@@ -66,9 +66,9 @@ func stagedPasskeyResponse(t *testing.T, nonce []byte, credentialID []byte) []by
 		t.Fatal(err)
 	}
 	clientData, err := json.Marshal(map[string]any{
-		"type": "webauthn.create",
-		"origin": "https://login.example.test",
-		"challenge": base64.RawURLEncoding.EncodeToString(nonce),
+		"type":        "webauthn.create",
+		"origin":      "https://login.example.test",
+		"challenge":   base64.RawURLEncoding.EncodeToString(nonce),
 		"crossOrigin": false,
 	})
 	if err != nil {
@@ -78,7 +78,7 @@ func stagedPasskeyResponse(t *testing.T, nonce []byte, credentialID []byte) []by
 	payload, err := json.Marshal(map[string]any{
 		"id": id, "rawId": id, "type": "public-key",
 		"response": map[string]any{
-			"clientDataJSON": base64.RawURLEncoding.EncodeToString(clientData),
+			"clientDataJSON":    base64.RawURLEncoding.EncodeToString(clientData),
 			"attestationObject": base64.RawURLEncoding.EncodeToString(attestation),
 		},
 	})
@@ -268,16 +268,14 @@ func TestIdentityZPasskeyRegistrationAtomicStage(t *testing.T) {
 	firstID, firstNonce := issue()
 	firstCredential := bytes.Repeat([]byte{0x41}, 32)
 	firstPayload := stagedPasskeyResponse(t, firstNonce, firstCredential)
-	if err := stager.Stage(ctx, bearer, firstID, firstPayload);
-		!errors.Is(err, usecase.ErrPasskeyStageDenied) || count("passkey_credentials") != 0 {
+	if err := stager.Stage(ctx, bearer, firstID, firstPayload); !errors.Is(err, usecase.ErrPasskeyStageDenied) || count("passkey_credentials") != 0 {
 		t.Fatalf("missing v32 approval staged a credential: %v", err)
 	}
 	admitTestOnly(firstID)
 	wrongNonce := append([]byte(nil), firstNonce...)
 	wrongNonce[0] ^= 0x80
 	if err := stager.Stage(ctx, bearer, firstID,
-		stagedPasskeyResponse(t, wrongNonce, firstCredential));
-		!errors.Is(err, usecase.ErrPasskeyStageDenied) {
+		stagedPasskeyResponse(t, wrongNonce, firstCredential)); !errors.Is(err, usecase.ErrPasskeyStageDenied) {
 		t.Fatal("invalid authenticator challenge changed SQL state")
 	}
 	if err := stager.Stage(ctx, bearer, firstID, firstPayload); err != nil {
@@ -306,8 +304,7 @@ func TestIdentityZPasskeyRegistrationAtomicStage(t *testing.T) {
 		eventType != "PASSKEY_REGISTRATION_STAGED" {
 		t.Fatalf("privilege boundary or pending notification missing: %v", err)
 	}
-	if err := stager.Stage(ctx, bearer, firstID, firstPayload);
-		!errors.Is(err, usecase.ErrPasskeyStageDenied) {
+	if err := stager.Stage(ctx, bearer, firstID, firstPayload); !errors.Is(err, usecase.ErrPasskeyStageDenied) {
 		t.Fatal("consumed nonce replayed after commit")
 	}
 
@@ -317,8 +314,7 @@ func TestIdentityZPasskeyRegistrationAtomicStage(t *testing.T) {
 	secondID, secondNonce := issue()
 	admitTestOnly(secondID)
 	if err := stager.Stage(ctx, bearer, secondID,
-		stagedPasskeyResponse(t, secondNonce, firstCredential));
-		!errors.Is(err, usecase.ErrPasskeyStageUnavailable) {
+		stagedPasskeyResponse(t, secondNonce, firstCredential)); !errors.Is(err, usecase.ErrPasskeyStageUnavailable) {
 		t.Fatalf("globally duplicate credential accepted: %v", err)
 	}
 	if nonceSpent, admissionSpent := consumed(secondID); nonceSpent || admissionSpent {
