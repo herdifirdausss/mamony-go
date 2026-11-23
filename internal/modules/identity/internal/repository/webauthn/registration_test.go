@@ -72,7 +72,13 @@ func syntheticRegistration(t *testing.T, f registrationFixture) []byte {
 	if len(f.attestedID) > 65535 {
 		t.Fatal("synthetic attested credential ID exceeds uint16 length")
 	}
-	binary.BigEndian.PutUint16(idLength[:], uint16(len(f.attestedID)))
+	// Count into a bounded uint16 rather than narrowing an int (gosec G115).
+	// The earlier length check guarantees no wraparound.
+	var safeLength uint16
+	for range f.attestedID {
+		safeLength++
+	}
+	binary.BigEndian.PutUint16(idLength[:], safeLength)
 	authData = append(authData, idLength[:]...)
 	authData = append(authData, f.attestedID...)
 	authData = append(authData, cose...)
