@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "14:false" {
-		t.Fatalf("identity migration should be at clean version 14: %q err=%v", out, err)
+	if err != nil || out != "15:false" {
+		t.Fatalf("identity migration should be at clean version 15: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "14" {
+	if err != nil || out != "15" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -348,6 +348,57 @@ func TestPostgresIdentityZAuthenticationGrantRole(t *testing.T) {
 			"SELECT mamony_identity.issue_opaque_session('sub_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')")
 		if err == nil || !strings.Contains(out, "42883") {
 			t.Fatalf("removed subject-only function survived: %s err=%v out=%s", role, err, out)
+		}
+	}
+}
+
+func TestPostgresIdentityZPasswordChangeRole(t *testing.T) {
+	const grantSQL = "SELECT mamony_identity.stage_password_change_grant('invalid',1,decode(repeat('11',32),'hex'))"
+	const changeSQL = "SELECT mamony_identity.rotate_password_verifier(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',16),'hex'),decode(repeat('44',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_PASSWORD_CHANGE_URL", "-c", changeSQL)
+	if err != nil || out != "f" {
+		t.Fatalf("password change role denied approved bounded function: output=%q err=%v", out, err)
+	}
+	for _, sql := range []string{
+		grantSQL,
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT digest FROM mamony_identity.password_verifiers",
+		"UPDATE mamony_identity.password_verifiers SET digest=decode(repeat('44',32),'hex')",
+		"UPDATE mamony_identity.subjects SET session_epoch=42",
+		"SELECT token_digest FROM mamony_identity.opaque_sessions",
+		"SELECT mamony_identity.resolve_opaque_session(decode(repeat('11',32),'hex'))",
+		"SELECT mamony_identity.issue_opaque_session_with_grant(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"INSERT INTO mamony_identity.security_outbox (event_id) VALUES ('bad')",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSWORD_CHANGE_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("password change role escaped EXECUTE-only boundary: sql=%q output=%s err=%v", sql, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_AUTH_GRANT_URL", "-c", grantSQL)
+	if err != nil || out != "f" {
+		t.Fatalf("grant role cannot stage new PASSWORD_CHANGE purpose: output=%q err=%v", out, err)
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL", "TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_DELIVERY_URL", "TEST_PLATFORM_RUNTIME_URL",
+	} {
+		for _, sql := range []string{grantSQL, changeSQL} {
+			out, err := invokePSQL(role, "-c", sql)
+			if err == nil || !strings.Contains(out, "42501") {
+				t.Fatalf("role %s escaped password change privilege matrix: sql=%q out=%q err=%v",
+					role, sql, out, err)
+			}
+		}
+	}
+	for _, role := range []string{"TEST_IDENTITY_AUTH_GRANT_URL", "TEST_IDENTITY_PASSWORD_CHANGE_URL"} {
+		out, err := invokePSQL(role, "-c",
+			"SELECT (NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls)::text FROM pg_roles WHERE rolname=current_user")
+		if err != nil || out != "true" {
+			t.Fatalf("role %s inherited privileges: out=%q err=%v", role, out, err)
 		}
 	}
 }

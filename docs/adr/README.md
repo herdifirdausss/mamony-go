@@ -16,5 +16,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0010 — Server-side session idle expiry](0010-server-side-session-idle-expiry.md) | PROPOSED: v12 30-minute DB-clock inactivity expiry; 12-hour absolute unaffected, no public routing. |
 | [ADR-0011 — Atomic five-session cap](0011-atomic-five-session-cap.md) | PROPOSED: v13 grant-bound mint atomically evicts oldest live session when five slots are occupied; consistent SQL lock order, no public routing. |
 | [ADR-0012 — Auth material epoch and grant fence](0012-auth-material-epoch-grant-fence.md) | PROPOSED: v14 invalidates sessions on credential/contact change and requires exact pre-KDF epoch for grant staging; no public mutations. |
+| [ADR-0013 — Authenticated password change](0013-authenticated-password-change.md) | PROPOSED: v15 separate purpose-bound password-change grant plus valid session; atomic verifier/epoch/audit update, no public route. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.

@@ -438,3 +438,7 @@ func TestBrowserCSRFHMACBindsSessionOriginAndExpiry(t *testing.T) {
 		t.Fatal("CSRF from future was accepted")
 	}
 }
+
+func (f *browserSessionStore) StageChange(ctx context.Context, subject string, epoch int64, digest []byte) (bool, error) {
+	return f.Stage(ctx, subject, epoch, digest)
+}
