@@ -226,4 +226,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.stage_verified_passkey_credential(
 -- be shared with the HTTP runtime or password-auth/nonce issuer/read roles.
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (33, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (33, '0713a7a5daebb3b03a7694a7ec2825feac6a48170b8ba5d51903e8c8d3a0b611');
