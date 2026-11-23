@@ -153,8 +153,8 @@ func TestIdentityMailgunMockRecoveryCodeSecurityNotice(t *testing.T) {
 	var mu sync.Mutex
 	requests := map[string]int{}
 	senderIDs := map[string]string{
-		"RECOVERY_CODES_ENROLLED":"created-code-notice@mailgun.test",
-		"RECOVERY_CODES_ROTATED":"rotated-code-notice@mailgun.test",
+		"RECOVERY_CODES_ENROLLED": "created-code-notice@mailgun.test",
+		"RECOVERY_CODES_ROTATED":  "rotated-code-notice@mailgun.test",
 	}
 	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		mu.Lock()
@@ -227,10 +227,10 @@ func TestIdentityMailgunMockRecoveryCodeSecurityNotice(t *testing.T) {
 		t.Fatal(err)
 	}
 	sender, err := mailgun.NewRecoveryCodeSecurityNoticeSender(mailgun.SecurityNoticeConfig{
-		Region:mailgun.RegionUS,Domain:"mg.example.test",
-		From:"Mamony Security <security@mg.example.test>",
-		APIKey:"synthetic-code-notice-key",
-	}, &http.Client{Timeout:2*time.Second,Transport:mockMailgunTransport{origin:origin}})
+		Region: mailgun.RegionUS, Domain: "mg.example.test",
+		From:   "Mamony Security <security@mg.example.test>",
+		APIKey: "synthetic-code-notice-key",
+	}, &http.Client{Timeout: 2 * time.Second, Transport: mockMailgunTransport{origin: origin}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,105 +240,106 @@ func TestIdentityMailgunMockRecoveryCodeSecurityNotice(t *testing.T) {
 	}
 	for i := 0; i < 2; i++ {
 		if processed, err := worker.DispatchOnce(ctx); !processed || err != nil {
-			t.Fatalf("real recovery-code notice worker dispatch %d: %t %v",i,processed,err)
+			t.Fatalf("real recovery-code notice worker dispatch %d: %t %v", i, processed, err)
 		}
 	}
 	health, err := ReadRecoveryCodeSecurityNoticeHealth(ctx, monitorDSN)
 	if err != nil || health.Retrying < 1 || health.SubmittedUnconfirmed < 1 {
-		t.Fatalf("count-only monitor did not distinguish retry from submission: %+v %v",health,err)
+		t.Fatalf("count-only monitor did not distinguish retry from submission: %+v %v", health, err)
 	}
 	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_recovery_code_notices
 		SET next_attempt_at=clock_timestamp()-interval '1 second'
-		WHERE event_id=$1 AND status='PENDING'`,createdEvent); err != nil {
+		WHERE event_id=$1 AND status='PENDING'`, createdEvent); err != nil {
 		t.Fatal(err)
 	}
 	if processed, err := worker.DispatchOnce(ctx); !processed || err != nil {
 		t.Fatal("429 recovery-code alert did not retry with the lease")
 	}
 	for _, item := range []struct {
-		id string
+		id       string
 		provider string
 		attempts int
-	}{{createdEvent,senderIDs["RECOVERY_CODES_ENROLLED"],2},
-		{rotatedEvent,senderIDs["RECOVERY_CODES_ROTATED"],1}} {
+	}{{createdEvent, senderIDs["RECOVERY_CODES_ENROLLED"], 2},
+		{rotatedEvent, senderIDs["RECOVERY_CODES_ROTATED"], 1}} {
 		var state string
 		var attempts int
 		var digest []byte
 		if err := admin.QueryRow(ctx, `SELECT status,attempts,provider_message_digest
 			FROM mamony_identity.password_recovery_code_notices WHERE event_id=$1`,
-			item.id).Scan(&state,&attempts,&digest);err != nil {
+			item.id).Scan(&state, &attempts, &digest); err != nil {
 			t.Fatal(err)
 		}
 		expected := sha256.Sum256([]byte(item.provider))
 		if state != "ACCEPTED" || attempts != item.attempts ||
-			!bytes.Equal(digest,expected[:]) {
-			t.Fatalf("provider ACK not correlated to code-notice event: %s %d",state,attempts)
+			!bytes.Equal(digest, expected[:]) {
+			t.Fatalf("provider ACK not correlated to code-notice event: %s %d", state, attempts)
 		}
 	}
-	health,err = ReadRecoveryCodeSecurityNoticeHealth(ctx,monitorDSN)
+	health, err = ReadRecoveryCodeSecurityNoticeHealth(ctx, monitorDSN)
 	if err != nil || health.SubmittedUnconfirmed < 2 {
 		t.Fatal("Mailgun 200 was falsely counted as inbox delivery")
 	}
-	if _,err:=ReadRecoveryCodeSecurityNoticeHealth(ctx,noticeDSN);err==nil{
+	if _, err := ReadRecoveryCodeSecurityNoticeHealth(ctx, noticeDSN); err == nil {
 		t.Fatal("sender could use monitor credential")
 	}
 	// Prove lease fencing, stale-recipient screening and mandatory retention
 	// using a synthetic third legitimate v25 rotation event.
 	grant = freshGrant("rotation-after-acceptance")
-	thirdEvent := randomSyntheticID(t,"evt_")
+	thirdEvent := randomSyntheticID(t, "evt_")
 	third := batch("third-notice-")
-	allowed,err = manager.Replace(ctx,sessionDigest,grant,second[0],third,thirdEvent)
-	if err!=nil||!allowed{
+	allowed, err = manager.Replace(ctx, sessionDigest, grant, second[0], third, thirdEvent)
+	if err != nil || !allowed {
 		t.Fatal("third v25 code rotation fixture failed")
 	}
-	lease1:=randomSyntheticID(t,"lse_")
-	job,found,err:=store.Claim(ctx,lease1)
-	if err!=nil||!found||job.EventID!=thirdEvent||job.Kind!="RECOVERY_CODES_ROTATED" {
+	lease1 := randomSyntheticID(t, "lse_")
+	job, found, err := store.Claim(ctx, lease1)
+	if err != nil || !found || job.EventID != thirdEvent || job.Kind != "RECOVERY_CODES_ROTATED" {
 		t.Fatal("third security notice lease did not select correct event type")
 	}
-	if err:=store.Finalize(ctx,thirdEvent,randomSyntheticID(t,"lse_"),usecase.DeliveryTemporary,"");
-		err==nil {
+	if err := store.Finalize(ctx, thirdEvent, randomSyntheticID(t, "lse_"), usecase.DeliveryTemporary, ""); err == nil {
 		t.Fatal("unfenced lease could finalize another sender's claim")
 	}
-	if _,err:=admin.Exec(ctx,`UPDATE mamony_identity.password_recovery_code_notices
+	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_recovery_code_notices
 		SET leased_until=clock_timestamp()-interval '1 second' WHERE event_id=$1`,
-		thirdEvent);err!=nil{t.Fatal(err)}
-	if err:=store.Finalize(ctx,thirdEvent,lease1,usecase.DeliveryTemporary,"");err==nil{
+		thirdEvent); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Finalize(ctx, thirdEvent, lease1, usecase.DeliveryTemporary, ""); err == nil {
 		t.Fatal("expired lease was accepted")
 	}
-	lease2:=randomSyntheticID(t,"lse_")
-	job,found,err=store.Claim(ctx,lease2)
-	if err!=nil||!found||job.EventID!=thirdEvent{
+	lease2 := randomSyntheticID(t, "lse_")
+	job, found, err = store.Claim(ctx, lease2)
+	if err != nil || !found || job.EventID != thirdEvent {
 		t.Fatal("expired lease could not be safely reclaimed")
 	}
-	if err:=store.Finalize(ctx,thirdEvent,lease2,usecase.DeliveryPermanent,"");err!=nil {
+	if err := store.Finalize(ctx, thirdEvent, lease2, usecase.DeliveryPermanent, ""); err != nil {
 		t.Fatal("permanent bounce not finalized")
 	}
 	var state string
-	if err:=admin.QueryRow(ctx,`SELECT status FROM mamony_identity.password_recovery_code_notices
-		WHERE event_id=$1`,thirdEvent).Scan(&state);err!=nil||state!="DEAD"{
+	if err := admin.QueryRow(ctx, `SELECT status FROM mamony_identity.password_recovery_code_notices
+		WHERE event_id=$1`, thirdEvent).Scan(&state); err != nil || state != "DEAD" {
 		t.Fatal("permanent delivery failure not dead-lettered")
 	}
 	// Erase recipient PII after seven days, but leave immutable audit.
-	if _,err:=admin.Exec(ctx,`UPDATE mamony_identity.password_recovery_code_notices
+	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_recovery_code_notices
 		SET occurred_at=clock_timestamp()-interval '8 days'
-		WHERE event_id=ANY($1)`,[]string{createdEvent,rotatedEvent});err!=nil{
+		WHERE event_id=ANY($1)`, []string{createdEvent, rotatedEvent}); err != nil {
 		t.Fatal(err)
 	}
-	maintenanceDSN:=guardedDB(t,"TEST_IDENTITY_MAINTENANCE_URL","mamony_identity_maintenance_runtime")
-	maintenance,err:=pgx.Connect(ctx,maintenanceDSN)
-	if err!=nil{t.Fatal(err)}
-	defer func(){_ = maintenance.Close(context.Background())}()
+	maintenanceDSN := guardedDB(t, "TEST_IDENTITY_MAINTENANCE_URL", "mamony_identity_maintenance_runtime")
+	maintenance, err := pgx.Connect(ctx, maintenanceDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = maintenance.Close(context.Background()) }()
 	var erased int
-	if err:=maintenance.QueryRow(ctx,
-		"SELECT mamony_identity.purge_old_recovery_code_security_notices()").Scan(&erased);
-		err!=nil||erased<2{
+	if err := maintenance.QueryRow(ctx,
+		"SELECT mamony_identity.purge_old_recovery_code_security_notices()").Scan(&erased); err != nil || erased < 2 {
 		t.Fatal("bounded recipient-PII notice retention failed")
 	}
 	var audited int
-	if err:=admin.QueryRow(ctx,`SELECT count(*) FROM mamony_identity.security_outbox
-		WHERE event_id=ANY($1)`,[]string{createdEvent,rotatedEvent}).Scan(&audited);
-		err!=nil||audited!=2{
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.security_outbox
+		WHERE event_id=ANY($1)`, []string{createdEvent, rotatedEvent}).Scan(&audited); err != nil || audited != 2 {
 		t.Fatal("purging notice erased immutable identifier-only audit evidence")
 	}
 }
