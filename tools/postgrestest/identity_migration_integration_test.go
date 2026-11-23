@@ -1557,7 +1557,7 @@ func TestPostgresIdentityZPasskeyActivationRoles(t *testing.T) {
 		}
 	}
 	// Exact capability separation, even between the two new principals.
-	for _, scenario := range []struct { role, stmt string }{
+	for _, scenario := range []struct{ role, stmt string }{
 		{"TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL", read},
 		{"TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL", issue},
 	} {
