@@ -35,6 +35,7 @@ const (
 // EmailProofRequest is a trusted, single-transaction repository command.
 // The token digest must never be used as a bearer or logged.
 type EmailProofRequest struct {
+	OnlyIfFirst   bool // recovery must never replace an existing historical proof
 	SubjectID     string
 	ChallengeID   string
 	EventID       string
@@ -107,6 +108,18 @@ func tokenDigest(secret string) []byte {
 // its return value must be handed directly to a vetted delivery adapter with
 // bounded issuance and resend/recovery behavior.
 func (v *EmailVerification) Prepare(ctx context.Context, subjectID string) (PreparedEmailProof, error) {
+	return v.prepare(ctx, subjectID, false)
+}
+
+// FirstIfMissing is reserved for bounded reconciliation. The repository
+// rechecks that NO previous challenge exists under the subject lock, so a
+// stale read-only finder result cannot trigger token rotation.
+func (v *EmailVerification) FirstIfMissing(ctx context.Context, subjectID string) error {
+	_, err := v.prepare(ctx, subjectID, true)
+	return err
+}
+
+func (v *EmailVerification) prepare(ctx context.Context, subjectID string, onlyIfFirst bool) (PreparedEmailProof, error) {
 	if v == nil || v.store == nil || v.sealer == nil || len(subjectID) != 26 || subjectID[:4] != "sub_" {
 		return PreparedEmailProof{}, ErrEmailProofUnavailable
 	}
@@ -128,7 +141,7 @@ func (v *EmailVerification) Prepare(ctx context.Context, subjectID string) (Prep
 		return PreparedEmailProof{}, ErrEmailProofUnavailable
 	}
 	target, err := v.store.Issue(ctx, EmailProofRequest{
-		SubjectID: subjectID, ChallengeID: challengeID,
+		SubjectID: subjectID, ChallengeID: challengeID, OnlyIfFirst: onlyIfFirst,
 		EventID: eventID, TokenDigest: tokenDigest(secret),
 		EnvelopeKeyID: keyID, SealedToken: sealed,
 	})
