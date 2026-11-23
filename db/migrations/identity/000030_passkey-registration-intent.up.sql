@@ -117,4 +117,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.issue_passkey_registration_intent(
     TO mamony_identity_passkey_registration_issuer_runtime;
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (30, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (30, '8e82bd8d4e7ea7e592478a3dddcfd6a51e5183b6e169c4e33247d531155eb57e');
