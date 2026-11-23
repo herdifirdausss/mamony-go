@@ -156,13 +156,13 @@ func TestIdentityZPasskeyActivationChallenge(t *testing.T) {
 	credentialID := bytes.Repeat([]byte{0x81}, 32)
 	publicKey := bytes.Repeat([]byte{0x84}, 64)
 	candidate := usecase.PasskeyRegistrationCandidate{
-		CredentialID: credentialID,
-		PublicKeyCOSE: publicKey,
-		AAGUID: make([]byte, 16),
+		CredentialID:      credentialID,
+		PublicKeyCOSE:     publicKey,
+		AAGUID:            make([]byte, 16),
 		AttestationFormat: "none",
-		AttestationType: "none",
-		UserPresent: true,
-		UserVerified: true,
+		AttestationType:   "none",
+		UserPresent:       true,
+		UserVerified:      true,
 	}
 	copyOfNonce := [32]byte{}
 	copy(copyOfNonce[:], registration.Challenge())
@@ -195,7 +195,7 @@ func TestIdentityZPasskeyActivationChallenge(t *testing.T) {
 	// silently replace or read an unexpired challenge.
 	type result struct {
 		value usecase.PasskeyActivationChallenge
-		err error
+		err   error
 	}
 	outcomes := make(chan result, 2)
 	var wg sync.WaitGroup
