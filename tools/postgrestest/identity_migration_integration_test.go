@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "4:false" {
-		t.Fatalf("identity migration should be at clean version 4: %q err=%v", out, err)
+	if err != nil || out != "5:false" {
+		t.Fatalf("identity migration should be at clean version 5: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "4" {
+	if err != nil || out != "5" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -119,6 +119,27 @@ func TestPostgresIdentityDeliveryRole(t *testing.T) {
 		output, err := invokePSQL("TEST_IDENTITY_DELIVERY_URL", "-c", stmt)
 		if err == nil || !strings.Contains(output, "42501") {
 			t.Fatalf("delivery worker role must deny %q: %q err=%v", stmt, output, err)
+		}
+	}
+}
+
+// TestPostgresIdentityAdmissionRole verifies the v5 admission-only table does
+// not allow the registration runtime to delete/rewrite identity key material,
+// or broaden the roles used for verification and delivery.
+func TestPostgresIdentityAdmissionRole(t *testing.T) {
+	for _, tc := range []struct {
+		env string
+		sql string
+	}{
+		{"TEST_IDENTITY_RUNTIME_URL", "DELETE FROM mamony_identity.anonymous_admission_buckets"},
+		{"TEST_IDENTITY_RUNTIME_URL", "UPDATE mamony_identity.anonymous_admission_buckets SET key_digest='\\x00'::bytea"},
+		{"TEST_IDENTITY_VERIFIER_URL", "SELECT * FROM mamony_identity.anonymous_admission_buckets"},
+		{"TEST_IDENTITY_DELIVERY_URL", "SELECT * FROM mamony_identity.anonymous_admission_buckets"},
+		{"TEST_PLATFORM_RUNTIME_URL", "SELECT * FROM mamony_identity.anonymous_admission_buckets"},
+	} {
+		out, err := invokePSQL(tc.env, "-c", tc.sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("untrusted Identity role must refuse %q: %v %s", tc.sql, err, out)
 		}
 	}
 }

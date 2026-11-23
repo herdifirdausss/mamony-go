@@ -1,0 +1,101 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
+	"github.com/jackc/pgx/v5"
+)
+
+var errAdmissionSpent = errors.New("anonymous admission budget exhausted")
+
+// AdmissionStore records privacy-keyed fixed-window accounting in one
+// transaction against the restricted Identity enrollment runtime credential.
+// No raw remote IP, email, subject or bearer enters this table or SQL.
+type AdmissionStore struct {
+	db Transactor
+}
+
+func NewAdmissionStore(db Transactor) (*AdmissionStore, error) {
+	if db == nil {
+		return nil, ErrStorageUnavailable
+	}
+	return &AdmissionStore{db: db}, nil
+}
+
+func validAdmissionBucket(b usecase.AdmissionBucket) bool {
+	if b.Key == ([32]byte{}) {
+		return false
+	}
+	switch b.Scope {
+	case "CLIENT_MINUTE":
+		return b.WindowSeconds == 60 && b.Limit == 8
+	case "CLIENT_HOUR":
+		return b.WindowSeconds == 3600 && b.Limit == 80
+	case "EMAIL_HOUR":
+		return b.WindowSeconds == 3600 && b.Limit == 3
+	case "EMAIL_DAY":
+		return b.WindowSeconds == 86400 && b.Limit == 5
+	default:
+		return false
+	}
+}
+
+// Spend holds the database transaction through ALL four counter upserts.
+// Every counter shares one DB clock sample and deterministic lock order.
+// A denied request rolls back the previous three increments. This keeps the
+// budget coherent across processes without in-memory mutexes or cache TTLs.
+//
+// Windows are intentionally FIXED UTC-aligned bins; boundaries can permit
+// double-burst traffic. Deploy an edge WAF/global rate limiter separately.
+func (s *AdmissionStore) Spend(ctx context.Context, action usecase.AnonymousAction, budgets []usecase.AdmissionBucket) (bool, error) {
+	if s == nil || s.db == nil || (action != usecase.AnonymousRegister && action != usecase.AnonymousResend) ||
+		len(budgets) != 4 {
+		return false, ErrStorageUnavailable
+	}
+	expected := [...]string{"CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
+	for i, budget := range budgets {
+		if budget.Scope != expected[i] || !validAdmissionBucket(budget) {
+			return false, ErrStorageUnavailable
+		}
+	}
+	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		var now time.Time
+		if err := tx.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&now); err != nil {
+			return err
+		}
+		for _, budget := range budgets {
+			var hits int
+			err := tx.QueryRow(ctx, `INSERT INTO mamony_identity.anonymous_admission_buckets
+					(action, scope, key_digest, window_start, hits)
+				VALUES ($1, $2, $3,
+					date_bin(make_interval(secs => $4::int), $5::timestamptz,
+						timestamptz '1970-01-01 00:00:00+00'), 1)
+				ON CONFLICT (action, scope, key_digest, window_start)
+				DO UPDATE SET hits = mamony_identity.anonymous_admission_buckets.hits + 1
+				WHERE mamony_identity.anonymous_admission_buckets.hits < $6
+				RETURNING hits`,
+				string(action), budget.Scope, budget.Key[:], budget.WindowSeconds, now, budget.Limit).
+				Scan(&hits)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return errAdmissionSpent
+			}
+			if err != nil {
+				return err
+			}
+			if hits < 1 || int32(hits) > budget.Limit {
+				return ErrStorageUnavailable
+			}
+		}
+		return nil
+	})
+	if errors.Is(err, errAdmissionSpent) {
+		return false, nil
+	}
+	if err != nil {
+		return false, ErrStorageUnavailable
+	}
+	return true, nil
+}
