@@ -121,6 +121,21 @@ func TestIdentityZPasskeyRegistrationIntent(t *testing.T) {
 	if wrong, err := reader.Read(ctx, base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{0x2a}, 32)), intent.IntentID()); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || wrong.Subject != "" {
 		t.Fatal("session mismatch exposed registration evidence")
 	}
+	// A SECOND VALID session for the SAME subject must not inherit the
+	// intent. This rules out a subject-only check instead of exact-session
+	// cryptographic binding.
+	otherRaw := bytes.Repeat([]byte{0x6e}, 32)
+	otherBearer := base64.RawURLEncoding.EncodeToString(otherRaw)
+	otherDigest := sha256.Sum256(append([]byte("mamony:identity:session-token:v1\x00"), otherRaw...))
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.opaque_sessions
+		(token_digest,subject_id,subject_epoch,issued_at,expires_at)
+		VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '12 hours')`,
+		otherDigest[:], subject, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if other, err := reader.Read(ctx, otherBearer, intent.IntentID()); !errors.Is(err, usecase.ErrPasskeyRegistrationDenied) || other.Subject != "" {
+		t.Fatal("another live session for SAME subject read original registration nonce")
+	}
 	wrongRP, err := usecase.NewPasskeyRelyingParty("wrong.example.test", "https://wrong.example.test")
 	if err != nil {
 		t.Fatal(err)
