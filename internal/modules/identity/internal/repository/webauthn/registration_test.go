@@ -2,7 +2,7 @@ package webauthn
 
 import (
 	"context"
-	"crypto/elliptic"
+	"crypto/ecdh"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -48,9 +48,15 @@ func syntheticRegistration(t *testing.T, f registrationFixture) []byte {
 	}
 	// A valid ES256 COSE EC2 public key with a deterministic, TEST-ONLY
 	// private scalar. No private key enters the production verifier.
-	x, y := elliptic.P256().ScalarBaseMult([]byte{7})
-	xCoord := x.FillBytes(make([]byte, 32))
-	yCoord := y.FillBytes(make([]byte, 32))
+	scalar := make([]byte, 32)
+	scalar[len(scalar)-1] = 7
+	privateKey, err := ecdh.P256().NewPrivateKey(scalar)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey := privateKey.PublicKey().Bytes()
+	xCoord := publicKey[1:33]
+	yCoord := publicKey[33:65]
 	cose, err := cbor.Marshal(map[int]any{
 		1: 2, 3: -7, -1: 1, -2: xCoord, -3: yCoord,
 	})
@@ -63,6 +69,9 @@ func syntheticRegistration(t *testing.T, f registrationFixture) []byte {
 	// 4-byte counter, 16-byte AAGUID, 2-byte big endian credential ID length.
 	authData = append(authData, make([]byte, 4+16)...)
 	var idLength [2]byte
+	if len(f.attestedID) > 65535 {
+		t.Fatal("synthetic attested credential ID exceeds uint16 length")
+	}
 	binary.BigEndian.PutUint16(idLength[:], uint16(len(f.attestedID)))
 	authData = append(authData, idLength[:]...)
 	authData = append(authData, f.attestedID...)
