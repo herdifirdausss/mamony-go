@@ -19,14 +19,14 @@ import (
 // enforcement; "none" attestation by itself is NOT hardware provenance or an
 // independent identity/credential-binding authorization.
 type registrationFixture struct {
-	challenge [32]byte
-	rpID      string
-	origin    string
-	flags     byte
-	clientType string
+	challenge   [32]byte
+	rpID        string
+	origin      string
+	flags       byte
+	clientType  string
 	crossOrigin bool
-	rawID     []byte
-	attestedID []byte
+	rawID       []byte
+	attestedID  []byte
 }
 
 func syntheticRegistration(t *testing.T, f registrationFixture) []byte {
@@ -74,9 +74,9 @@ func syntheticRegistration(t *testing.T, f registrationFixture) []byte {
 		t.Fatal(err)
 	}
 	client, err := json.Marshal(map[string]any{
-		"type": f.clientType,
-		"challenge": base64.RawURLEncoding.EncodeToString(f.challenge[:]),
-		"origin": f.origin,
+		"type":        f.clientType,
+		"challenge":   base64.RawURLEncoding.EncodeToString(f.challenge[:]),
+		"origin":      f.origin,
 		"crossOrigin": f.crossOrigin,
 	})
 	if err != nil {
@@ -84,11 +84,11 @@ func syntheticRegistration(t *testing.T, f registrationFixture) []byte {
 	}
 	encodedID := base64.RawURLEncoding.EncodeToString(f.rawID)
 	result, err := json.Marshal(map[string]any{
-		"id": encodedID,
+		"id":    encodedID,
 		"rawId": encodedID,
-		"type": "public-key",
+		"type":  "public-key",
 		"response": map[string]any{
-			"clientDataJSON": base64.RawURLEncoding.EncodeToString(client),
+			"clientDataJSON":    base64.RawURLEncoding.EncodeToString(client),
 			"attestationObject": base64.RawURLEncoding.EncodeToString(attestation),
 		},
 	})
@@ -102,7 +102,7 @@ func testEvidence() usecase.PasskeyRegistrationEvidence {
 	return usecase.PasskeyRegistrationEvidence{
 		Subject: "sub_AAAAAAAAAAAAAAAAAAAAAA", Epoch: 2,
 		Nonce: [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9},
-		RPID: "login.example.test", Origin: "https://login.example.test",
+		RPID:  "login.example.test", Origin: "https://login.example.test",
 		PolicyGeneration: 1,
 	}
 }
