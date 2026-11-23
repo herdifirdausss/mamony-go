@@ -35,6 +35,7 @@ var requiredTests = []string{
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
+	"TestIdentityHTTPEnrollmentDB",
 	"TestIdentityResendAdmission",
 	"TestIdentityAnonymousAdmission",
 	"TestIdentityRetentionPurge",
@@ -118,7 +119,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentityMailgunMock", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -205,7 +206,9 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 		if ev.Action == "pass" && !strings.Contains(ev.Test, "/") &&
 			((ev.Package == requiredPackage && strings.HasPrefix(ev.Test, "TestPostgres")) ||
 				(ev.Package == identityPackage && strings.HasPrefix(ev.Test, "TestIdentity")) ||
-				(ev.Package == identityIntegrationPackage && strings.HasPrefix(ev.Test, "TestIdentityMailgunMock"))) {
+				(ev.Package == identityIntegrationPackage &&
+					(strings.HasPrefix(ev.Test, "TestIdentityMailgunMock") ||
+						strings.HasPrefix(ev.Test, "TestIdentityHTTPEnrollmentDB")))) {
 			passed[ev.Test] = true
 		}
 	}

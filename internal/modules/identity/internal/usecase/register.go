@@ -64,42 +64,50 @@ func newOpaqueID(r io.Reader, prefix string) (string, error) {
 
 // RegisterPending is not an HTTP handler. It does not send email or expose
 // the existence of an alias. Neither a session nor ACTIVE status is issued.
+// RegisterPending retains the legacy no-subject internal contract.
 func (s *Registration) RegisterPending(ctx context.Context, email, password string) error {
+	_, err := s.RegisterPendingWithSubject(ctx, email, password)
+	return err
+}
+
+// RegisterPendingWithSubject returns a subject ONLY for a freshly persisted
+// account. Duplicate aliases return ("", nil); callers must never serialize
+// the new subject or branch on duplicate status in an HTTP response.
+// Registration and proof issuance are separate transactions: if proof issue
+// fails, the pending subject remains recoverable through a later resend.
+func (s *Registration) RegisterPendingWithSubject(ctx context.Context, email, password string) (string, error) {
 	if s == nil {
-		return ErrRegistrationUnavailable
+		return "", ErrRegistrationUnavailable
 	}
 	alias, err := domain.CanonicalEmail(email)
 	if err != nil {
-		return err
+		return "", err
 	}
 	normalized, err := s.policy.NormalizeAndValidate(password, alias)
 	if err != nil {
-		return err
+		return "", err
 	}
 	verifier, err := s.hasher.Hash(ctx, normalized)
 	if err != nil {
-		return err
+		return "", ErrRegistrationUnavailable
 	}
 	subject, err := newOpaqueID(s.random, "sub_")
 	if err != nil {
-		return err
+		return "", ErrRegistrationUnavailable
 	}
 	event, err := newOpaqueID(s.random, "evt_")
 	if err != nil {
-		return err
+		return "", ErrRegistrationUnavailable
 	}
 	err = s.store.CreatePendingWithObligation(ctx, PendingRegistration{
 		SubjectID: subject, CanonicalEmail: alias, Status: "UNVERIFIED",
 		PasswordVerifier: verifier, EventID: event, CreatedAt: s.clock().UTC(),
 	})
-	// The caller must use a generic public response when this is eventually
-	// exposed. A duplicate is indistinguishable at the usecase-result layer;
-	// timing and abuse admission require independent HTTP tests.
 	if errors.Is(err, ErrAliasAlreadyReserved) {
-		return nil
+		return "", nil
 	}
 	if err != nil {
-		return ErrRegistrationUnavailable
+		return "", ErrRegistrationUnavailable
 	}
-	return nil
+	return subject, nil
 }

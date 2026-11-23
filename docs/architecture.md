@@ -59,3 +59,7 @@ Threat-driven checks are owned by the affected contract rather than by a generic
 - **Secret misuse, audit suppression, restore rollback:** [platform](contracts/platform.md), [operations](contracts/reconciliation-and-events.md#operator-workflow-and-audit) and [recovery procedures](runbooks/recovery.md)
 
 Document the attacker foothold, surviving trusted authority, expected refusal, and concrete test for every new security claim. The [verification rules](engineering.md#security-verification) require evidence for implemented capabilities and `NOT RUN` for unimplemented controls. Record unresolved choices in the [decision register](open-decisions.md#security-architecture-decisions).
+
+### Identity HTTP enrollment candidate (Draft PR #31)
+
+`internal/modules/identity/internal/handler/enrollment_http.go` is a nonmounted, manually constructed `http.Handler` for two proposed JSON endpoints. It requires direct TLS (no trusted `X-Forwarded-Proto`), exact operator-configured Origin/Host, strict 2KB JSON without duplicate/unknown keys, no cookies or Authorization, and already implemented anonymous HMAC admission. Internal `EnrollmentFlow` connects new pending subjects to the encrypted proof issuer and restricts resend to server-resolved UNVERIFIED subjects. No public listener routes changed. The optional browser-facing workflow is **not safe to deploy** until a reviewed TLS proxy boundary, blocklist, latency obfuscation, async reconciliation/monitoring, real provider quota and frontend proof-consumption flow exist.
