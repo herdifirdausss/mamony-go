@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "1:false" {
+	if err != nil || out != "2:false" {
 		t.Fatalf("identity migration should be at clean version 1: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "1" {
+	if err != nil || out != "2" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -52,6 +52,7 @@ func TestPostgresIdentityMigration(t *testing.T) {
 		"SELECT * FROM mamony_identity.migration_fingerprints",
 		"SELECT * FROM mamony_identity.schema_migrations",
 		"SET ROLE mamony_identity_migrator",
+		"SELECT * FROM mamony_identity.email_verification_challenges",
 	} {
 		output, err := invokePSQL("TEST_IDENTITY_RUNTIME_URL", "-c", stmt)
 		if err == nil || !strings.Contains(output, "42501") {
@@ -63,8 +64,13 @@ func TestPostgresIdentityMigration(t *testing.T) {
 	activeID := "sub_AAAAAAAAAAAAAAAAAAAAAA"
 	output, err := invokePSQL("TEST_IDENTITY_RUNTIME_URL", "-c",
 		"INSERT INTO mamony_identity.subjects (subject_id, status, created_at) VALUES ('"+activeID+"','ACTIVE',now())")
-	if err == nil || !strings.Contains(output, "23514") {
-		t.Fatalf("direct ACTIVE insert must fail the migration constraint: %q %v", output, err)
+	if err == nil || !strings.Contains(output, "42501") {
+		t.Fatalf("registration role must not INSERT the protected status column: %q %v", output, err)
+	}
+	output, err = invokePSQL("TEST_IDENTITY_RUNTIME_URL", "-c",
+		"INSERT INTO mamony_identity.email_aliases (canonical_email, subject_id, verified_at, created_at) VALUES ('fake@example.test','"+activeID+"',now(),now())")
+	if err == nil || !strings.Contains(output, "42501") {
+		t.Fatalf("registration role must not INSERT the verified_at column: %q %v", output, err)
 	}
 	for _, stmt := range []string{
 		"SELECT * FROM mamony_identity.subjects",
@@ -74,6 +80,24 @@ func TestPostgresIdentityMigration(t *testing.T) {
 		output, err := invokePSQL("TEST_PLATFORM_RUNTIME_URL", "-c", stmt)
 		if err == nil || !strings.Contains(output, "42501") {
 			t.Fatalf("cross-schema access must fail: query=%q err=%v output=%q", stmt, err, output)
+		}
+	}
+}
+
+func TestPostgresIdentityVerifierRole(t *testing.T) {
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.invalid_table (id integer)",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"SELECT * FROM mamony_identity.schema_migrations",
+		"DELETE FROM mamony_identity.email_verification_challenges",
+		"DELETE FROM mamony_identity.security_outbox",
+		"UPDATE mamony_identity.email_verification_challenges SET expires_at=now()",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		output, err := invokePSQL("TEST_IDENTITY_VERIFIER_URL", "-c", stmt)
+		if err == nil || !strings.Contains(output, "42501") {
+			t.Fatalf("verifier runtime must deny %q: %q err=%v", stmt, output, err)
 		}
 	}
 }
