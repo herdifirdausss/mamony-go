@@ -103,7 +103,7 @@ func (v *RegistrationVerifier) VerifyRegistration(ctx context.Context,
 
 type ceremonyUser struct{ subject string }
 
-func (u ceremonyUser) WebAuthnID() []byte                  { return []byte(u.subject) }
-func (u ceremonyUser) WebAuthnName() string                { return "Mamony identity" }
-func (u ceremonyUser) WebAuthnDisplayName() string         { return "Mamony identity" }
+func (u ceremonyUser) WebAuthnID() []byte                           { return []byte(u.subject) }
+func (u ceremonyUser) WebAuthnName() string                         { return "Mamony identity" }
+func (u ceremonyUser) WebAuthnDisplayName() string                  { return "Mamony identity" }
 func (u ceremonyUser) WebAuthnCredentials() []gowebauthn.Credential { return nil }
