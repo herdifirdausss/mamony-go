@@ -8,11 +8,11 @@ import (
 )
 
 type fakeActivationAssertionProtocol struct {
-	calls int
+	calls    int
 	expected PasskeyActivationEvidence
-	payload []byte
-	result PasskeyActivationAssertionResult
-	err error
+	payload  []byte
+	result   PasskeyActivationAssertionResult
+	err      error
 }
 
 func (f *fakeActivationAssertionProtocol) VerifyAssertion(_ context.Context,
@@ -30,7 +30,7 @@ func assertionProofFixture(t *testing.T) (*PasskeyActivationAssertionVerifier,
 	protocol := &fakeActivationAssertionProtocol{
 		result: PasskeyActivationAssertionResult{
 			CredentialID: append([]byte(nil), store.record.CredentialID...),
-			Counter: 1, UserPresent: true, UserVerified: true,
+			Counter:      1, UserPresent: true, UserVerified: true,
 		},
 	}
 	proof, err := NewPasskeyActivationAssertionVerifier(reader, protocol)
@@ -76,8 +76,7 @@ func TestPasskeyActivationAssertionProofRejectsUntrustedClaims(t *testing.T) {
 	v, store, proto, bearer := assertionProofFixture(t)
 	id := "pav_AAAAAAAAAAAAAAAAAAAAAA"
 	for _, raw := range [][]byte{nil, {}, make([]byte, (128<<10)+1)} {
-		if got, err := v.VerifyOnly(context.Background(), bearer, id, raw);
-			!errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
+		if got, err := v.VerifyOnly(context.Background(), bearer, id, raw); !errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
 			t.Fatalf("malformed assertion reached library: %v", err)
 		}
 	}
@@ -85,32 +84,28 @@ func TestPasskeyActivationAssertionProofRejectsUntrustedClaims(t *testing.T) {
 		t.Fatal("unbounded/empty payload reached crypto verifier")
 	}
 	raw := []byte(`{"type":"public-key"}`)
-	if got, err := v.VerifyOnly(context.Background(), "invalid", id, raw);
-		!errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
+	if got, err := v.VerifyOnly(context.Background(), "invalid", id, raw); !errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
 		t.Fatal("invalid session reached crypto verifier")
 	}
 	store.found = false
-	if got, err := v.VerifyOnly(context.Background(), bearer, id, raw);
-		!errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
+	if got, err := v.VerifyOnly(context.Background(), bearer, id, raw); !errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
 		t.Fatal("missing v34 challenge reached crypto verifier")
 	}
 	store.found = true
 	store.err = errors.New("connection lost")
-	if got, err := v.VerifyOnly(context.Background(), bearer, id, raw);
-		!errors.Is(err, ErrPasskeyAssertionUnavailable) || len(got.CredentialID) != 0 {
+	if got, err := v.VerifyOnly(context.Background(), bearer, id, raw); !errors.Is(err, ErrPasskeyAssertionUnavailable) || len(got.CredentialID) != 0 {
 		t.Fatal("DB reader error ignored")
 	}
 	store.err = nil
 	proto.err = ErrPasskeyAssertionDenied
-	if got, err := v.VerifyOnly(context.Background(), bearer, id, raw);
-		!errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
+	if got, err := v.VerifyOnly(context.Background(), bearer, id, raw); !errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
 		t.Fatal("signature failure accepted")
 	}
 	proto.err = nil
 
 	base := proto.result
 	for _, tc := range []struct {
-		name string
+		name   string
 		modify func(*PasskeyActivationAssertionResult)
 	}{
 		{"wrong ID", func(x *PasskeyActivationAssertionResult) { x.CredentialID = bytes.Repeat([]byte{0x31}, 32) }},
@@ -123,16 +118,14 @@ func TestPasskeyActivationAssertionProofRejectsUntrustedClaims(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			proto.result = base
 			tc.modify(&proto.result)
-			if got, err := v.VerifyOnly(context.Background(), bearer, id, raw);
-				!errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
+			if got, err := v.VerifyOnly(context.Background(), bearer, id, raw); !errors.Is(err, ErrPasskeyAssertionDenied) || len(got.CredentialID) != 0 {
 				t.Fatalf("fake vendor proof bypassed usecase fence: %v", err)
 			}
 		})
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if got, err := v.VerifyOnly(ctx, bearer, id, raw);
-		!errors.Is(err, ErrPasskeyAssertionUnavailable) || len(got.CredentialID) != 0 {
+	if got, err := v.VerifyOnly(ctx, bearer, id, raw); !errors.Is(err, ErrPasskeyAssertionUnavailable) || len(got.CredentialID) != 0 {
 		t.Fatal("canceled operation called assertion verifier")
 	}
 }
