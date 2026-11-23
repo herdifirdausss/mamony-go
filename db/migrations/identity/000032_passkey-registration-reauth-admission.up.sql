@@ -199,4 +199,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.admit_passkey_registration_intent(
 -- only when future approved atomic credential binding is implemented.
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (32, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (32, '88d95b0d8d95c69706b269565dff2a0cb6a198ab0894f7ab102fedbd2132348b');
