@@ -131,3 +131,88 @@ sequenceDiagram
 | New SQL/Go integration test, race/role tests, migration fingerprint | **NOT RUN — not implemented** |
 | Security review, owner G2/technical G3 approval | **PENDING** |
 | Production/browser rollout and independent security-notice delivery | **NOT IMPLEMENTED** |
+
+## G3 supplement — precise TOCTOU, SQL lock and lineage review (2026-11-23)
+
+This section is a **design review, not a signoff**. It was checked against the **actual** v33 and v34 migration code and v35 Go verifier after #77 merged. Primary outside reference: [PostgreSQL 18 explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html), [PostgreSQL 18 SELECT locking clauses](https://www.postgresql.org/docs/18/sql-select.html), and [W3C WebAuthn Level 3 Recommendation, 2026-08-25](https://www.w3.org/TR/2026/REC-webauthn-3-20260825/).
+
+### Snapshot binding is mandatory
+
+V35 `verifyForActivation` deliberately returns the **original read-only evidence and signed assertion facts in one call**. These must be passed unchanged to the future finisher in one opaque request struct. In particular, the database must **compare the COSE public key bytes, credential ID, expected stored counter and BE/BS from the originally signed evidence** to the locked current rows, not query a potentially changed credential and silently treat it as what the signature verified.
+
+The future SQL function is a privileged *claim consumer*, not a cryptographic verifier; a compromised finisher runtime credential can lie about a signed result. The trusted Go constructor must prohibit injecting an arbitrary insecure assertion validator into public composition; the role must remain inaccessible from HTTP and excluded from the regular identity runtime DSN.
+
+A verified assertion proves possession of the **private key for the staged public key** in this ceremony. It does not prove legitimate account owner, manufacturer provenance, device uniqueness, independent enrollment assurance, successful notice delivery, login authority or Profile B resistance.
+
+### Proposed lock plan, consistent with existing v33/v34
+
+The future function must read and lock in **separate ordered statements** rather than trusting a planner-dependent multi-relation JOIN to imply lock order:
+
+1. Lookup subject ID by 32-byte session digest **without** accepting a caller-supplied subject.
+2. Lock active `subjects` + currently verified `email_aliases` (`FOR UPDATE OF s,a`), revalidate subject and contact epoch/version.
+3. Lock the **same** `opaque_sessions` row (`FOR UPDATE OF ss`), revalidate subject, epoch, revoked status, and 30-minute idle plus absolute expiry.
+4. Lock the exact `passkey_credentials` row (`FOR UPDATE OF c`) before mutating state; recheck `PENDING_ASSERTION`, credential subject/epoch/contact, `PASSWORD_REAUTH_ONLY`, RP/origin, **byte-equal COSE key**, signed ID, stored counter and expected BE/BS flags.
+5. Lock the exact `passkey_activation_challenges` row (`FOR UPDATE OF a`), recheck **challenge ID AND random nonce**, credential selector, original session digest, subject/epoch/contact, policy generation, fixed purpose, unconsumed status, 3-minute expiration and 10-minute stage cap.
+6. Revalidate the credential's **original** v30 registration intent and v32 consumed admission, including immutable intent ID/session digest, the required stage audit and registration notice, and ensure a newer registration intent did not replace the one used for staging. Gate on the subject lock used by the older writers; tests must confirm this ordering with actual PostgreSQL sessions.
+7. Sample **`clock_timestamp()` after acquiring the conflicting locks**, then reject any session/challenge/stage expiry that elapsed during a wait. Never rely on the time measured during v35's earlier read.
+8. Under the same transaction, insert event (whose provenance-checked trigger enqueues activation notice), conditionally transition the credential and stored signed counter/backup state, set immutable possession metadata, and conditionally consume the exact challenge. Require one affected row for every conditional UPDATE; any failure raises/returns an error causing **rollback**, not a swallowed partial commit.
+
+V34 reader already locks subject+alias and session before reading `c,a` with a joint `FOR SHARE`; v34 issuer locks subject+alias and session before `c` and challenge. A new finisher must be compatible with these paths; the added real-DB race fixture must run **reader vs issuer vs finisher** and fail if any unexpected `40P01` deadlock occurs. Do not assume planner JOIN order proves the invariant.
+
+**Schema auditability:** the currently proposed possession timestamp and unique `possession_event_id` preserve the activation event, but v34 overwrites a consumed challenge on subsequent issuance. Consider retaining a non-secret **`possession_challenge_id`** or event-to-challenge link in the credential to preserve proof lineage after that overwrite. This is a design decision (no challenge nonce/bearer persisted in audit), not an approved additional column.
+
+### No entitlement confusion
+
+The proposed `POSSESSION_VERIFIED` state must not be treated by existing or future login queries as `ACTIVE` or as the separate independently enrolled recovery code authority. The resulting storage transition is **verification of possession only**, not authentication of a new browser session. Explicitly inventory any credential queries introduced later, rather than equating `state != PENDING_ASSERTION` with authorization.
+
+### Operational choices still unaccepted
+
+- One-use challenge retention/audit linkage and abandoned-stage cleanup.
+- Responsibility for secure role provisioning and a separately protected verifier workload; Profile A remains the scoped guarantee.
+- Activation notification worker, retry/dead-letter, recipient changes, bounded PII retention, incident runbook and human receipt policy.
+- Independently reviewed public Browser Begin/Finish contract, exact RP/Origin, HMAC CSRF, direct/forwarded TLS, session cookie and abuse budget.
+
+## G4 supplement — executable test matrix for the future accepted slice
+
+All cases below are **PLANNED / NOT RUN**. Run against disposable PostgreSQL with distinct principals and genuine v35 ES256 signing, not mocked storage. No test is allowed to make an unimplemented capability count as PASS.
+
+| ID | Failure/adversarial setup | Expected authoritative DB outcome |
+|---|---|---|
+| PKA-T01 | Signed ES256 assertion on matching staged credential + live original session/nonce | One `POSSESSION_VERIFIED` row, consumed challenge, one activation event and one pending activation notice |
+| PKA-T02 | Same signed assertion submitted again, even with signCount 0/0 | DENY, no second event/notice, no counter change |
+| PKA-T03 | **16 concurrent** finishes using pool with >=16 physical connections, synchronized at SQL admission | Exactly one commit; 15 denied/serialized; no deadlock or extra event |
+| PKA-T04 | Valid but different live session of same subject | DENY; no cross-session adoption |
+| PKA-T05 | A different subject (even if it knows the challenge ID/credential ID) | DENY; subject derives only from live session |
+| PKA-T06 | Session revoked, epoch rotated or subject frozen after signature verification but before commit | DENY under locks; no mutation |
+| PKA-T07 | Verified alias changed or contact version stale after signature verification | DENY; no obligation to stale recipient |
+| PKA-T08 | v34 challenge replaced after expiry, same ID with different nonce or different ID | DENY old signature/evidence; exact ID **and** nonce checked |
+| PKA-T09 | Acquire a subject lock, hold finisher waiting across expiry, then release | DENY using **post-lock** DB clock |
+| PKA-T10 | Credential staged more than ten minutes earlier | DENY even if a stale challenge row was manually left unexpired in test fixture |
+| PKA-T11 | Credential state already changed; stage provenance wrong/missing | DENY, no second state transition |
+| PKA-T12 | Original v30 intent overwritten by a fresh registration | DENY; no stale admission fallback |
+| PKA-T13 | Original v32 admission not consumed, absent, mismatched session or wrong provenance | DENY |
+| PKA-T14 | Stage security event or registration notice missing/wrong subject | DENY; no late assertion privilege bypass |
+| PKA-T15 | Current RP/origin, policy generation or COSE key differs from original signed v35 evidence | DENY; byte-level binding |
+| PKA-T16 | Current stored signCount changed after v35 read | DENY (snapshot mismatch), even if signed counter would advance relative to the new value |
+| PKA-T17 | Counter transitions 0→0, 0→1 and 1→2 | ALLOW only with a **fresh challenge** each time as applicable; 0/0 explicitly has no clone detection |
+| PKA-T18 | Counter transitions 2→2, 2→1 or 0→nonadvancing nonzero | DENY; no persisted count regression |
+| PKA-T19 | Signed BE differs from staged BE, or BS=1 with BE=0 | DENY; a legal signed BS transition with stable BE is allowed |
+| PKA-T20 | Duplicate `evt_` identifier at late event insert | Entire transaction rolls back credential, nonce, counter and notice |
+| PKA-T21 | Test-only DB owner injects failure at activation-notice INSERT/trigger | Entire transaction rolls back; after removing fault a new intentional attempt may succeed **only if still unexpired** |
+| PKA-T22 | Conflict: v34 reader vs issuer vs finisher under multiple independent sessions | No unexpected deadlock (`40P01`) and all successful state consistent |
+| PKA-T23 | Finisher runtime attempts direct `SELECT/UPDATE`, `SET ROLE`, grant staging, session issue, recovery approval or migration | DENIED by SQL privileges |
+| PKA-T24 | Any previous issuer/reader/staging/authenticator/ordinary runtime invokes new finisher function | DENIED by privilege and original `session_user` fence |
+| PKA-T25 | Commit acknowledgment deliberately dropped after definite SQL commit | Go returns sanitized **UNAVAILABLE**, no automatic retry, durable DB state exactly once |
+| PKA-T26 | Malformed proof, truncated nonce/credential, canceled context, oversized assertion | Fail closed without persistent writes or raw SQL/secret disclosure |
+| PKA-T27 | Default public/private listeners hit hypothetical passkey registration/activation/login endpoints | 404; no runtime privilege or user session granted |
+| PKA-T28 | Future migration installs over empty and upgraded v34 schema; migration SQL altered after apply | Exactly 35 committed fingerprints; original 1–34 immutable; history tampering denied by existing migrator preflight |
+
+### Required evidence before calling implementation PASS
+
+- Run the existing **unchanged** real-PG and Chromium test gates and the **new** named v36 integration test; add it to `tools/testgate/main.go` and verify missing/skipped tests fail the gate.
+- Update `tools/postgrestest/testdata/identity-bootstrap.sql`, isolated DSN role variables in **both** PostgreSQL and browser workflows, `tools/postgrestest/run-local.sh`, test role-matrix and fingerprint count **only after** accepted G2/G3 design.
+- `make migrations-check`, `make check`, `make test-repeat`, targeted Go tests and disposable PostgreSQL concurrency tests are independently logged with **exact HEAD SHA**; local execution **NOT RUN** for this docs-only review.
+- Migration file `000035` must include canonical `-- mamony:integrity:v1` trailer calculated over bytes preceding the marker; never edit applied v33/v34 SQL or manually change their fingerprints.
+- Separate human/technical review must inspect the new test assertions themselves to ensure a green test isn't obtained by relaxing the expected denial behavior.
+
+**Status:** all PKA-T cases NOT RUN; design acceptance remains pending in #78.

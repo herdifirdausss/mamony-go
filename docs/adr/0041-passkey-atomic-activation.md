@@ -28,3 +28,13 @@ Require real signed WebAuthn assertion fixture coupled with real PostgreSQL test
 Remain strictly unmounted; `POSSESSION_VERIFIED` must NOT authorize password-independent account recovery, login, higher assurance or financial approval. The separate notification queue has no worker and `PENDING` is not evidence of delivery. Complete browser options, authorization, ingress/proxy, key custody, role isolation, device loss, backup/restore and alerting decisions before any public release.
 
 **Decision owner approval:** PENDING. **Independent technical acceptance:** PENDING. **Code/CI evidence:** NOT RUN.
+
+## Concurrency and code-review findings (2026-11-23)
+
+The v34 issuer requires subject+alias → session → pending credential → challenge; the v34 evidence reader first acquires shared subject/alias and session locks, then performs a joined `FOR SHARE OF c,a` for credential and challenge. For the future finisher, acquire subject+alias and session **before** an exclusive credential lock and **then** challenge lock. Recheck the original v30 intent/v32 admission and actual server clock after conflicting row locks. Because joined locking and other writers can interact, add an explicit three-way **reader vs issuer vs finisher** real-PG deadlock regression; never infer lock acquisition order from SQL JOIN syntax. [PostgreSQL 18 explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html).
+
+The finisher must be given **the exact v35 evidence snapshot**, including byte-identical COSE public key and prior counter; it must not refetch a new key and treat an earlier signature as verification of it. The SQL role is a privileged verifier oracle only under Profile A. Even after a successful proof, `POSSESSION_VERIFIED` carries **zero** login, independently trusted recovery or financial permissions.
+
+V34 can overwrite a consumed nonce row. Review whether the credential needs a non-secret `possession_challenge_id`/audit relation to preserve original challenge lineage after overwrite; storing the random nonce or any bearer in audit is out of scope.
+
+The detailed proposed **28-case** acceptance/test matrix and schema/role changes reside in [the Critical proposal](../proposals/identity-passkey-atomic-activation.md#g4-supplement--executable-test-matrix-for-the-future-accepted-slice). All cases are **NOT RUN** pending explicit G2/G3 acceptance.
