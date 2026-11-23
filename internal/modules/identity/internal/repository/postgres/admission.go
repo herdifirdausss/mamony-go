@@ -29,6 +29,22 @@ func validAdmissionBucket(action usecase.AnonymousAction, b usecase.AdmissionBuc
 	if b.Key == ([32]byte{}) {
 		return false
 	}
+	if action == usecase.AnonymousRecovery {
+		switch b.Scope {
+		case "GLOBAL_MINUTE":
+			return b.WindowSeconds == 60 && b.Limit == 60
+		case "CLIENT_MINUTE":
+			return b.WindowSeconds == 60 && b.Limit == 5
+		case "CLIENT_HOUR":
+			return b.WindowSeconds == 3600 && b.Limit == 40
+		case "EMAIL_HOUR":
+			return b.WindowSeconds == 3600 && b.Limit == 2
+		case "EMAIL_DAY":
+			return b.WindowSeconds == 86400 && b.Limit == 4
+		default:
+			return false
+		}
+	}
 	// LOGIN has a separate domain and deliberately different alias quotas.
 	// All other actions preserve their immutable v5-v7 accounting policy.
 	if action == usecase.AnonymousLogin {
@@ -81,6 +97,8 @@ func (s *AdmissionStore) Spend(ctx context.Context, action usecase.AnonymousActi
 	case usecase.AnonymousConfirm:
 		expected = []string{"CLIENT_MINUTE", "CLIENT_HOUR"}
 	case usecase.AnonymousLogin:
+		expected = []string{"GLOBAL_MINUTE", "CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
+	case usecase.AnonymousRecovery:
 		expected = []string{"GLOBAL_MINUTE", "CLIENT_MINUTE", "CLIENT_HOUR", "EMAIL_HOUR", "EMAIL_DAY"}
 	default:
 		return false, ErrStorageUnavailable
