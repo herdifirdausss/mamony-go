@@ -1006,7 +1006,7 @@ func TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles(t *testing.T) {
 		"SELECT mamony_identity.replace_password_recovery_offline_codes(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),ARRAY[decode(repeat('44',32),'hex')],'evt_AAAAAAAAAAAAAAAAAAAAAA')",
 		"SELECT mamony_identity.approve_password_recovery_offline_code(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
 		"SELECT mamony_identity.claim_password_recovery_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')",
-		"SELECT mamony_identity.claim_security_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.claim_password_change_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')",
 		"SELECT mamony_identity.recovery_code_security_notice_health()",
 		"SELECT mamony_identity.purge_old_recovery_code_security_notices()",
 		"SET ROLE mamony_identity_migrator",
