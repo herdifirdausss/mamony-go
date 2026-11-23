@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "16:false" {
-		t.Fatalf("identity migration should be at clean version 16: %q err=%v", out, err)
+	if err != nil || out != "17:false" {
+		t.Fatalf("identity migration should be at clean version 17: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "16" {
+	if err != nil || out != "17" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -405,7 +405,7 @@ func TestPostgresIdentityZPasswordChangeRole(t *testing.T) {
 
 func TestPostgresIdentityZSecurityNoticeRole(t *testing.T) {
 	const claim = "SELECT * FROM mamony_identity.claim_password_change_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')"
-	const finalize = "SELECT mamony_identity.finalize_password_change_notice('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','ACCEPTED')"
+	const finalize = "SELECT mamony_identity.finalize_password_change_notice_v2('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','ACCEPTED',decode(repeat('11',32),'hex'))"
 	out, err := invokePSQL("TEST_IDENTITY_SECURITY_NOTICE_URL", "-c", claim)
 	if err != nil || out != "" {
 		t.Fatalf("notice worker could not execute safe empty claim: %q %v", out, err)
@@ -446,5 +446,59 @@ func TestPostgresIdentityZSecurityNoticeRole(t *testing.T) {
 				t.Fatalf("role %s could claim/finalize alerts: sql=%q out=%q err=%v", role, stmt, out, err)
 			}
 		}
+	}
+}
+
+func TestPostgresIdentityZMailgunWebhookRole(t *testing.T) {
+	const record = "SELECT mamony_identity.record_mailgun_security_notice_receipt(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),'DELIVERED',now())"
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.webhook_attack (id integer)",
+		"SELECT * FROM mamony_identity.password_change_notices",
+		"SELECT * FROM mamony_identity.security_notice_mailgun_receipts",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"UPDATE mamony_identity.password_change_notices SET provider_state='DELIVERED'",
+		"DELETE FROM mamony_identity.security_notice_mailgun_receipts",
+		"SELECT mamony_identity.security_notice_health()",
+		"SELECT mamony_identity.purge_old_mailgun_security_receipts()",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_NOTICE_WEBHOOK_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("webhook SQL role escaped append-only EXECUTE: %q out=%q err=%v", stmt, out, err)
+		}
+	}
+	// A valid function call is permitted, but cannot claim receipt contents,
+	// security audit or password/change/session permissions.
+	out, err := invokePSQL("TEST_IDENTITY_NOTICE_WEBHOOK_URL", "-c", record)
+	if err != nil || out != "t" {
+		t.Fatalf("webhook receiver could not execute bounded SQL: %q %v", out, err)
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL", "TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL", "TEST_IDENTITY_PASSWORD_CHANGE_URL",
+		"TEST_IDENTITY_SECURITY_NOTICE_URL", "TEST_IDENTITY_DELIVERY_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", record)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("role %s can spoof Mailgun receipt: out=%q err=%v", role, out, err)
+		}
+	}
+	for _, role := range []string{"TEST_IDENTITY_NOTICE_WEBHOOK_URL",
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_SECURITY_NOTICE_URL"} {
+		out, err := invokePSQL(role, "-c",
+			"SELECT mamony_identity.finalize_password_change_notice('evt_AAAAAAAAAAAAAAAAAAAAAA','lse_AAAAAAAAAAAAAAAAAAAAAA','ACCEPTED')")
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("role %s can use uncorrelated legacy finalize: %q %v", role, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_MAINTENANCE_URL", "-c",
+		"SELECT * FROM mamony_identity.security_notice_health()")
+	if err != nil || out == "" {
+		t.Fatalf("maintenance monitoring role cannot access count-only health: %q %v", out, err)
 	}
 }

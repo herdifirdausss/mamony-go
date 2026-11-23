@@ -26,13 +26,16 @@ func (f *fakeNoticeStore) Claim(_ context.Context, lease string) (SecurityNotice
 	return job, true, nil
 }
 
-func (f *fakeNoticeStore) Finalize(_ context.Context, event, lease string, result ProofDeliveryOutcome) error {
+func (f *fakeNoticeStore) Finalize(_ context.Context, event, lease string, result ProofDeliveryOutcome, providerID string) error {
 	f.finals++
 	if f.finalErr != nil {
 		return f.finalErr
 	}
 	if event != f.job.EventID || len(lease) != 26 {
 		return errors.New("lease fence mismatch")
+	}
+	if result == DeliveryAccepted && providerID != "<synthetic@mailgun.test>" && providerID != "synthetic@mailgun.test" {
+		return errors.New("provider message ID mismatch")
 	}
 	f.outcome = result
 	return nil
@@ -45,11 +48,14 @@ type fakeNoticeSender struct {
 	recipient string
 }
 
-func (f *fakeNoticeSender) SendPasswordChanged(_ context.Context, event, recipient string) error {
+func (f *fakeNoticeSender) SendPasswordChanged(_ context.Context, event, recipient string) (string, error) {
 	f.calls++
 	f.event = event
 	f.recipient = recipient
-	return f.err
+	if f.err != nil {
+		return "", f.err
+	}
+	return "<synthetic@mailgun.test>", nil
 }
 
 func TestSecurityNoticeWorkerBoundedDeliveryOutcomes(t *testing.T) {
