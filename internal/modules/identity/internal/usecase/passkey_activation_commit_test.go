@@ -8,11 +8,11 @@ import (
 )
 
 type fakePasskeyActivationFinishStore struct {
-	calls int
+	calls   int
 	request PasskeyActivationFinishRequest
 	allowed bool
-	oneUse bool
-	err error
+	oneUse  bool
+	err     error
 }
 
 func (f *fakePasskeyActivationFinishStore) Finish(_ context.Context,
