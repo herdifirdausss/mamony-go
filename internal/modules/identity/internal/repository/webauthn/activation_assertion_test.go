@@ -55,7 +55,11 @@ func syntheticSignedAssertion(t *testing.T, key *ecdsa.PrivateKey,
 	if f.id == nil {
 		f.id = bytes.Repeat([]byte{0x61}, 32)
 	}
-	pub := elliptic.Marshal(elliptic.P256(), key.PublicKey.X, key.PublicKey.Y)
+	publicECDH, err := key.PublicKey.ECDH()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := publicECDH.Bytes()
 	cose, err := cbor.Marshal(map[int]any{
 		1: 2, 3: -7, -1: 1, -2: pub[1:33], -3: pub[33:65],
 	})
