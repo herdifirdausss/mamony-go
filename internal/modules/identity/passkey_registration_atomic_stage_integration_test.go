@@ -5,11 +5,8 @@ package identity
 import (
 	"bytes"
 	"context"
-	"crypto/ecdh"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"net/url"
 	"strings"
@@ -17,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	identitypg "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/postgres"
 	identitywa "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/webauthn"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
@@ -30,58 +26,7 @@ import (
 // UP and UV; no attestation-none response claims independent device trust.
 func stagedPasskeyResponse(t *testing.T, nonce []byte, credentialID []byte) []byte {
 	t.Helper()
-	scalar := make([]byte, 32)
-	scalar[31] = 7
-	private, err := ecdh.P256().NewPrivateKey(scalar)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pub := private.PublicKey().Bytes()
-	cose, err := cbor.Marshal(map[int]any{
-		1: 2, 3: -7, -1: 1, -2: pub[1:33], -3: pub[33:65],
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	rpHash := sha256.Sum256([]byte("login.example.test"))
-	authData := append([]byte(nil), rpHash[:]...)
-	authData = append(authData, 0x45)                // user-present, user-verified, attested credential data
-	authData = append(authData, make([]byte, 20)...) // counter + AAGUID
-	if len(credentialID) > 65535 {
-		t.Fatal("test credential ID cannot fit in WebAuthn ACD")
-	}
-	var idLength uint16
-	for range credentialID {
-		idLength++
-	}
-	var encodedLength [2]byte
-	binary.BigEndian.PutUint16(encodedLength[:], idLength)
-	authData = append(authData, encodedLength[:]...)
-	authData = append(authData, credentialID...)
-	authData = append(authData, cose...)
-	attestation, err := cbor.Marshal(map[string]any{
-		"fmt": "none", "authData": authData, "attStmt": map[string]any{},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientData, err := json.Marshal(map[string]any{
-		"type":        "webauthn.create",
-		"origin":      "https://login.example.test",
-		"challenge":   base64.RawURLEncoding.EncodeToString(nonce),
-		"crossOrigin": false,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	id := base64.RawURLEncoding.EncodeToString(credentialID)
-	payload, err := json.Marshal(map[string]any{
-		"id": id, "rawId": id, "type": "public-key",
-		"response": map[string]any{
-			"clientDataJSON":    base64.RawURLEncoding.EncodeToString(clientData),
-			"attestationObject": base64.RawURLEncoding.EncodeToString(attestation),
-		},
-	})
+	payload, err := identitywa.SyntheticRegistrationResponse(nonce, credentialID)
 	if err != nil {
 		t.Fatal(err)
 	}
