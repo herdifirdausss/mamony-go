@@ -36,6 +36,7 @@ var requiredTests = []string{
 	"TestIdentityRegistrationPersistence",
 	"TestIdentityPasswordAuthentication",
 	"TestIdentityOpaqueSessions",
+	"TestIdentityZSessionFreezeIssueInterleavings",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
 	"TestIdentityMailgunMockPipeline",
@@ -139,7 +140,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -234,7 +235,8 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZEmailConfirmationHTTPDB") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZConfirmationAdmissionHTTPDB") ||
 						strings.HasPrefix(ev.Test, "TestIdentityPasswordAuthentication") ||
-						strings.HasPrefix(ev.Test, "TestIdentityOpaqueSessions"))) {
+						strings.HasPrefix(ev.Test, "TestIdentityOpaqueSessions") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZSessionFreezeIssueInterleavings"))) {
 				passed[ev.Test] = true
 			}
 
