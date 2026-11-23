@@ -5,6 +5,8 @@ package identity
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -133,10 +135,22 @@ func TestIdentityMailgunMockRecoveryCodeNoticeWebhookReconciliation(t *testing.T
 		return v
 	}
 	approval := sha256.Sum256([]byte("synthetic-code-notice-independent:" + subject))
+	// Disposable ADMIN fixture simulates a previously trusted factor binding;
+	// no production runtime or API may register a signing key.
+	publicKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.recovery_code_factor_keys
+		(subject_id,public_key,bound_epoch,bound_contact_version,bound_at)
+		VALUES($1,$2,$3,1,clock_timestamp())`,
+		subject, []byte(publicKey), epoch); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_recovery_code_enrollment_approvals
-		(subject_id,subject_epoch,proof_digest,approved_at,expires_at)
-		VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '4 minutes')`,
-		subject, epoch, approval[:]); err != nil {
+		(subject_id,subject_epoch,proof_digest,approved_at,expires_at,factor_public_key)
+		VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '4 minutes',$4)`,
+		subject, epoch, approval[:], []byte(publicKey)); err != nil {
 		t.Fatal(err)
 	}
 	first := batch("first-notice-")
