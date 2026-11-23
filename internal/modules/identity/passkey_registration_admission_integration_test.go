@@ -258,6 +258,45 @@ func TestIdentityZPasskeyRegistrationAdmission(t *testing.T) {
 	if accepted, err := admStore.Admit(ctx, sessionDigest, intent.IntentID(), previous); err != nil || accepted {
 		t.Fatalf("consumed proof replayed: accepted=%t err=%v", accepted, err)
 	}
+	// A new v30 nonce must never inherit the prior admission, even though
+	// the subject and issuing session are still identical. The old admission
+	// row remains but its intent ID no longer matches the current challenge.
+	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.passkey_registration_intents "+
+		"SET expires_at=issued_at+interval '1 millisecond' WHERE subject_id=$1",
+		subject); err != nil {
+		t.Fatal(err)
+	}
+	replacement, err := issuer.Begin(ctx, bearer)
+	if err != nil || replacement.IntentID() == intent.IntentID() {
+		t.Fatalf("expired v30 intent did not rotate: %v", err)
+	}
+	var admissionIntent string
+	if err := admin.QueryRow(ctx,
+		"SELECT intent_id FROM mamony_identity.passkey_registration_admissions WHERE subject_id=$1",
+		subject).Scan(&admissionIntent); err != nil || admissionIntent != intent.IntentID() {
+		t.Fatal("new nonce silently inherited the previous password reauth")
+	}
+	// Only a NEW purpose-specific grant can approve a superseding nonce;
+	// in this disposable SQL fixture, the trusted grant role simulates a
+	// separate already-verified password event.
+	replacementProof := sha256.Sum256([]byte("reauth-for-replacement-" + subject))
+	if err := grantConn.QueryRow(ctx,
+		"SELECT mamony_identity.stage_passkey_registration_reauth_grant($1,$2,$3)",
+		subject, epoch, replacementProof[:]).Scan(&staged); err != nil || !staged {
+		t.Fatalf("could not stage independent replacement reauth assertion: %v", err)
+	}
+	if accepted, err := admStore.Admit(ctx, sessionDigest, replacement.IntentID(),
+		replacementProof); err != nil || !accepted {
+		t.Fatalf("separately proven new intent not admitted: %t %v", accepted, err)
+	}
+	if countAdmissions() != 1 {
+		t.Fatal("passkey admission cardinality exceeded one per subject")
+	}
+	if err := admin.QueryRow(ctx,
+		"SELECT intent_id FROM mamony_identity.passkey_registration_admissions WHERE subject_id=$1",
+		subject).Scan(&admissionIntent); err != nil || admissionIntent != replacement.IntentID() {
+		t.Fatal("new purpose-bound grant failed to replace old intent binding")
+	}
 	if _, err := admin.Exec(ctx,
 		"UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1",
 		subject); err != nil {
