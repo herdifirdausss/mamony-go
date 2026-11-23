@@ -96,4 +96,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.read_passkey_registration_intent(
 -- default-deny future separate ADRs and code reviews.
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (31, 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (31, '6c1ebb2661e6728c64a8f203cadd6f0f703c1f0e34cc614551f45d6eb5e5986c');
