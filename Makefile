@@ -5,7 +5,7 @@ check: fmt-check vet unit architecture docs skills migrations-check build
 
 fmt-check:
 	@gofmt -l .
-	@test -z "`gofmt -l .`" || { echo "gofmt required"; exit 1; }
+	@test -z "`gofmt -l .`" || { gofmt -d .; echo "gofmt required"; exit 1; }
 
 vet:
 	go vet ./...

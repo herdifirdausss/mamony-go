@@ -27,5 +27,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0021 — Password recovery authority foundation](0021-password-recovery-authority-foundation.md) | PROPOSED: 256-bit domain-separated recovery proof primitive and threat model; no issuance, SQL authority, public recovery route or password reset. |
 | [ADR-0022 — Password recovery issuance and sealed outbox](0022-password-recovery-issuance-outbox.md) | PROPOSED: Identity v19 dedicated EXECUTE-only issuer, independent HMAC recovery budget and atomic challenge/ciphertext queue; no HTTP, worker or redemption. |
 | [ADR-0023 — Recovery AEAD and fenced delivery worker](0023-password-recovery-delivery-worker.md) | PROPOSED: Identity v20 EXECUTE-only lease/finalize worker, separate AES-GCM recovery keys, bounded Mailgun adapter and local mock tests; no live send or reset. |
+| [ADR-0024 — Assurance-gated atomic recovery redemption](0024-atomic-password-recovery-redemption.md) | PROPOSED: Identity v21 separate EXECUTE-only one-use recovery authority, default-deny assurance grant, global session epoch rotation and token-free recovery notice; no public reset. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
