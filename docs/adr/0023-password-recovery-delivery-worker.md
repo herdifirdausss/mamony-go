@@ -1,0 +1,32 @@
+# ADR 0023 — Recovery-purpose AEAD and fenced encrypted delivery worker (Identity v20)
+
+Status: **PROPOSED / stacked Draft PR #60**, based on Draft #59. Do not merge, deploy or enable any public route, mail process, live secrets or external Mailgun provider from this change. No recovery-token redemption, password reset, session mutation or financial authorization exists.
+
+## Why this is a separate sender
+
+Registration email proofs belong to UNVERIFIED contact activation, while forgot-password tokens are sensitive account-control capabilities for ACTIVE, currently verified subjects. Their key material, challenge IDs, verified-recipient eligibility, policy and worker credentials must not be interchangeable. The v19 `password_recovery_deliveries` table already persists encrypted obligations; v20 adds only an explicitly constructed, **unlaunched** worker and two owner-controlled SQL functions.
+
+## Recovery envelope and Mailgun adapter
+
+`mailcrypto.RecoveryKeyring` accepts one explicitly active 32-byte AES-256-GCM key and up to eight rotating key IDs injected by trusted code; production keys must come from an independently protected recovery-purpose secret source, not the registration-verification keyring. Sealing and opening require a canonical email, a `rcv_` challenge ID and the exact recovery-domain AEAD AAD `mamony:identity:recovery-envelope:v1\0<alias>\0<challenge>\0PASSWORD_RECOVERY`. The encoded 32-byte bearer is canonical 43-character base64url; nonce is a fresh 96-bit CSPRNG value; ciphertext length is exactly 71 bytes. Wrong alias, challenge, key, nonce/tag, purpose or ciphertext length fails without leaking plaintext. A retired encryption key may be held as read-only until queued jobs drain; then revoke.
+
+`mailgun.RecoveryMailSender` is **not** the email verification sender or password-changed notification sender. It requires pinned HTTPS `/account/recover-password` landing URL, a configured allowlisted Mailgun region/sending domain/from address and no untrusted HTTP Host or open redirects. A token is placed only in the URL **fragment**, never the query, and the message has no HTML, tracking, personalization or recipient-supplied template. Provider acknowledgement must contain a valid message ID; 429/408/420/5xx or transport ambiguity is retryable, most 4xx are terminal. Errors are sanitized, because provider failures may include secret URLs. It is **not safe to send any live recovery email** until the landing page, redeem API, MFA/assurance policy and operational review are independently completed. A future recipient page must scrub the fragment before any third-party subresource, and never consume a proof on GET.
+
+## Identity v20 SQL authority and state
+
+New role `mamony_identity_recovery_delivery_runtime` (disposable synthetic fixture only) has **schema USAGE and EXECUTE only**, on:
+- `claim_password_recovery_delivery(lease_id)`: picks one due PENDING row with `FOR UPDATE OF d SKIP LOCKED`, 45-second lease, at most five attempts and an independent database-clock eligibility recheck. The original ACTIVE subject, current verified contact, canonical recipient, contact version, subject epoch, unconsumed/unrevoked proof and at least 15 seconds remaining on the 15-minute challenge must all match. A stale row is atomically marked DEAD and returned as **non-sendable with empty recipient, key and ciphertext**; the adapter discards it. No untrusted caller selects a subject/challenge or reads the queue directly.
+- `finalize_password_recovery_delivery(challenge_id,lease_id,outcome)`: requires the current unexpired lease and an allowed outcome; advances attempts and clears lease. Temporary failures back off 1, 2, 4, 8 minutes, fifth attempt terminal DEAD. Accepted means **HTTP provider acceptance only**, not inbox delivery. A stale worker or replayed finalization fails; aborted transactions must not acknowledge delivery.
+
+Both functions check the original PostgreSQL `session_user`, reject unexpected callers and preserve the existing v19 and older SQL grants. Recovery worker cannot issue tokens, read account/password/session tables, create a session, redeem a challenge, change a verifier, read provider signing keys or inherit migrator privileges. Other Identity runtimes cannot claim recovery proof mail.
+
+**Race limitation:** a contact/status/epoch can change between the DB claim and the out-of-process provider request. This candidate rechecks at claim, not atomically with external delivery; it does **not** guarantee a token never reaches an address invalidated milliseconds later. Redemption **must** recheck current alias+version+epoch under lock and deny the previously issued proof. Network failure after provider acceptance can cause duplicate mail; the worker supplies stable challenge ID but Mailgun Messages API does not guarantee idempotence. These risks require owner-reviewed operational limits before launch.
+
+## Verification and rollout boundary
+
+- Unit tests: AEAD key rotation and wrong-purpose/ciphertext rejection; fake worker expiry/invalid-contact/decrypt failure and sanitized error classification; local Mailgun server validates exact pinned HTTPS fragment URL, Basic Auth, no tracking and 429/200/400 status classification.
+- Real PostgreSQL integration: restricted role matrix; lease fencing, retry/backoff, finalization, expired/suspended subject quarantine with **no recipient or ciphertext** disclosed. Test fixtures are synthetic and isolated.
+- Real PostgreSQL + local HTTP Mailgun mock: v19 anonymous admission, real recovery AEAD seal and digest, v20 worker claim/open, provider 429 then 200 and **same secret** on retry, status ACCEPTED after two sends, unknown-account no durable issue, no password/session mutation. No live provider.
+- All five GitHub Actions gates must succeed on the **exact final HEAD SHA**. Default application routers stay 404 for recovery request, redemption and landing page.
+
+Remaining blockers: verified production recovery AEAD key provisioning and rotation; actual HTTPS first-party reset page; one-use token redeem with DB single-transaction verifier rotation and session-epoch revocation; separate provenance-checked `PASSWORD_RECOVERED` alert; MFA/assurance and anti-enumeration timing approval; provider deliverability/suppression/bounces, stale ciphertext retention/backup erasure, edge abuse protection, operational/on-call and recovery incident response. No public recovery user experience exists in this Draft.
