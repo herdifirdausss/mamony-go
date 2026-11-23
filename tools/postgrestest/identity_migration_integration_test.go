@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "33:false" {
-		t.Fatalf("identity migration should be at clean version 33: %q err=%v", out, err)
+	if err != nil || out != "34:false" {
+		t.Fatalf("identity migration should be at clean version 34: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "33" {
+	if err != nil || out != "34" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -1500,5 +1500,103 @@ func TestPostgresIdentityZPasskeyRegistrationStageRole(t *testing.T) {
 		FROM pg_roles WHERE rolname=current_user`)
 	if err != nil || out != "true" {
 		t.Fatalf("passkey staging role unexpectedly elevated: out=%q err=%v", out, err)
+	}
+}
+
+// TestPostgresIdentityZPasskeyActivationRoles requires isolated v34 issuer
+// and expected-credential reader. Neither principal can access tables,
+// mint sessions, bind credentials, stage proofs, or invoke the other's SQL.
+func TestPostgresIdentityZPasskeyActivationRoles(t *testing.T) {
+	const issue = "SELECT mamony_identity.issue_passkey_activation_challenge(" +
+		"decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex')," +
+		"'pav_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('33',32),'hex')," +
+		"'login.example.test','https://login.example.test')"
+	const read = "SELECT * FROM mamony_identity.read_passkey_activation_challenge(" +
+		"decode(repeat('11',32),'hex'),'pav_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL", "-c", issue)
+	if err != nil || out != "f" {
+		t.Fatalf("unknown session staged activation nonce: out=%q err=%v", out, err)
+	}
+	out, err = invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL", "-c", read)
+	if err != nil || out != "" {
+		t.Fatalf("untrusted session released COSE public key: out=%q err=%v", out, err)
+	}
+	deniedSQL := []string{
+		"SELECT * FROM mamony_identity.passkey_credentials",
+		"SELECT * FROM mamony_identity.passkey_activation_challenges",
+		"SELECT * FROM mamony_identity.passkey_registration_intents",
+		"SELECT * FROM mamony_identity.passkey_registration_admissions",
+		"SELECT * FROM mamony_identity.passkey_registration_notices",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.password_login_grants",
+		"SELECT * FROM mamony_identity.recovery_code_factor_keys",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"UPDATE mamony_identity.passkey_credentials SET state='PENDING_ASSERTION'",
+		"DELETE FROM mamony_identity.passkey_credentials",
+		"UPDATE mamony_identity.passkey_activation_challenges SET consumed_at=clock_timestamp()",
+		"DELETE FROM mamony_identity.passkey_activation_challenges",
+		"INSERT INTO mamony_identity.passkey_activation_challenges(subject_id) VALUES ('sub_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.admit_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'))",
+		"SELECT mamony_identity.stage_passkey_registration_reauth_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'))",
+		"SELECT mamony_identity.issue_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'login.example.test','https://login.example.test')",
+		"CREATE TABLE mamony_identity.passkey_activation_role_escape(v integer)",
+		"SET ROLE mamony_identity_migrator",
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL",
+	} {
+		for _, stmt := range deniedSQL {
+			out, err := invokePSQL(role, "-c", stmt)
+			if err == nil || !strings.Contains(out, "42501") {
+				t.Fatalf("v34 runtime bypassed role boundary: role=%s sql=%q out=%q err=%v", role, stmt, out, err)
+			}
+		}
+	}
+	// Exact capability separation, even between the two new principals.
+	for _, scenario := range []struct{ role, stmt string }{
+		{"TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL", read},
+		{"TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL", issue},
+	} {
+		out, err := invokePSQL(scenario.role, "-c", scenario.stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("v34 issuer/reader privileges overlapped: role=%s out=%q err=%v", scenario.role, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		for _, stmt := range []string{issue, read} {
+			out, err := invokePSQL(role, "-c", stmt)
+			if err == nil || !strings.Contains(out, "42501") {
+				t.Fatalf("unrelated role acquired activation evidence authority: role=%s out=%q err=%v", role, out, err)
+			}
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL",
+	} {
+		out, err := invokePSQL(role, "-c", `SELECT
+			(NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+			AND NOT rolreplication AND NOT rolbypassrls)::text
+			FROM pg_roles WHERE rolname=current_user`)
+		if err != nil || out != "true" {
+			t.Fatalf("activation role elevated: role=%s out=%q err=%v", role, out, err)
+		}
 	}
 }
