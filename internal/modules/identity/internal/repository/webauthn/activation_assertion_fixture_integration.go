@@ -49,9 +49,9 @@ func (s *SyntheticActivationSigner) SignedResponse(
 		return nil, errors.New("invalid test assertion inputs")
 	}
 	client, err := json.Marshal(map[string]any{
-		"type": "webauthn.get",
-		"origin": "https://login.example.test",
-		"challenge": base64.RawURLEncoding.EncodeToString(challenge[:]),
+		"type":        "webauthn.get",
+		"origin":      "https://login.example.test",
+		"challenge":   base64.RawURLEncoding.EncodeToString(challenge[:]),
 		"crossOrigin": false,
 	})
 	if err != nil {
@@ -74,10 +74,10 @@ func (s *SyntheticActivationSigner) SignedResponse(
 	return json.Marshal(map[string]any{
 		"id": id, "rawId": id, "type": "public-key",
 		"response": map[string]any{
-			"clientDataJSON": base64.RawURLEncoding.EncodeToString(client),
+			"clientDataJSON":    base64.RawURLEncoding.EncodeToString(client),
 			"authenticatorData": base64.RawURLEncoding.EncodeToString(authData),
-			"signature": base64.RawURLEncoding.EncodeToString(sig),
-			"userHandle": base64.RawURLEncoding.EncodeToString([]byte(subject)),
+			"signature":         base64.RawURLEncoding.EncodeToString(sig),
+			"userHandle":        base64.RawURLEncoding.EncodeToString([]byte(subject)),
 		},
 	})
 }
