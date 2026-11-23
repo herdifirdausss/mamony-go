@@ -1348,7 +1348,6 @@ func TestPostgresIdentityZPasskeyRegistrationReaderRole(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZPasskeyRegistrationAdmissionRole verifies the v32
 // admission principal may consume only a purpose-bound fresh-password grant
 // against an already issued, session-bound passkey intent. It cannot stage
