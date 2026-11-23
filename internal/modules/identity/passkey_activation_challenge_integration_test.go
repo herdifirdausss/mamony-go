@@ -16,6 +16,7 @@ import (
 	"time"
 
 	identitypg "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/postgres"
+	identitywa "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/webauthn"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	platformpg "github.com/herdifirdausss/mamony-go/internal/platform/postgres"
 	"github.com/jackc/pgx/v5"
