@@ -282,10 +282,6 @@ func TestIdentityMailgunMockRecoveryCodeSecurityNotice(t *testing.T) {
 	if _,err:=ReadRecoveryCodeSecurityNoticeHealth(ctx,noticeDSN);err==nil{
 		t.Fatal("sender could use monitor credential")
 	}
-	if _,err:=store.Claim(ctx,"lse_AAAAAAAAAAAAAAAAAAAAAA");err==nil {
-		// The sender has no eligible further item; a 4-value claim needs
-		// an intentional typed unpack in tests outside this branch.
-	}
 	// Prove lease fencing, stale-recipient screening and mandatory retention
 	// using a synthetic third legitimate v25 rotation event.
 	grant = freshGrant("rotation-after-acceptance")
