@@ -35,3 +35,21 @@ Reproduce locally only after creating the standard disposable PostgreSQL 18 loop
 - The test uses **real database authority but a synthetic password hasher**, and all remote provider calls are mocks. Real secrets/key rotation, actual sign-in, account status query after ambiguous verification, accessibility on actual assistive technology, production observability and global rate limits remain open.
 - A missing or ambiguous HTTP response **never proves the commit did not occur**. The client may need a verified-account status check once a safe login flow exists; it must not silently retry or reissue a single-use bearer.
 - These tests are opt-in by build tag and candidate-only. Passing CI is **not** approval to mount any Identity endpoints or merge stacked Draft PRs into `main`.
+
+## Stacked Draft PR #44 — real Chromium first-party sessions
+
+A second test-only suite, `TestIdentityZBrowserSessionE2E`, uses real 64 MiB Argon2id, password verifier SELECT-only role, durable pre-KDF login admission, verified-email transition and the PostgreSQL v10 session issue/resolve/revoke authority. A disposable Go HTTPS mux manually constructs the **unmounted** browser-session candidate from [ADR-0008](../adr/0008-unmounted-browser-session-http-candidate.md). Browser requests are bridged from the exact `https://app.example.test` origin to loopback, forwarding Chromium-generated Origin, any Fetch Metadata supplied by the Playwright route and browser cookie behavior. The routing bridge may omit Sec-Fetch-Site; separate HTTP boundary tests assert strict rejection of hostile supplied values. No deployed route, mail provider, reverse proxy or application composition is changed.
+
+Actual Chromium proves that the `__Host-mamony_sid` response cookie is accepted with host-only, Secure, HttpOnly, SameSite=Strict and Path=/ properties; browser JavaScript cannot access the bearer through document.cookie or fetch response headers. Same-origin fetch attaches the cookie; wrong password does not issue it. The client can read only the authenticated boolean and a distinct 15-minute session-bound CSRF token. A cross-site browser POST from a different registrable domain cannot carry the Strict cookie; the server independently rejects its Origin with 403 and cannot revoke the session. A separate same-site-but-cross-origin sibling (`https://attacker.example.test`) demonstrates that `SameSite=Strict` **does** permit the host-only cookie to be sent back to `app.example.test` on a cross-origin request; the independent exact Origin check still denies that POST with 403. Since Playwright route.fulfill can bypass native browser CORS filtering, this fixture makes **no independent CORS enforcement claim**. Invalid/missing and previous-session CSRF values cannot logout. A valid logout clears the browser cookie and revokes the authoritative session.
+
+The fixture then **drops the final logout response after the PostgreSQL revoke committed**. Chromium retains its cookie because it never received the deletion, but the actual Resolve rejects it; no client-side automatic replay occurs. This demonstrates why a lost response must not be reported as a confirmed logout to the user. Database evidence checks exactly two SESSION_CREATED and two SESSION_REVOKED events, and both application listeners still return 404 for all session paths.
+
+The pinned Chromium/PostgreSQL CI job now runs both browser tests:
+
+```sh
+go test -tags=integration,browser_e2e \
+  -run '^TestIdentityZBrowser(Verification|Session)E2E$' \
+  -count=1 -timeout=4m ./internal/modules/identity
+```
+
+The test bridge is **not** a production DNS, TLS ingress or proxy test. A browser E2E passing does not resolve the `mamony_identity_session_runtime` direct-mint privilege, production CSRF key management, MFA, financial authorization or release gates. Keep #43 and #44 Draft and all candidate routes unmounted.

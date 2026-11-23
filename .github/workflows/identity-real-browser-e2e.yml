@@ -61,7 +61,7 @@ jobs:
         run: tools/browsercheck/node_modules/.bin/playwright install --with-deps --only-shell chromium
       - name: Bootstrap disposable roles and run all required database gates
         run: make integration
-      - name: Run actual Chromium with local TLS and real PostgreSQL verification
+      - name: Run actual Chromium for email verification and first-party sessions
         run: |
-          go test -tags=integration,browser_e2e -run '^TestIdentityZBrowserVerificationE2E$' \
-            -count=1 -timeout=3m ./internal/modules/identity
+          go test -tags=integration,browser_e2e -run '^TestIdentityZBrowser(Verification|Session)E2E$' \
+            -count=1 -timeout=4m ./internal/modules/identity
