@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "9:false" {
-		t.Fatalf("identity migration should be at clean version 9: %q err=%v", out, err)
+	if err != nil || out != "10:false" {
+		t.Fatalf("identity migration should be at clean version 10: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "9" {
+	if err != nil || out != "10" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -241,5 +241,61 @@ func TestPostgresIdentityZAuthenticatorRole(t *testing.T) {
 		FROM pg_roles WHERE rolname=current_user`)
 	if err != nil || out != "true" {
 		t.Fatalf("authenticator must not inherit elevated DB privilege: %v %s", err, out)
+	}
+}
+
+// TestPostgresIdentityZSessionRole verifies that the dedicated session runtime
+// only executes three reviewed SECURITY DEFINER functions and no direct SQL.
+func TestPostgresIdentityZSessionRole(t *testing.T) {
+	for _, stmt := range []string{
+		"SELECT mamony_identity.issue_opaque_session('invalid',decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.resolve_opaque_session(decode(repeat('22',32),'hex')) IS NULL",
+		"SELECT mamony_identity.revoke_opaque_session(decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_SESSION_URL", "-c", stmt)
+		if err != nil {
+			t.Fatalf("approved session function denied: %q %s %v", stmt, out, err)
+		}
+	}
+	for _, sql := range []string{
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT token_digest FROM mamony_identity.opaque_sessions LIMIT 1",
+		"INSERT INTO mamony_identity.opaque_sessions (token_digest) VALUES ('\\x00'::bytea)",
+		"UPDATE mamony_identity.opaque_sessions SET revoked_at=now()",
+		"DELETE FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT session_epoch FROM mamony_identity.subjects LIMIT 1",
+		"UPDATE mamony_identity.subjects SET status='ACTIVE'",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT digest FROM mamony_identity.password_verifiers LIMIT 1",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"INSERT INTO mamony_identity.security_outbox (event_id) VALUES ('bad')",
+		"SELECT * FROM mamony_identity.email_verification_challenges",
+		"SELECT * FROM mamony_identity.anonymous_admission_buckets",
+		"SELECT mamony_identity.purge_expired_opaque_sessions()",
+		"SELECT * FROM mamony_identity.migration_fingerprints",
+		"SET ROLE mamony_identity_migrator",
+		"CREATE TABLE mamony_identity.session_escape(id integer)",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_SESSION_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("session role gained forbidden privilege: %q err=%v out=%s", sql, err, out)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL", "TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_VERIFIER_URL", "TEST_IDENTITY_DELIVERY_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c",
+			"SELECT mamony_identity.issue_opaque_session('invalid',decode(repeat('22',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')")
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("non-session role could mint: %s err=%v out=%s", role, err, out)
+		}
+	}
+	out, err := invokePSQL("TEST_IDENTITY_SESSION_URL", "-c",
+		"SELECT (NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls)::text FROM pg_roles WHERE rolname=current_user")
+	if err != nil || out != "true" {
+		t.Fatalf("session runtime has elevated privileges: err=%v out=%s", err, out)
 	}
 }
