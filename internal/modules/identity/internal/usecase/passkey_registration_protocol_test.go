@@ -92,7 +92,7 @@ func TestPasskeyProofVerifierRejectsUntrustedOrIncompleteEvidence(t *testing.T) 
 	t.Parallel()
 	v, store, proto, bearer := passkeyProofFixture(t)
 	id := "wrg_AAAAAAAAAAAAAAAAAAAAAA"
-	for _, bad := range [][]byte{nil, []byte{}, make([]byte, (128<<10)+1)} {
+	for _, bad := range [][]byte{nil, {}, make([]byte, (128<<10)+1)} {
 		if got, err := v.VerifyOnly(context.Background(), bearer, id, bad); !errors.Is(err, ErrPasskeyProtocolDenied) || len(got.CredentialID) != 0 {
 			t.Fatalf("bad payload reached protocol verifier: %v", err)
 		}
