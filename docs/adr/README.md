@@ -39,5 +39,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0033 — Strict WebAuthn RP before enrollment](0033-webauthn-relying-party-pre-enrollment.md) | PROPOSED: exact pinned HTTPS RP ID/origin with negative routing tests and independent binding decisions; **no** WebAuthn ceremony, key enrollment or AAL claim. |
 | [ADR-0034 — Durable WebAuthn registration intents](0034-webauthn-registration-intent.md) | PROPOSED: v30 single live session/epoch/RP-bound 3-minute challenge, dedicated EXECUTE-only issuer and no finish/credential binding authority; unmounted Draft. |
 | [ADR-0035 — Isolated WebAuthn registration evidence reader](0035-webauthn-registration-evidence-reader.md) | PROPOSED: v31 session/epoch/intent-bound expected-challenge reader, strictly separated EXECUTE-only role; no verifier/credential registration/finish authority. |
+| [ADR-0036 — Unmounted WebAuthn registration protocol verifier](0036-webauthn-registration-protocol-verifier.md) | PROPOSED: pinned go-webauthn v0.18.2 verifies challenge/origin/RP/UP/UV/attestation against v31 expected nonce; candidate only, no finish or binding. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
