@@ -126,7 +126,7 @@ TO mamony_identity_recovery_code_notice_webhook_runtime;
 
 -- The original five-field v26 health function retains its ABI. Its
 -- submitted-unconfirmed metric is corrected to exclude DELIVERED, bounce,
--- complaint and unsubscribe states, including v23 callback updates.
+-- complaint and unsubscribe states, including v27 callback updates.
 CREATE OR REPLACE FUNCTION mamony_identity.recovery_code_security_notice_health()
 RETURNS TABLE(pending_due bigint,dead bigint,submitted_unconfirmed bigint,
               retrying bigint,expired_pending bigint)
