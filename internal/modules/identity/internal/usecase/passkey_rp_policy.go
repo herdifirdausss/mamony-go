@@ -34,8 +34,8 @@ func NewPasskeyRelyingParty(rpID, origin string) (PasskeyRelyingParty, error) {
 	return PasskeyRelyingParty{id: rpID, origin: origin}, nil
 }
 
-func (r PasskeyRelyingParty) RPID() string    { return r.id }
-func (r PasskeyRelyingParty) Origin() string  { return r.origin }
+func (r PasskeyRelyingParty) RPID() string   { return r.id }
+func (r PasskeyRelyingParty) Origin() string { return r.origin }
 func (r PasskeyRelyingParty) Configured() bool {
 	return r.id != "" && r.origin == "https://"+r.id && validPasskeyRPID(r.id)
 }
