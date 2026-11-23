@@ -86,6 +86,9 @@ type RecoveryCodeSecurityNoticeHealth struct {
 	SubmittedUnconfirmed int64
 	Retrying             int64
 	ExpiredPending       int64
+	Delivered            int64
+	ProviderFailures     int64
+	UnmatchedEvents      int64
 }
 
 type RecoveryCodeSecurityNoticeHealthStore struct{ db Transactor }
@@ -103,10 +106,15 @@ func (s *RecoveryCodeSecurityNoticeHealthStore) Read(ctx context.Context) (Recov
 		return result, ErrStorageUnavailable
 	}
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx,
+		if err := tx.QueryRow(ctx,
 			"SELECT * FROM mamony_identity.recovery_code_security_notice_health()").Scan(
 			&result.PendingDue, &result.Dead, &result.SubmittedUnconfirmed,
-			&result.Retrying, &result.ExpiredPending)
+			&result.Retrying, &result.ExpiredPending); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx,
+			"SELECT * FROM mamony_identity.recovery_code_security_notice_delivery_health()").Scan(
+			&result.Delivered, &result.ProviderFailures, &result.UnmatchedEvents)
 	})
 	if err != nil {
 		return RecoveryCodeSecurityNoticeHealth{}, ErrStorageUnavailable

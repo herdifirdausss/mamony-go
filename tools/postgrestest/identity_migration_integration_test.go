@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "26:false" {
-		t.Fatalf("identity migration should be at clean version 26: %q err=%v", out, err)
+	if err != nil || out != "27:false" {
+		t.Fatalf("identity migration should be at clean version 27: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "26" {
+	if err != nil || out != "27" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -1055,6 +1055,81 @@ func TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles(t *testing.T) {
 		out, err = invokePSQL(role, "-c", monitor)
 		if err == nil || !strings.Contains(out, "42501") {
 			t.Fatalf("unrelated role could monitor code-change alerts: role=%s out=%s err=%v", role, out, err)
+		}
+	}
+}
+
+// v27 recovery-code signed Mailgun role remains separate from v23 recovery notices.
+func TestPostgresIdentityZRecoveryCodeNoticeWebhookRole(t *testing.T) {
+	const valid = "SELECT mamony_identity.record_mailgun_recovery_code_notice_receipt(" +
+		"decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex')," +
+		"decode(repeat('33',32),'hex'),'DELIVERED',clock_timestamp())"
+	out, err := invokePSQL("TEST_IDENTITY_RECOVERY_CODE_NOTICE_WEBHOOK_URL", "-c", valid)
+	if err != nil || out != "t" {
+		t.Fatalf("purpose-specific digest-only receipt recording denied: %s %v", out, err)
+	}
+	for _, stmt := range []string{
+		"CREATE TABLE mamony_identity.recovery_code_webhook_escape (id integer)",
+		"SELECT * FROM mamony_identity.password_recovery_code_notices",
+		"SELECT * FROM mamony_identity.recovery_code_notice_mailgun_receipts",
+		"SELECT * FROM mamony_identity.password_recovery_notices",
+		"SELECT * FROM mamony_identity.password_recovery_notice_mailgun_receipts",
+		"SELECT * FROM mamony_identity.password_recovery_offline_codes",
+		"SELECT * FROM mamony_identity.password_recovery_code_enrollment_approvals",
+		"SELECT * FROM mamony_identity.password_recovery_assurance_grants",
+		"SELECT * FROM mamony_identity.security_notice_mailgun_receipts",
+		"SELECT * FROM mamony_identity.password_change_notices",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.password_recovery_challenges",
+		"SELECT * FROM mamony_identity.password_recovery_assurance_grants",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"UPDATE mamony_identity.password_recovery_code_notices SET provider_state='DELIVERED'",
+		"DELETE FROM mamony_identity.recovery_code_notice_mailgun_receipts",
+		"SELECT * FROM mamony_identity.recovery_code_security_notice_health()",
+		"SELECT * FROM mamony_identity.recovery_code_security_notice_delivery_health()",
+		"SELECT mamony_identity.purge_old_recovery_code_notice_mailgun_receipts()",
+		"SELECT mamony_identity.record_mailgun_recovery_notice_receipt(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),'DELIVERED',clock_timestamp())",
+		"SELECT * FROM mamony_identity.claim_recovery_code_security_notice('lse_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT * FROM mamony_identity.password_recovery_notice_health()",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_CODE_NOTICE_WEBHOOK_URL", "-c", stmt)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("recovery receipt role escalated: query=%s out=%s err=%v", stmt, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_WEBHOOK_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_ASSURANCE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL",
+		"TEST_IDENTITY_NOTICE_WEBHOOK_URL",
+		"TEST_IDENTITY_SECURITY_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL",
+		"TEST_IDENTITY_RECOVERY_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_REDEEMER_URL",
+		"TEST_IDENTITY_RECOVERY_DELIVERY_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", valid)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("cross-purpose role recorded recovery webhook: role=%s out=%s err=%v", role, out, err)
+		}
+	}
+	for _, sql := range []string{
+		"SELECT * FROM mamony_identity.recovery_code_security_notice_health()",
+		"SELECT * FROM mamony_identity.recovery_code_security_notice_delivery_health()",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL", "-c", sql)
+		if err != nil || out == "" {
+			t.Fatalf("read-only recovery monitor lost approved aggregate: sql=%s err=%v", sql, err)
 		}
 	}
 }
