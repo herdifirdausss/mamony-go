@@ -21,7 +21,7 @@ func TestRepositoryMigrationFiles(t *testing.T) {
 func TestRepositoryIdentityMigrationFiles(t *testing.T) {
 	t.Parallel()
 	files, err := LoadIdentity(filepath.Join("..", "..", "..", "db", "migrations", "identity"))
-	if err != nil || len(files) != 30 {
+	if err != nil || len(files) != 31 {
 		t.Fatalf("committed identity SQL must pass fingerprint verification: files=%v err=%v", files, err)
 	}
 }
