@@ -41,6 +41,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_factor_verifier_runtime') THEN
         CREATE ROLE mamony_identity_recovery_factor_verifier_runtime LOGIN PASSWORD 'local-test-recovery-factor-verifier';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_passkey_registration_issuer_runtime') THEN
+        CREATE ROLE mamony_identity_passkey_registration_issuer_runtime LOGIN PASSWORD 'local-test-passkey-registration-issuer';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_code_manager_runtime') THEN
         CREATE ROLE mamony_identity_recovery_code_manager_runtime LOGIN PASSWORD 'local-test-identity-recovery-code-manager';
     END IF;
@@ -92,6 +95,7 @@ ALTER ROLE mamony_identity_recovery_code_notice_runtime LOGIN NOSUPERUSER NOCREA
 ALTER ROLE mamony_identity_recovery_code_notice_monitor_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-code-notice-monitor';
 ALTER ROLE mamony_identity_recovery_factor_issuer_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-recovery-factor-issuer';
 ALTER ROLE mamony_identity_recovery_factor_verifier_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-recovery-factor-verifier';
+ALTER ROLE mamony_identity_passkey_registration_issuer_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-passkey-registration-issuer';
 ALTER ROLE mamony_identity_recovery_code_manager_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-code-manager';
 ALTER ROLE mamony_identity_recovery_assurance_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-assurance';
 ALTER ROLE mamony_identity_recovery_redeemer_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-redeemer';
