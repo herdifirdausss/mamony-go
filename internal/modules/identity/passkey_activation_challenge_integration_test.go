@@ -16,6 +16,7 @@ import (
 	"time"
 
 	identitypg "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/postgres"
+	identitywa "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/webauthn"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	platformpg "github.com/herdifirdausss/mamony-go/internal/platform/postgres"
 	"github.com/jackc/pgx/v5"
@@ -154,7 +155,14 @@ func TestIdentityZPasskeyActivationChallenge(t *testing.T) {
 	// Privileged TEST-only stage. The maintained WebAuthn verifier's real
 	// positive/negative cases are tested in v33, not bypassed in production.
 	credentialID := bytes.Repeat([]byte{0x81}, 32)
-	publicKey := bytes.Repeat([]byte{0x84}, 64)
+	signer, err := identitywa.NewSyntheticActivationSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey, err := signer.PublicCOSE()
+	if err != nil {
+		t.Fatal(err)
+	}
 	candidate := usecase.PasskeyRegistrationCandidate{
 		CredentialID:      credentialID,
 		PublicKeyCOSE:     publicKey,
@@ -235,6 +243,43 @@ func TestIdentityZPasskeyActivationChallenge(t *testing.T) {
 		evidence.PolicyGeneration != 1 {
 		t.Fatalf("v34 reader did not preserve session-bound pending credential context: %v", err)
 	}
+	// v35: this is a REAL ES256 signed assertion, not a mocked crypto
+	// verifier. The public key was retrieved through the isolated v34
+	// PostgreSQL evidence reader and the nonce is the exact v34 issue.
+	assertionProtocol, err := identitywa.NewActivationAssertionVerifier(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertionVerifier, err := usecase.NewPasskeyActivationAssertionVerifier(reader, assertionProtocol)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedResponse, err := signer.SignedResponse(evidence.Nonce, credentialID, subject, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verified, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), signedResponse); err != nil || !verified.UserPresent || !verified.UserVerified ||
+		verified.Counter != 1 || !bytes.Equal(verified.CredentialID, credentialID) {
+		t.Fatalf("v35 signed activation assertion with DB-owned key rejected: %v", err)
+	}
+	// VerifyOnly MUST NOT consume: replay remains cryptographically valid.
+	// The future v36 atomic commit must fence the nonce against replay.
+	if _, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), signedResponse); err != nil {
+		t.Fatalf("read-only v35 verifier unexpectedly consumed challenge: %v", err)
+	}
+	if _, err := assertionVerifier.VerifyOnly(ctx, otherBearer, issued.ChallengeID(), signedResponse); !errors.Is(err, usecase.ErrPasskeyAssertionDenied) {
+		t.Fatal("other live session was able to verify credential assertion")
+	}
+	badNonce := evidence.Nonce
+	badNonce[0] ^= 0x40
+	wrongResponse, err := signer.SignedResponse(badNonce, credentialID, subject, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := assertionVerifier.VerifyOnly(ctx, bearer, issued.ChallengeID(), wrongResponse); !errors.Is(err, usecase.ErrPasskeyAssertionDenied) {
+		t.Fatal("v35 verified signature over a wrong challenge")
+	}
+
 	if _, err := reader.Read(ctx, otherBearer, issued.ChallengeID()); !errors.Is(err, usecase.ErrPasskeyActivationDenied) {
 		t.Fatalf("second live session read original activation evidence: %v", err)
 	}
