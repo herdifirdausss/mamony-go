@@ -34,7 +34,11 @@ func (s *SyntheticActivationSigner) PublicCOSE() ([]byte, error) {
 	if s == nil || s.private == nil {
 		return nil, errors.New("missing test key")
 	}
-	pub := elliptic.Marshal(elliptic.P256(), s.private.PublicKey.X, s.private.PublicKey.Y)
+	publicECDH, err := s.private.PublicKey.ECDH()
+	if err != nil {
+		return nil, err
+	}
+	pub := publicECDH.Bytes()
 	return cbor.Marshal(map[int]any{
 		1: 2, 3: -7, -1: 1, -2: pub[1:33], -3: pub[33:65],
 	})
