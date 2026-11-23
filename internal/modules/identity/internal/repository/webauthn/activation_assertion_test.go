@@ -22,15 +22,15 @@ import (
 // P-256 TEST key and serializes that key as a COSE EC2 public key.
 // This is never a copied fixture or a mock cryptographic verifier.
 type assertionFixture struct {
-	challenge [32]byte
-	rpID string
-	origin string
-	ceremonyType string
-	flags byte
-	counter uint32
-	id []byte
-	userHandle []byte
-	crossOrigin bool
+	challenge       [32]byte
+	rpID            string
+	origin          string
+	ceremonyType    string
+	flags           byte
+	counter         uint32
+	id              []byte
+	userHandle      []byte
+	crossOrigin     bool
 	tamperSignature bool
 }
 
@@ -184,8 +184,8 @@ func TestPasskeyActivationAssertionRejectsAlteredSignatureAndCeremony(t *testing
 	key := signedTestKey(t)
 	v := assertionVerifier(t)
 	for _, tc := range []struct {
-		name string
-		opts assertionFixture
+		name   string
+		opts   assertionFixture
 		mutate func(*usecase.PasskeyActivationEvidence)
 	}{
 		{"tampered signature", assertionFixture{flags: 0x05, counter: 1, tamperSignature: true}, nil},
