@@ -27,9 +27,9 @@ func NewActivationAssertionVerifier(rp usecase.PasskeyRelyingParty) (*Activation
 		return nil, usecase.ErrPasskeyAssertionUnavailable
 	}
 	engine, err := gowebauthn.New(&gowebauthn.Config{
-		RPID: rp.RPID(),
-		RPOrigins: []string{rp.Origin()},
-		RPDisplayName: "Mamony",
+		RPID:               rp.RPID(),
+		RPOrigins:          []string{rp.Origin()},
+		RPDisplayName:      "Mamony",
 		RPAllowCrossOrigin: false,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			UserVerification: protocol.VerificationRequired,
@@ -81,30 +81,30 @@ func (v *ActivationAssertionVerifier) VerifyAssertion(ctx context.Context,
 		flags |= protocol.FlagBackupState
 	}
 	credential := gowebauthn.Credential{
-		ID: append([]byte(nil), expected.CredentialID...),
+		ID:        append([]byte(nil), expected.CredentialID...),
 		PublicKey: append([]byte(nil), expected.PublicKeyCOSE...),
-		Flags: gowebauthn.NewCredentialFlags(flags),
+		Flags:     gowebauthn.NewCredentialFlags(flags),
 		Authenticator: gowebauthn.Authenticator{
-			AAGUID: append([]byte(nil), expected.AAGUID[:]...),
+			AAGUID:    append([]byte(nil), expected.AAGUID[:]...),
 			SignCount: expected.SignCount,
 		},
 		AttestationFormat: "none", // No claimed verified manufacturer provenance.
-		AttestationType: "none",
+		AttestationType:   "none",
 	}
 	user := activationAssertionUser{
-		subject: expected.Subject,
+		subject:    expected.Subject,
 		credential: credential,
 	}
 	session := gowebauthn.SessionData{
-		Challenge: base64.RawURLEncoding.EncodeToString(expected.Nonce[:]),
+		Challenge:      base64.RawURLEncoding.EncodeToString(expected.Nonce[:]),
 		RelyingPartyID: expected.RPID,
-		Origin: expected.Origin,
-		UserID: user.WebAuthnID(),
+		Origin:         expected.Origin,
+		UserID:         user.WebAuthnID(),
 		AllowedCredentialIDs: [][]byte{
 			append([]byte(nil), expected.CredentialID...),
 		},
 		UserVerification: protocol.VerificationRequired,
-		Mediation: protocol.MediationDefault,
+		Mediation:        protocol.MediationDefault,
 	}
 	verified, err := v.engine.ValidateLogin(user, session, parsed)
 	if err != nil || verified == nil || ctx.Err() != nil ||
@@ -123,12 +123,12 @@ func (v *ActivationAssertionVerifier) VerifyAssertion(ctx context.Context,
 		return denied, usecase.ErrPasskeyAssertionDenied
 	}
 	return usecase.PasskeyActivationAssertionResult{
-		CredentialID: append([]byte(nil), verified.ID...),
-		Counter: counter,
-		UserPresent: true,
-		UserVerified: true,
+		CredentialID:   append([]byte(nil), verified.ID...),
+		Counter:        counter,
+		UserPresent:    true,
+		UserVerified:   true,
 		BackupEligible: rawFlags.HasBackupEligible(),
-		BackupState: rawFlags.HasBackupState(),
+		BackupState:    rawFlags.HasBackupState(),
 	}, nil
 }
 
@@ -137,8 +137,8 @@ type activationAssertionUser struct {
 	credential gowebauthn.Credential
 }
 
-func (u activationAssertionUser) WebAuthnID() []byte { return []byte(u.subject) }
-func (u activationAssertionUser) WebAuthnName() string { return "Mamony identity" }
+func (u activationAssertionUser) WebAuthnID() []byte          { return []byte(u.subject) }
+func (u activationAssertionUser) WebAuthnName() string        { return "Mamony identity" }
 func (u activationAssertionUser) WebAuthnDisplayName() string { return "Mamony identity" }
 func (u activationAssertionUser) WebAuthnCredentials() []gowebauthn.Credential {
 	return []gowebauthn.Credential{u.credential}
