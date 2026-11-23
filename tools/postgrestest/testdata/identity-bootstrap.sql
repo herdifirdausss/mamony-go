@@ -20,6 +20,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_notice_runtime') THEN
         CREATE ROLE mamony_identity_recovery_notice_runtime LOGIN PASSWORD 'local-test-identity-recovery-notice';
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_notice_webhook_runtime') THEN
+        CREATE ROLE mamony_identity_recovery_notice_webhook_runtime LOGIN PASSWORD 'local-test-identity-recovery-notice-webhook';
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mamony_identity_recovery_notice_monitor_runtime') THEN
         CREATE ROLE mamony_identity_recovery_notice_monitor_runtime LOGIN PASSWORD 'local-test-identity-recovery-notice-monitor';
     END IF;
@@ -61,6 +64,7 @@ ALTER ROLE mamony_identity_verifier_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREAT
 ALTER ROLE mamony_identity_authenticator_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-authenticator';
 ALTER ROLE mamony_identity_auth_grant_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-auth-grant';
 ALTER ROLE mamony_identity_recovery_notice_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice';
+ALTER ROLE mamony_identity_recovery_notice_webhook_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice-webhook';
 ALTER ROLE mamony_identity_recovery_notice_monitor_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-notice-monitor';
 ALTER ROLE mamony_identity_recovery_redeemer_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-redeemer';
 ALTER ROLE mamony_identity_recovery_delivery_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD 'local-test-identity-recovery-delivery';
