@@ -177,8 +177,8 @@ func TestIdentityMailgunMockRecoveryCodeNoticeWebhookReconciliation(t *testing.T
 	var mu sync.Mutex
 	requests := map[string]int{}
 	senderIDs := map[string]string{
-		"RECOVERY_CODES_ENROLLED": "created-code-notice@mailgun.test",
-		"RECOVERY_CODES_ROTATED":  "rotated-code-notice@mailgun.test",
+		"RECOVERY_CODES_ENROLLED": "created-code-webhook-notice@mailgun.test",
+		"RECOVERY_CODES_ROTATED":  "rotated-code-webhook-notice@mailgun.test",
 	}
 	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		mu.Lock()
@@ -265,7 +265,7 @@ func TestIdentityMailgunMockRecoveryCodeNoticeWebhookReconciliation(t *testing.T
 	// Provider webhook arrives BEFORE an API ACK: persist a separate
 	// purpose-specific digest-only receipt, reconcile when ACK commits.
 	early := signedMockSecurityWebhook(t, signingKey, clock, strings.Repeat("a", 50),
-		"recovery-code-early-delivered", "<created-code-notice@mailgun.test>", "delivered", "")
+		"recovery-code-early-delivered", "<created-code-webhook-notice@mailgun.test>", "delivered", "")
 	if status := deliverWebhook(early); status != http.StatusOK {
 		t.Fatalf("signed early code-notice callback rejected: %d", status)
 	}
@@ -385,7 +385,7 @@ func TestIdentityMailgunMockRecoveryCodeNoticeWebhookReconciliation(t *testing.T
 	if codeState(rotatedEvent) != "UNSUBSCRIBED" {
 		t.Fatal("unsubscribe did not retain highest severity")
 	}
-	unknown := signedMockSecurityWebhook(t, signingKey, clock, strings.Repeat("g", 50),
+	unknown := signedMockSecurityWebhook(t, signingKey, clock, strings.Repeat("1", 50),
 		"code-unknown-provider-msg", "unknown-code-notice@mailgun.test", "failed", "permanent")
 	if status := deliverWebhook(unknown); status != http.StatusOK {
 		t.Fatal("valid unmatched signed callback was not durably recorded")
@@ -396,12 +396,12 @@ func TestIdentityMailgunMockRecoveryCodeNoticeWebhookReconciliation(t *testing.T
 		t.Fatalf("count-only reconciled recovery-code monitor incorrect: %+v %v", health, err)
 	}
 	forged := signedMockSecurityWebhook(t, []byte("invalid-separate-signing-credential"), clock,
-		strings.Repeat("h", 50), "code-forged-provider-event", rotatedID, "delivered", "")
+		strings.Repeat("2", 50), "code-forged-provider-event", rotatedID, "delivered", "")
 	if status := deliverWebhook(forged); status != http.StatusNotAcceptable {
 		t.Fatalf("unsigned/forged provider callback accepted: %d", status)
 	}
 	wrongDomain := signedMockSecurityWebhook(t, signingKey, clock,
-		strings.Repeat("i", 50), "code-wrong-domain", rotatedID, "delivered", "")
+		strings.Repeat("3", 50), "code-wrong-domain", rotatedID, "delivered", "")
 	wrongDomain = bytes.Replace(wrongDomain, []byte("mg.example.test"),
 		[]byte("evil.example.test"), 1)
 	if status := deliverWebhook(wrongDomain); status != http.StatusNotAcceptable {
