@@ -38,6 +38,7 @@ var requiredTests = []string{
 	"TestIdentityHTTPEnrollmentDB",
 	"TestIdentityZEnrollmentReconciliationDB",
 	"TestIdentityZEnrollmentBacklogDB",
+	"TestIdentityZEmailConfirmationHTTPDB",
 	"TestIdentityResendAdmission",
 	"TestIdentityAnonymousAdmission",
 	"TestIdentityRetentionPurge",
@@ -121,7 +122,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -212,7 +213,8 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 					(strings.HasPrefix(ev.Test, "TestIdentityMailgunMock") ||
 						strings.HasPrefix(ev.Test, "TestIdentityHTTPEnrollmentDB") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZEnrollmentReconciliationDB") ||
-						strings.HasPrefix(ev.Test, "TestIdentityZEnrollmentBacklogDB"))) {
+						strings.HasPrefix(ev.Test, "TestIdentityZEnrollmentBacklogDB") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZEmailConfirmationHTTPDB"))) {
 				passed[ev.Test] = true
 			}
 
