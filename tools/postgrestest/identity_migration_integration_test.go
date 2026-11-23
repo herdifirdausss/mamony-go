@@ -1233,6 +1233,17 @@ func TestPostgresIdentityZPasskeyRegistrationIssuerRole(t *testing.T) {
 	if err != nil || out != "f" {
 		t.Fatalf("issuer must safely deny missing/stale session: %q err=%v", out, err)
 	}
+	// Wrong origin and noncanonical RP configuration must deny BEFORE a
+	// session lookup; no alternate public suffix/origin is a fallback.
+	for _, invalid := range []string{
+		"SELECT mamony_identity.issue_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'login.example.test','https://elsewhere.example.test')",
+		"SELECT mamony_identity.issue_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'login..example.test','https://login..example.test')",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL", "-c", invalid)
+		if err != nil || out != "f" {
+			t.Fatalf("invalid RP scope accepted or raised database error: %s %v", out, err)
+		}
+	}
 	denied := []string{
 		"SELECT * FROM mamony_identity.passkey_registration_intents",
 		"SELECT challenge FROM mamony_identity.passkey_registration_intents",
