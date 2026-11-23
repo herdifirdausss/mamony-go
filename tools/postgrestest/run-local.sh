@@ -57,6 +57,8 @@ export TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL="postgres://mamony_identity
 export TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL="postgres://mamony_identity_passkey_registration_reader_runtime:local-test-passkey-registration-reader@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL="postgres://mamony_identity_passkey_registration_admission_runtime:local-test-passkey-registration-admission@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL="postgres://mamony_identity_passkey_registration_stage_runtime:local-test-passkey-registration-stage@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL="postgres://mamony_identity_passkey_activation_issuer_runtime:local-test-passkey-activation-issuer@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL="postgres://mamony_identity_passkey_activation_reader_runtime:local-test-passkey-activation-reader@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL="postgres://mamony_identity_recovery_code_manager_runtime:local-test-identity-recovery-code-manager@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_ASSURANCE_URL="postgres://mamony_identity_recovery_assurance_runtime:local-test-identity-recovery-assurance@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_REDEEMER_URL="postgres://mamony_identity_recovery_redeemer_runtime:local-test-identity-recovery-redeemer@127.0.0.1:$port/mamony_test_local?sslmode=disable"
