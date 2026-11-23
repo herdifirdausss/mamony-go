@@ -1133,3 +1133,94 @@ func TestPostgresIdentityZRecoveryCodeNoticeWebhookRole(t *testing.T) {
 		}
 	}
 }
+
+
+// TestPostgresIdentityZRecoveryFactorRoles establishes that the issuer and
+// signature-verifying application have distinct SQL credentials; neither may
+// enroll/rebind cryptographic keys or directly create approvals.
+func TestPostgresIdentityZRecoveryFactorRoles(t *testing.T) {
+	const issue = "SELECT mamony_identity.issue_recovery_code_factor_challenge(" +
+		"decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex')," +
+		"'fac_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('33',32),'hex'))"
+	const read = "SELECT * FROM mamony_identity.read_recovery_code_factor_challenge('fac_AAAAAAAAAAAAAAAAAAAAAA')"
+	const complete = "SELECT mamony_identity.complete_recovery_code_factor_challenge(" +
+		"'fac_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('44',32),'hex')," +
+		"decode(repeat('55',32),'hex'),'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	const fail = "SELECT mamony_identity.fail_recovery_code_factor_challenge('fac_AAAAAAAAAAAAAAAAAAAAAA')"
+	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL", "-c", issue);
+		err != nil || out != "f" {
+		t.Fatalf("issuer cannot safely deny unknown credential: %s %v", out, err)
+	}
+	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL", "-c", read);
+		err != nil {
+		t.Fatalf("verifier cannot read only available factor challenge: %s %v", out, err)
+	}
+	if out, err := invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL", "-c", complete);
+		err != nil || out != "f" {
+		t.Fatalf("verifier cannot safely deny unknown signed proof: %s %v", out, err)
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+	} {
+		for _, sql := range []string{
+			"SELECT * FROM mamony_identity.recovery_code_factor_keys",
+			"SELECT * FROM mamony_identity.recovery_code_factor_challenges",
+			"SELECT * FROM mamony_identity.password_recovery_code_enrollment_approvals",
+			"SELECT * FROM mamony_identity.password_recovery_offline_codes",
+			"SELECT * FROM mamony_identity.password_login_grants",
+			"SELECT * FROM mamony_identity.opaque_sessions",
+			"SELECT * FROM mamony_identity.password_verifiers",
+			"SELECT * FROM mamony_identity.security_outbox",
+			"SELECT * FROM mamony_identity.email_aliases",
+			"SELECT * FROM mamony_identity.subjects",
+			"CREATE TABLE mamony_identity.recovery_factor_escape(id int)",
+			"INSERT INTO mamony_identity.recovery_code_factor_keys(subject_id,public_key,bound_epoch,bound_contact_version,bound_at) VALUES('sub_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('11',32),'hex'),1,1,clock_timestamp())",
+			"UPDATE mamony_identity.recovery_code_factor_keys SET revoked_at=NULL",
+			"INSERT INTO mamony_identity.password_recovery_code_enrollment_approvals(subject_id,subject_epoch,proof_digest,approved_at,expires_at) VALUES('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'),clock_timestamp(),clock_timestamp()+interval '5 minutes')",
+			"SET ROLE mamony_identity_migrator",
+		} {
+			out, err := invokePSQL(role, "-c", sql)
+			if err == nil || !strings.Contains(out, "42501") {
+				t.Fatalf("factor authority overprivileged: role=%s sql=%s out=%s err=%v", role, sql, out, err)
+			}
+		}
+	}
+	for _, sql := range []string{read,fail,complete,
+		"SELECT mamony_identity.replace_password_recovery_offline_codes(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),ARRAY[decode(repeat('44',32),'hex')],'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+	} {
+		out,err:=invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL","-c",sql)
+		if err==nil || !strings.Contains(out,"42501") {
+			t.Fatalf("issuer invoked verifier/manager capability: sql=%s out=%s err=%v",sql,out,err)
+		}
+	}
+	for _, sql := range []string{issue,
+		"SELECT mamony_identity.stage_recovery_code_rotation_grant('sub_AAAAAAAAAAAAAAAAAAAAAA',1,decode(repeat('11',32),'hex'))",
+		"SELECT mamony_identity.replace_password_recovery_offline_codes(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),decode(repeat('33',32),'hex'),ARRAY[decode(repeat('44',32),'hex')],'evt_AAAAAAAAAAAAAAAAAAAAAA')",
+	} {
+		out,err:=invokePSQL("TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL","-c",sql)
+		if err==nil || !strings.Contains(out,"42501") {
+			t.Fatalf("verifier invoked issuer/manager capability: sql=%s out=%s err=%v",sql,out,err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_RECOVERY_ASSURANCE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_IDENTITY_RECOVERY_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_NOTICE_WEBHOOK_URL",
+		"TEST_IDENTITY_RECOVERY_REDEEMER_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		for _, sql := range []string{issue,read,complete}{
+			out,err:=invokePSQL(role,"-c",sql)
+			if err==nil || !strings.Contains(out,"42501") {
+				t.Fatalf("unrelated identity principal invoked factor authority: role=%s sql=%s out=%s err=%v",
+					role,sql,out,err)
+			}
+		}
+	}
+}
