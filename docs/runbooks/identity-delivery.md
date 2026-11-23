@@ -1,6 +1,6 @@
 # Identity email delivery — runbook and security boundary
 
-**Status:** internal proposed infrastructure (stacked Draft PR #25); no public endpoint, external email provider, live worker loop, or deployment secrets are wired. No real delivery claim may be made.
+**Status:** internal proposed infrastructure (stacked Draft PRs #25–#26); a Mailgun HTTP API adapter is now implemented but only tested against local HTTP mocks. No public endpoint, live worker process, deployment secrets, or real outbound email has been configured. No real delivery claim may be made.
 
 ## Ownership and secrets
 
@@ -37,3 +37,15 @@ Before public enablement, resolve and test: actual sender provider and domain au
 ## Deployment sequencing and rollback
 
 Apply v1, then v2, then **v3**, with the offline `mamony-identity-migrate` binary and a dedicated migrator credential. Provision the separate nonprivileged delivery role before v3. The v3 verifier implementation fails closed if the encrypted delivery table is missing; do not deploy the changed verifier against a v2-only database. Keep the worker paused until both the persisted envelope and external key source are verified. A code rollback must account for queue rows produced by the new version, and must not re-enable public endpoints.
+
+## Mailgun adapter (stacked Draft PR #26) — mock-first contract
+
+Mailgun supports explicit US/EU/AU data regions. The adapter uses only the official `POST /v3/{domain}/messages` host for the configured region, **HTTP Basic Auth** (`api` + a purpose-limited Domain Sending Key), and documented `multipart/form-data` fields. Production code does not accept a caller-supplied provider endpoint; HTTP tests inject a custom local mock transport without DNS/network access to Mailgun.
+
+Required deployment inputs (all mandatory, no defaults): region (`US`, `EU`, `AU`), verified sending domain, a `From` address on that exact domain, Domain Sending Key from a trusted secret source, and a verified HTTPS origin for the future frontend's `/verify-email` page. The secret manager and actual runner remain **unwired**. Sender configuration is validated before a request; no keys, response bodies or verification tokens may be returned in errors.
+
+The plain-text message contains a link with a fragment `#token=...`; browser fragments are not sent with an ordinary GET, but the future frontend must remove the fragment from browser history and explicitly POST the token to a protected verification endpoint. Treat the fragment as a bearer secret nonetheless: no analytics, click redirects, URL logging, link previews, support screenshots or client-side third-party scripts on this page. Until that frontend exists, this contract is internal only.
+
+Mailgun request options disable tracking opens/clicks and require TLS. `o:deliver-within=5m` limits Mailgun's own retry window but **does not guarantee arrival before the challenge's 20-minute expiry**. Mailgun's Messages API does **not** provide generic exactly-once idempotency for normal sends. The separate `o:inbox-placement-test-key` relates to inbox-placement testing, not deduplication of user email. A retried ambiguous send may arrive twice; the token stays one-use.
+
+Tests: `sender_test.go` runs request/auth/region/config/validation/429/420/408/5xx/4xx/timeouts/redirect tests against an `httptest` HTTP server, not Mailgun. A real PostgreSQL integration test `TestIdentityMailgunMockPipeline` tests the path through the registrar, v3 encrypted outbox, claim, mock 429, retry, mock 200, acceptance, and activation. **No live Mailgun sandbox, API account, DNS or email is accessed by CI**. Provider webhook signature verification, bounce/complaint handling and inbound event reconciliation are separate future work.

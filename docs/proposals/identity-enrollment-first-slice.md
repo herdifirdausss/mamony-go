@@ -1,6 +1,6 @@
 # Identity enrollment: first implementation slice
 
-**Status:** DRAFT / stacked PRs #22–#25; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, connected email provider/worker process, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Status:** DRAFT / stacked PRs #22–#26; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed provider credentials/worker process, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
 The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Real provider delivery, running worker and public HTTP activation are still disabled.
 
@@ -59,3 +59,9 @@ An AES-256-GCM keyring is a repo-owned crypto adapter with an explicitly injecte
 A dedicated delivery DB role can claim ciphertext using `FOR UPDATE SKIP LOCKED`, fence work with a 45-second lease, retry temporary provider errors after 1/2/4/8 minutes, and stop after five attempts or the 20-minute token expiry. A real worker must give its provider a **stable challenge ID** for idempotency where supported. A crash or ambiguous provider timeout can cause duplicate deliveries; exactly-once delivery is **not guaranteed**. Expired, revoked, consumed or already-verified challenges must not be claimed.
 
 Do not enable public registration until a real provider adapter, configured execution process, secure sender domain/DKIM/SPF/DMARC and destination policy, bounded per-subject/per-IP rate limiting, provider timeout/rejection/bounce monitoring, expiry/retention cleanup, encryption key lifecycle and HTTP-level security tests exist. [Operational runbook](../runbooks/identity-delivery.md).
+
+## Mock-first Mailgun delivery adapter (stacked Draft PR #26)
+
+`internal/modules/identity/internal/repository/mailgun` supplies a region-pinned, HTTPS-only Mailgun Messages API adapter for the existing `EmailSender` usecase port. Its HTTP integration seam accepts a **test-provided mock transport**; production does not accept arbitrary Mailgun URLs. Mailgun Domain Sending Keys, `From` domain and HTTPS frontend origin are validated and never exposed in errors. The text-only email embeds the short-lived proof in a URL **fragment** (requiring a future safe browser handler), disables Mailgun open/click tracking, and requests TLS and a bounded provider delivery window.
+
+All outgoing HTTP tests use local `httptest` mocks. A separate tagged real-PostgreSQL integration test exercises the persisted encrypted delivery → mock 429 → retry → mock 200 → activation path. Production provider credentials, live outbound mail, worker startup, delivery webhooks, rate admission and login/HTTP endpoints remain disabled.

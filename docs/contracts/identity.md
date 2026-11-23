@@ -2,7 +2,7 @@
 
 The identity module owns tenants, users, sessions, API credentials, roles, and change approvals. Capabilities own their resources. They supply the resource and tenant context for authorization.
 
-**Implementation status:** Draft internal registration/password primitives (PR #22), transactional PostgreSQL pending enrollment (PR #23), and email-proof issuance/consumption with contact-bound token digests and atomic ACTIVE transition (stacked PR #24), plus encrypted delivery queue and bounded worker ports (stacked PR #25). **No Identity HTTP routes, connected email provider, running worker, login, sessions, recovery, tenant membership, financial authorization or usable end-user verification exist.** Internal tests are not a deployed authentication control.
+**Implementation status:** Draft internal registration/password primitives (PR #22), transactional PostgreSQL pending enrollment (PR #23), and email-proof issuance/consumption with contact-bound token digests and atomic ACTIVE transition (stacked PR #24), plus encrypted delivery queue and bounded worker ports (stacked PR #25) and a mock-tested Mailgun HTTP sender adapter (stacked PR #26). **No Identity HTTP routes, configured Mailgun credentials/account, running worker, live email send, login, sessions, recovery, tenant membership, financial authorization or usable end-user verification exist.** Internal tests are not a deployed authentication control.
 
 ## Internal contact verification — accepted narrow Phase 1 scope (IDF-02)
 

@@ -17,6 +17,7 @@ import (
 
 const requiredPackage = "github.com/herdifirdausss/mamony-go/tools/postgrestest"
 const identityPackage = "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/postgres"
+const identityIntegrationPackage = "github.com/herdifirdausss/mamony-go/internal/modules/identity"
 
 var requiredTests = []string{
 	"TestPostgresRoleSeparation",
@@ -31,6 +32,7 @@ var requiredTests = []string{
 	"TestIdentityRegistrationPersistence",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
+	"TestIdentityMailgunMockPipeline",
 }
 
 type testEvent struct {
@@ -105,6 +107,8 @@ func run() error {
 			"-run", "^TestPostgres", "-count=1", "-timeout=3m", "./tools/postgrestest"),
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
+		exec.Command("go", "test", "-json", "-tags=integration",
+			"-run", "^TestIdentityMailgunMock", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -190,7 +194,8 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 		}
 		if ev.Action == "pass" && !strings.Contains(ev.Test, "/") &&
 			((ev.Package == requiredPackage && strings.HasPrefix(ev.Test, "TestPostgres")) ||
-				(ev.Package == identityPackage && strings.HasPrefix(ev.Test, "TestIdentity"))) {
+				(ev.Package == identityPackage && strings.HasPrefix(ev.Test, "TestIdentity")) ||
+				(ev.Package == identityIntegrationPackage && strings.HasPrefix(ev.Test, "TestIdentityMailgunMock"))) {
 			passed[ev.Test] = true
 		}
 	}
