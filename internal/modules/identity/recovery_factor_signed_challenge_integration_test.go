@@ -298,4 +298,76 @@ func TestIdentityZRecoveryFactorSignedChallenge(t *testing.T) {
 	if evidence, found, err := verificationStore.Read(ctx, stale); err != nil || found || evidence.Subject != "" {
 		t.Fatal("epoch-stale cryptographic challenge was readable")
 	}
+	// Revocation after a genuine signature and before code enrollment MUST
+	// invalidate the pending approval, without reusing a consumed challenge.
+	// Use a separate synthetic subject so the successful bootstrap above
+	// remains an independent positive regression.
+	revokedSubject := randomSyntheticID(t, "sub_")
+	revokedEmail := strings.ToLower(randomSyntheticID(t, "rev_")) + "@example.test"
+	revokedHash, err := kdf.Hash(ctx, currentPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, "INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", revokedSubject); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.email_aliases
+		(canonical_email,subject_id,verified_at,created_at)
+		VALUES($1,$2,clock_timestamp(),clock_timestamp())`, revokedEmail, revokedSubject); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.password_verifiers
+		(subject_id,kdf_version,memory_kib,iterations,parallelism,salt,digest,created_at)
+		VALUES($1,1,65536,3,1,$2,$3,clock_timestamp())`,
+		revokedSubject, revokedHash.Salt, revokedHash.Digest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", revokedSubject); err != nil {
+		t.Fatal(err)
+	}
+	var revokedEpoch int64
+	if err := admin.QueryRow(ctx, "SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1", revokedSubject).Scan(&revokedEpoch); err != nil {
+		t.Fatal(err)
+	}
+	revokedPeer := netip.MustParseAddr("198.51.100.226")
+	revokedSession, err := sessionLogin.Authenticate(ctx, revokedEmail, currentPassword, revokedPeer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revokedBearer := revokedSession.ForTrustedTransport()
+	revokedPub, revokedPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `INSERT INTO mamony_identity.recovery_code_factor_keys
+		(subject_id,public_key,bound_epoch,bound_contact_version,bound_at)
+		VALUES($1,$2,$3,1,clock_timestamp())`, revokedSubject, []byte(revokedPub), revokedEpoch); err != nil {
+		t.Fatal(err)
+	}
+	revokedChallenge, err := issuer.Issue(ctx, revokedBearer, revokedEmail, currentPassword, revokedPeer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revokedApproval, err := authority.Verify(ctx, revokedChallenge.ChallengeID(),
+		ed25519.Sign(revokedPriv, revokedChallenge.ForTrustedAuthenticator()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, `UPDATE mamony_identity.recovery_code_factor_keys
+		SET revoked_at=clock_timestamp() WHERE subject_id=$1`, revokedSubject); err != nil {
+		t.Fatal(err)
+	}
+	if denied, err := manager.Enroll(ctx, revokedBearer, revokedEmail, currentPassword,
+		revokedApproval.ForTrustedEnrollment(), revokedPeer); !errors.Is(err, usecase.ErrRecoveryCodeManagerDenied) ||
+		denied.ForTrustedDisplay()[0] != "" {
+		t.Fatalf("revoked independent factor permitted stale approval enrollment: %v", err)
+	}
+	var revokedCodes, revokedCodeEvents int
+	if err := admin.QueryRow(ctx, `SELECT
+		(SELECT count(*) FROM mamony_identity.password_recovery_offline_codes WHERE subject_id=$1),
+		(SELECT count(*) FROM mamony_identity.security_outbox
+		 WHERE subject_id=$1 AND event_type='RECOVERY_CODES_ENROLLED')`,
+		revokedSubject).Scan(&revokedCodes, &revokedCodeEvents); err != nil || revokedCodes != 0 || revokedCodeEvents != 0 {
+		t.Fatal("revoked factor produced codes or an enrollment audit")
+	}
 }
