@@ -1,0 +1,65 @@
+name: Identity real browser E2E
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chromium-postgresql:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18.7
+        env:
+          POSTGRES_DB: mamony_test_ci
+          POSTGRES_USER: mamony_test_admin
+          POSTGRES_PASSWORD: local-test-admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mamony_test_admin -d mamony_test_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_ADMIN_URL: postgres://mamony_test_admin:local-test-admin@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_DATABASE_URL: postgres://mamony_test_runtime:local-test-runtime@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_PLATFORM_MIGRATION_URL: postgres://mamony_platform_migrator:local-test-platform-migrator@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_PLATFORM_RUNTIME_URL: postgres://mamony_platform_runtime:local-test-platform-runtime@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_MIGRATION_URL: postgres://mamony_identity_migrator:local-test-identity-migrator@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_RUNTIME_URL: postgres://mamony_identity_runtime:local-test-identity-runtime@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_VERIFIER_URL: postgres://mamony_identity_verifier_runtime:local-test-identity-verifier@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_DELIVERY_URL: postgres://mamony_identity_delivery_runtime:local-test-identity-delivery@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_MAINTENANCE_URL: postgres://mamony_identity_maintenance_runtime:local-test-identity-maintenance@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Setup pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.16.0'
+      - name: Provision PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Install pinned Playwright package
+        run: |
+          npm install --prefix tools/browsercheck --ignore-scripts --no-audit --no-fund --no-package-lock
+          node -e "if(require('./tools/browsercheck/node_modules/playwright/package.json').version !== '1.65.1') process.exit(1)"
+      - name: Install isolated Chromium headless browser
+        run: tools/browsercheck/node_modules/.bin/playwright install --with-deps --only-shell chromium
+      - name: Bootstrap disposable roles and run all required database gates
+        run: make integration
+      - name: Run actual Chromium with local TLS and real PostgreSQL verification
+        run: |
+          go test -tags=integration,browser_e2e -run '^TestIdentityZBrowserVerificationE2E$' \
+            -count=1 -timeout=3m ./internal/modules/identity

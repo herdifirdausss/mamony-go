@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "name": "mamony-identity-browsercheck",
+  "version": "0.0.0",
+  "description": "CI-only pinned real Chromium regression runner; not shipped with Mamony",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "playwright": "1.65.1"
+  }
+}
