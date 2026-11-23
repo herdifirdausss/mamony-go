@@ -44,6 +44,7 @@ var requiredTests = []string{
 	"TestPostgresIdentityZPasskeyRegistrationIssuerRole",
 	"TestPostgresIdentityZPasskeyRegistrationReaderRole",
 	"TestPostgresIdentityZPasskeyRegistrationAdmissionRole",
+	"TestPostgresIdentityZPasskeyRegistrationStageRole",
 	"TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles",
 	"TestPostgresIdentityZRecoveryCodeNoticeWebhookRole",
 	"TestPostgresIdentityZRecoverySecurityNoticeRoles",
@@ -67,6 +68,7 @@ var requiredTests = []string{
 	"TestIdentityZRecoveryFactorSignedChallenge",
 	"TestIdentityZPasskeyRegistrationIntent",
 	"TestIdentityZPasskeyRegistrationAdmission",
+	"TestIdentityZPasskeyRegistrationAtomicStage",
 	"TestIdentityZSecurityNoticeOutbox",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
@@ -128,6 +130,7 @@ func run() error {
 	identityPasskeyIssuerDSN := os.Getenv("TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL")
 	identityPasskeyReaderDSN := os.Getenv("TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL")
 	identityPasskeyAdmissionDSN := os.Getenv("TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL")
+	identityPasskeyStageDSN := os.Getenv("TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL")
 	identityRecoveryCodeNoticeDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL")
 	identityRecoveryCodeNoticeWebhookDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_WEBHOOK_URL")
 	identityRecoveryCodeNoticeMonitorDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL")
@@ -200,6 +203,9 @@ func run() error {
 	if err := validateDSN(identityPasskeyAdmissionDSN, "mamony_identity_passkey_registration_admission_runtime"); err != nil {
 		return fmt.Errorf("identity passkey reauth admission fixture: %w", err)
 	}
+	if err := validateDSN(identityPasskeyStageDSN, "mamony_identity_passkey_registration_stage_runtime"); err != nil {
+		return fmt.Errorf("identity passkey staging fixture: %w", err)
+	}
 	if err := validateDSN(identityRecoveryCodeManagerDSN, "mamony_identity_recovery_code_manager_runtime"); err != nil {
 		return fmt.Errorf("identity recovery code manager fixture: %w", err)
 	}
@@ -256,6 +262,7 @@ func run() error {
 	identityPasskeyIssuerURL, _ := url.Parse(identityPasskeyIssuerDSN)
 	identityPasskeyReaderURL, _ := url.Parse(identityPasskeyReaderDSN)
 	identityPasskeyAdmissionURL, _ := url.Parse(identityPasskeyAdmissionDSN)
+	identityPasskeyStageURL, _ := url.Parse(identityPasskeyStageDSN)
 	identityRecoveryCodeNoticeURL, _ := url.Parse(identityRecoveryCodeNoticeDSN)
 	identityRecoveryCodeNoticeWebhookURL, _ := url.Parse(identityRecoveryCodeNoticeWebhookDSN)
 	identityRecoveryCodeNoticeMonitorURL, _ := url.Parse(identityRecoveryCodeNoticeMonitorDSN)
@@ -268,7 +275,7 @@ func run() error {
 	identityWebhookURL, _ := url.Parse(identityWebhookDSN)
 	identityMonitorURL, _ := url.Parse(identityMonitorDSN)
 	identityMaintenanceURL, _ := url.Parse(identityMaintenanceDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryFactorIssuerURL, identityRecoveryFactorVerifierURL, identityPasskeyIssuerURL, identityPasskeyReaderURL, identityPasskeyAdmissionURL, identityRecoveryCodeManagerURL, identityRecoveryCodeNoticeURL, identityRecoveryCodeNoticeWebhookURL, identityRecoveryCodeNoticeMonitorURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryFactorIssuerURL, identityRecoveryFactorVerifierURL, identityPasskeyIssuerURL, identityPasskeyReaderURL, identityPasskeyAdmissionURL, identityPasskeyStageURL, identityRecoveryCodeManagerURL, identityRecoveryCodeNoticeURL, identityRecoveryCodeNoticeWebhookURL, identityRecoveryCodeNoticeMonitorURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}
@@ -286,7 +293,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZPasskeyRegistrationAtomicStage|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -396,6 +403,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryFactorSignedChallenge") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyRegistrationIntent") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyRegistrationAdmission") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyRegistrationAtomicStage") ||
 						strings.HasPrefix(ev.Test, "TestIdentityMailgunMockRecoveryCodeSecurityNotice") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZSecurityNoticeOutbox"))) {
 				passed[ev.Test] = true
