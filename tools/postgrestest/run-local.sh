@@ -53,6 +53,7 @@ export TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL="postgres://mamony_identity_recove
 export TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL="postgres://mamony_identity_recovery_code_notice_monitor_runtime:local-test-identity-recovery-code-notice-monitor@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL="postgres://mamony_identity_recovery_factor_issuer_runtime:local-test-recovery-factor-issuer@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL="postgres://mamony_identity_recovery_factor_verifier_runtime:local-test-recovery-factor-verifier@127.0.0.1:$port/mamony_test_local?sslmode=disable"
+export TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL="postgres://mamony_identity_passkey_registration_issuer_runtime:local-test-passkey-registration-issuer@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL="postgres://mamony_identity_recovery_code_manager_runtime:local-test-identity-recovery-code-manager@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_ASSURANCE_URL="postgres://mamony_identity_recovery_assurance_runtime:local-test-identity-recovery-assurance@127.0.0.1:$port/mamony_test_local?sslmode=disable"
 export TEST_IDENTITY_RECOVERY_REDEEMER_URL="postgres://mamony_identity_recovery_redeemer_runtime:local-test-identity-recovery-redeemer@127.0.0.1:$port/mamony_test_local?sslmode=disable"

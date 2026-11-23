@@ -35,12 +35,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "29:false" {
-		t.Fatalf("identity migration should be at clean version 29: %q err=%v", out, err)
+	if err != nil || out != "30:false" {
+		t.Fatalf("identity migration should be at clean version 30: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "29" {
+	if err != nil || out != "30" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -1218,5 +1218,74 @@ func TestPostgresIdentityZRecoveryFactorRoles(t *testing.T) {
 					role, sql, out, err)
 			}
 		}
+	}
+}
+
+// TestPostgresIdentityZPasskeyRegistrationIssuerRole proves the v30 role can
+// issue only a session-bound, unverified challenge, but cannot read or edit
+// challenge state, bind passkeys, access credentials, or call cross-purpose APIs.
+func TestPostgresIdentityZPasskeyRegistrationIssuerRole(t *testing.T) {
+	const issue = "SELECT mamony_identity.issue_passkey_registration_intent(" +
+		"decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA'," +
+		"decode(repeat('22',32),'hex'),'login.example.test','https://login.example.test')"
+	out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL", "-c", issue)
+	if err != nil || out != "f" {
+		t.Fatalf("issuer must safely deny missing/stale session: %q err=%v", out, err)
+	}
+	// Wrong origin and noncanonical RP configuration must deny BEFORE a
+	// session lookup; no alternate public suffix/origin is a fallback.
+	for _, invalid := range []string{
+		"SELECT mamony_identity.issue_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'login.example.test','https://elsewhere.example.test')",
+		"SELECT mamony_identity.issue_passkey_registration_intent(decode(repeat('11',32),'hex'),'wrg_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('22',32),'hex'),'login..example.test','https://login..example.test')",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL", "-c", invalid)
+		if err != nil || out != "f" {
+			t.Fatalf("invalid RP scope accepted or raised database error: %s %v", out, err)
+		}
+	}
+	denied := []string{
+		"SELECT * FROM mamony_identity.passkey_registration_intents",
+		"SELECT challenge FROM mamony_identity.passkey_registration_intents",
+		"INSERT INTO mamony_identity.passkey_registration_intents(subject_id) VALUES ('sub_AAAAAAAAAAAAAAAAAAAAAA')",
+		"UPDATE mamony_identity.passkey_registration_intents SET consumed_at=clock_timestamp()",
+		"DELETE FROM mamony_identity.passkey_registration_intents",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.subjects",
+		"SELECT * FROM mamony_identity.email_aliases",
+		"SELECT * FROM mamony_identity.password_verifiers",
+		"SELECT * FROM mamony_identity.password_recovery_code_enrollment_approvals",
+		"SELECT * FROM mamony_identity.recovery_code_factor_keys",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"CREATE TABLE mamony_identity.passkey_role_escape(id integer)",
+		"SELECT mamony_identity.issue_recovery_code_factor_challenge(decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex'),'fac_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('33',32),'hex'))",
+		"SELECT mamony_identity.read_recovery_code_factor_challenge('fac_AAAAAAAAAAAAAAAAAAAAAA')",
+		"SELECT mamony_identity.resolve_opaque_session(decode(repeat('11',32),'hex'))",
+		"SET ROLE mamony_identity_migrator",
+	}
+	for _, sql := range denied {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("passkey issuer escaped privilege: sql=%s out=%s err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_ISSUER_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", issue)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("unrelated role issued passkey challenge: role=%s out=%s err=%v", role, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
+		"SELECT to_regprocedure('mamony_identity.finish_passkey_registration_intent(bytea,text,bytea)') IS NULL")
+	if err != nil || out != "t" {
+		t.Fatalf("unexpected unreviewed passkey finish function: out=%s err=%v", out, err)
 	}
 }
