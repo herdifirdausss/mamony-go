@@ -272,8 +272,7 @@ func TestIdentityMailgunMockRecoveryCodeNoticeWebhookReconciliation(t *testing.T
 	var earlyReceipts int
 	createdDigest := sha256.Sum256([]byte(senderIDs["RECOVERY_CODES_ENROLLED"]))
 	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.recovery_code_notice_mailgun_receipts
-		WHERE message_digest=$1`, createdDigest[:]).Scan(&earlyReceipts);
-		err != nil || earlyReceipts != 1 {
+		WHERE message_digest=$1`, createdDigest[:]).Scan(&earlyReceipts); err != nil || earlyReceipts != 1 {
 		t.Fatal("early code-change callback was not recorded independent of provider ACK")
 	}
 	for i := 0; i < 2; i++ {
@@ -342,8 +341,7 @@ func TestIdentityMailgunMockRecoveryCodeNoticeWebhookReconciliation(t *testing.T
 		}
 	}
 	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.recovery_code_notice_mailgun_receipts
-		WHERE message_digest=$1`, createdDigest[:]).Scan(&earlyReceipts);
-		err != nil || earlyReceipts != 1 {
+		WHERE message_digest=$1`, createdDigest[:]).Scan(&earlyReceipts); err != nil || earlyReceipts != 1 {
 		t.Fatal("duplicate signed callback bypassed replay protection")
 	}
 	codeState := func(event string) string {
