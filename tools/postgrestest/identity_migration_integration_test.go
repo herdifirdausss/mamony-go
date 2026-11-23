@@ -1221,7 +1221,6 @@ func TestPostgresIdentityZRecoveryFactorRoles(t *testing.T) {
 	}
 }
 
-
 // TestPostgresIdentityZPasskeyRegistrationIssuerRole proves the v30 role can
 // issue only a session-bound, unverified challenge, but cannot read or edit
 // challenge state, bind passkeys, access credentials, or call cross-purpose APIs.
