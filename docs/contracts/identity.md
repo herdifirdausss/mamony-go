@@ -37,6 +37,12 @@ Acceptance evidence must include real database expiry, wrong-contact/version, re
 
 See the [Identity delivery runbook](../runbooks/identity-delivery.md) for operational constraints, encryption key rotation, retry semantics, and missing deployment gates.
 
+## Direct SQL session mint — identified boundary (Draft PR #45)
+
+The existing v10 `mamony_identity_session_runtime` role is itself a session-mint capability: direct `EXECUTE` can create a cookie-equivalent session for any known ACTIVE+verified subject even when no password-verifier row exists. The disposable-PostgreSQL threat fixture `TestIdentityZDirectSessionMintThreatFixture` demonstrates this **known weakness**, not a defense. Real Chromium browser tests (#44) do not change the SQL privilege.
+
+[ADR-0009](../adr/0009-authentication-to-session-issuance-boundary.md) proposes a one-use, subject/purpose/epoch-bound grant protocol with separate grant-issuer and session-consumer database capabilities, but **does not implement or approve it**. A role separation that resides entirely in one compromised Identity process does not withstand that process's RCE. A future migration must remove legacy direct-mint EXECUTE, prove independent role denials and atomic grant consumption, then rerun all five mandatory CI workflows and browser regression on the exact SHA. **No public route activation.**
+
 ## Authentication and lifecycle
 
 | ID | Requirement | Acceptance check |
