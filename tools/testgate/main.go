@@ -381,6 +381,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryOfflineAssurance") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryCodeEnrollmentRotation") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryFactorSignedChallenge") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyRegistrationIntent") ||
 						strings.HasPrefix(ev.Test, "TestIdentityMailgunMockRecoveryCodeSecurityNotice") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZSecurityNoticeOutbox"))) {
 				passed[ev.Test] = true
