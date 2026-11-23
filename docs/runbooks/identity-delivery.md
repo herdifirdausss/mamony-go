@@ -1,6 +1,6 @@
 # Identity email delivery — runbook and security boundary
 
-**Status:** internal proposed infrastructure (stacked Draft PRs #25–#26); a Mailgun HTTP API adapter is now implemented but only tested against local HTTP mocks. No public endpoint, live worker process, deployment secrets, or real outbound email has been configured. No real delivery claim may be made.
+**Status:** internal proposed infrastructure (stacked Draft PRs #25–#27); a Mailgun HTTP API adapter and an opt-in worker command exist, but deployment secrets are not connected, the process is not deployed, and all HTTP integration tests use local mocks. No public Identity endpoint or real outbound email is configured. No real delivery claim may be made.
 
 ## Ownership and secrets
 
@@ -49,3 +49,38 @@ The plain-text message contains a link with a fragment `#token=...`; browser fra
 Mailgun request options disable tracking opens/clicks and require TLS. `o:deliver-within=5m` limits Mailgun's own retry window but **does not guarantee arrival before the challenge's 20-minute expiry**. Mailgun's Messages API does **not** provide generic exactly-once idempotency for normal sends. The separate `o:inbox-placement-test-key` relates to inbox-placement testing, not deduplication of user email. A retried ambiguous send may arrive twice; the token stays one-use.
 
 Tests: `sender_test.go` runs request/auth/region/config/validation/429/420/408/5xx/4xx/timeouts/redirect tests against an `httptest` HTTP server, not Mailgun. A real PostgreSQL integration test `TestIdentityMailgunMockPipeline` tests the path through the registrar, v3 encrypted outbox, claim, mock 429, retry, mock 200, acceptance, and activation. **No live Mailgun sandbox, API account, DNS or email is accessed by CI**. Provider webhook signature verification, bounce/complaint handling and inbound event reconciliation are separate future work.
+
+## Explicit Mailgun worker runtime (stacked Draft PR #27)
+
+A separate binary `cmd/mamony-identity-mail-worker` invokes the owning Identity facade and keeps the HTTP application unchanged. One process performs **at most one send at a time** with a fixed 5-second polling interval; multiple processes rely on the existing PostgreSQL lease/fencing/claim checks. It is not scheduled or deployed by this repository and is not automatically started when an API server starts.
+
+Starting this binary requires **both** the exact CLI flag `--send-live-mailgun` and `MAMONY_IDENTITY_MAIL_LIVE_APPROVAL=I_ACKNOWLEDGE_REAL_MAILGUN_EMAIL_SENDS`. It also refuses a `CI` environment or a disposable `mamony_test_*` database. Without both explicit approvals, it exits before opening database connections or sending any HTTP request. This is an operational brake, **not a substitute** for provider IAM quotas, host egress policy or authentic authorization of the operator.
+
+All three sensitive values are read from externally provisioned **absolute, non-symlink, owner-private files** (mode `0400` or `0600`); no raw Mailgun API key or envelope key is accepted directly as an environment variable:
+
+- `MAMONY_IDENTITY_DELIVERY_DSN_FILE`: complete PostgreSQL URL for **only** `mamony_identity_delivery_runtime`, `sslmode=verify-full`. Must NOT point at the disposable test DB.
+- `MAMONY_IDENTITY_MAILGUN_KEY_FILE`: Domain Sending Key only. Scope and rotation are owned by external secret provisioning.
+- `MAMONY_IDENTITY_ENVELOPE_KEYS_FILE`: bounded keyring JSON: `{"active":"key-version","keys":{"key-version":"<base64-encoded 32-byte key>"}}`. Maximum eight keys with prior keys kept while retry envelopes exist. The same external key management authority must also provision the issuer's keyring; the worker cannot issue new challenges.
+
+Other required nonsecret configuration: `MAMONY_IDENTITY_MAILGUN_REGION`, `MAMONY_IDENTITY_MAILGUN_DOMAIN`, `MAMONY_IDENTITY_MAIL_FROM`, `MAMONY_IDENTITY_MAIL_VERIFY_URL`. The Mailgun adapter validates these, including the region-specific fixed API endpoint and HTTPS verification URL. Example **dry review only** (DO NOT execute without an approved live environment):
+
+```sh
+# All /run/secrets/* files must be provisioned by an external secret manager.
+# Never store secret file contents in Git, workflow logs, shell command history,
+# or checked-in .env files.
+MAMONY_IDENTITY_DELIVERY_DSN_FILE=/run/secrets/identity_delivery_dsn \
+MAMONY_IDENTITY_MAILGUN_KEY_FILE=/run/secrets/mailgun_domain_key \
+MAMONY_IDENTITY_ENVELOPE_KEYS_FILE=/run/secrets/identity_envelope_keys \
+MAMONY_IDENTITY_MAILGUN_REGION=EU \
+MAMONY_IDENTITY_MAILGUN_DOMAIN=mg.example.com \
+MAMONY_IDENTITY_MAIL_FROM=security@mg.example.com \
+MAMONY_IDENTITY_MAIL_VERIFY_URL=https://app.example.com/verify-email \
+MAMONY_IDENTITY_MAIL_LIVE_APPROVAL=I_ACKNOWLEDGE_REAL_MAILGUN_EMAIL_SENDS \
+go run ./cmd/mamony-identity-mail-worker --send-live-mailgun
+```
+
+The command logs only coarse startup/shutdown messages; errors returned through the facade are generic and cannot include provider bodies or email bearer URLs. SIGTERM/SIGINT cancels active network work, stops subsequent claims, and releases pool connections. A send canceled during shutdown can leave its 45-second lease for crash recovery; an ambiguous provider response may still cause a duplicate email. **Never claim exactly once or durable inbox delivery.** The process intentionally exits on unexpected DB errors rather than silently looping on an unknown storage state.
+
+**Mock-only automated verification:** `TestDeliveryRunnerPollsSeriallyAndStopsOnShutdown` and `cmd/mamony-identity-mail-worker` tests cover cancellation, unsafe startup, CI guard, symlinks/permissions/invalid keyring. The named `TestIdentityMailgunMockPipeline` also exercises `RunDelivery` using an isolated real PostgreSQL fixture and **local HTTP mock transport**. No CI job supplies the live approval flag or external Mailgun credential. It cannot accidentally send real email.
+
+**Still pending before deploying live:** operator approval for account/domain/region; externally managed secret and rotation policy; audited egress restriction and provider quota; abuse/resend limits at the registration API; complaint/bounce/webhook signature verification; encrypted-envelope retention cleanup; frontend safe token handling; deploy rollback, metrics, readiness and alerting. No user-facing register/verify endpoint is exposed.

@@ -28,6 +28,8 @@ vendors:
     in:
       - golang.org/x/text/unicode/norm
 components:
+  identity_facade:
+    in: modules/identity
   app:
     in: app/**
   platform:
@@ -45,6 +47,15 @@ components:
   identity_postgres:
     in: modules/identity/internal/repository/postgres/**
 deps:
+  identity_facade:
+    mayDependOn:
+      - identity_usecase
+      - identity_mailcrypto
+      - identity_mailgun
+      - identity_postgres
+      - platform
+    canUse:
+      - pgx
   app:
     mayDependOn:
       - platform

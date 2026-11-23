@@ -54,3 +54,7 @@ Do not add a standalone security service, signing protocol, OAuth issuer, servic
 **Implemented as an internal candidate in stacked PR #25:** AES-256-GCM encrypted email-proof outbox, separate delivery database role, leased claim with `SKIP LOCKED`, bounded 5-attempt exponential retry and stable challenge-based provider idempotency key. Keys must come from an external purpose-scoped secret source; **not decided**: provider (SES/SMTP/etc.), key custody/rotation authority, trusted sender domain, bounce/complaint handling, final delivery audit retention, per-IP/subject abuse policy, email content URL policy, processing cadence and deployment rollback.
 
 The delivery handler is intentionally not wired into a production process or public API. A green integration test proves synthetic DB/Go mechanics, not sender deliverability or exactly-once behavior.
+
+## DEC-ID-DELIVERY-RUNTIME (draft, production enablement not approved)
+
+A separately executed Identity Mailgun delivery worker exists as stacked PR #27. Code uses a capability facade, a PostgreSQL role with restricted updates, one-at-a-time polling, and dual live-send opt-in with private-file secrets. This is **not** authorization to deploy or send real email: the operator has not provisioned an account/domain, approved a secret manager, sender limits, egress policy, retention, bounce/complaint webhooks, or public API admission. All CI Mailgun sends are intercepted by an injected `httptest` transport. Keep the PR Draft until those decisions and end-to-end negative tests are resolved.
