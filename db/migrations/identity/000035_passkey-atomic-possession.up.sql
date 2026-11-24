@@ -50,7 +50,7 @@ CREATE FUNCTION mamony_identity.enqueue_passkey_activation_notice()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,pg_temp AS $$
 DECLARE recipient_email text;
-BEGIN
+BEGIN -- PL/pgSQL function, not migration transaction control
     IF NEW.event_type<>'PASSKEY_POSSESSION_VERIFIED' THEN RETURN NEW; END IF;
     IF session_user<>'mamony_identity_passkey_activation_finisher_runtime' THEN
         RAISE EXCEPTION 'passkey possession notice origin denied' USING ERRCODE='42501';
@@ -100,7 +100,7 @@ DECLARE
     challenge_expires timestamptz;
     stamp timestamptz;
     affected integer;
-BEGIN
+BEGIN -- PL/pgSQL function, not migration transaction control
     IF session_user<>'mamony_identity_passkey_activation_finisher_runtime' THEN
         RAISE EXCEPTION 'passkey possession finisher origin denied'
             USING ERRCODE='42501';
@@ -252,4 +252,4 @@ GRANT EXECUTE ON FUNCTION mamony_identity.finish_verified_passkey_possession(
 -- unimplemented and all public/private router inventories are unchanged.
 
 -- mamony:integrity:v1
-INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (35, '38e0fa55a039b8d61852103db3dd1d732ae0335abaf7112590ed755d525b038c');
+INSERT INTO mamony_identity.migration_fingerprints (version, sha256) VALUES (35, '329725f31728911adddb53780e5827e761ed713a003a2cbbd9385ba3fc845157');
