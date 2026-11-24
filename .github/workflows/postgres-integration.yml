@@ -93,6 +93,9 @@ jobs:
           result="$(docker exec -i "$PG_SERVICE_CONTAINER_ID" psql -U mamony_test_admin -d mamony_test_ci -X -qAt -v ON_ERROR_STOP=1 < tools/postgrestest/identity-recovery-inventory.sql)"
           [[ "$result" == '30|30|0|0|0|-|-' ]] || { echo "Identity recovery inventory mismatch: $result" >&2; exit 1; }
           echo 'IDENTITY RECOVERY INVENTORY PASS: 30 classified tables; zero missing, unexpected or duplicate names'
+          provenance="$(docker exec -i "$PG_SERVICE_CONTAINER_ID" psql -U mamony_test_admin -d mamony_test_ci -X -qAt -v ON_ERROR_STOP=1 < tools/postgrestest/identity-recovery-provenance.sql)"
+          [[ "$provenance" == '17|0|-' ]] || { echo "Identity recovery provenance mismatch: $provenance" >&2; exit 1; }
+          echo 'IDENTITY RECOVERY PROVENANCE PASS: 17 selected validated non-cascading foreign keys'
       - name: Verify v36 passkey persistence after forced PostgreSQL SIGKILL/restart
         env:
           PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
