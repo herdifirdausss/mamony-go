@@ -91,8 +91,8 @@ jobs:
           [[ "$PG_SERVICE_CONTAINER_ID" =~ ^[[:xdigit:]]{64}$ ]]
           [[ "$(docker inspect --format '{{.Config.Image}}' "$PG_SERVICE_CONTAINER_ID")" == postgres:18.7 ]]
           result="$(docker exec -i "$PG_SERVICE_CONTAINER_ID" psql -U mamony_test_admin -d mamony_test_ci -X -qAt -v ON_ERROR_STOP=1 < tools/postgrestest/identity-recovery-inventory.sql)"
-          [[ "$result" == '29|29|0|0|0|-|-' ]] || { echo "Identity recovery inventory mismatch: $result" >&2; exit 1; }
-          echo 'IDENTITY RECOVERY INVENTORY PASS: 29 classified tables; zero missing, unexpected or duplicate names'
+          [[ "$result" == '30|30|0|0|0|-|-' ]] || { echo "Identity recovery inventory mismatch: $result" >&2; exit 1; }
+          echo 'IDENTITY RECOVERY INVENTORY PASS: 30 classified tables; zero missing, unexpected or duplicate names'
       - name: Verify v36 passkey persistence after forced PostgreSQL SIGKILL/restart
         env:
           PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
