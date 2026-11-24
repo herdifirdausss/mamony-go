@@ -52,7 +52,7 @@ For accepted changes, update the **owning capability contract** with the final A
 
 **Compatibility, observability and rollout:** Migration/rollback, release ordering, alerts, feature flags, safe disable behavior and repair path.
 
-**Decision status:** Proposed | Accepted | Blocked. For an owner-authorized bounded Critical Draft lab, record exact scope, synthetic containment, negative cases and explicit owner decision; mark independent technical acceptance pending until completed. Otherwise the ordinary G3 pre-code gate applies. Record technical acceptance reference and create/update an ADR only for a lasting architecture decision.
+**Decision status:** Proposed | Accepted | Blocked. For an owner-authorized bounded synthetic experiment, record exact scope, synthetic containment, negative cases and explicit owner decision; record independent technical acceptance as pending or DEFERRED only under the adopted solo mode. Synthetic-only merge is a separate exact-candidate owner decision; production readiness remains NOT ACCEPTED until independent acceptance. Otherwise the ordinary G3 pre-code gate applies. Record technical acceptance reference and create/update an ADR only for a lasting architecture decision.
 
 ## G4 — Implementation slices
 
@@ -70,4 +70,4 @@ For AC-to-test mapping, use the [test-plan checklist](test-plan.md) inside this 
 |---|---|---|---|
 | Pending | Pending | Pending | NOT RUN |
 
-Include independent review record for Critical work, unresolved risks, compatibility and rollout observations. Distinguish local synthetic tests from live deployment evidence. Update this record when the implementation diverges from the accepted design, and link the authoritative contract and ADR revisions.
+Include the review record for Critical work, unresolved risks, compatibility and rollout observations. For eligible solo synthetic merges, record actual containment evidence, exact owner merge authorization, deferred independent acceptance and outstanding production blockers; do not report independent approval. Distinguish local synthetic tests from live deployment evidence. Update this record when the implementation diverges from the accepted design, and link the authoritative contract and ADR revisions.
