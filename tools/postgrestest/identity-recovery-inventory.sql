@@ -4,6 +4,7 @@
 WITH expected(name, recovery_class) AS (
   VALUES
     ('migration_fingerprints', 'schema_integrity'),
+    ('schema_migrations', 'schema_integrity'),
     ('subjects', 'binding_reconcile'),
     ('email_aliases', 'binding_reconcile'),
     ('password_verifiers', 'binding_reconcile'),
