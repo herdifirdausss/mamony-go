@@ -1021,7 +1021,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false, false, false},
 		{"backup_false_to_true", 0, 1, true, false, 0x1d, true, false, false},
 		{"backup_true_to_false", 0, 1, true, true, 0x0d, true, false, false},
-		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false, false},
+		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false, false, false},
 		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false, false, false},
 		{"counter_one_to_two_definite_commit_ack_lost", 1, 2, false, false, 0x05, true, true, false},
 		{"counter_one_to_two_tcp_commit_ack_lost", 1, 2, false, false, 0x05, true, false, true},
