@@ -75,3 +75,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client
       - name: Verify synthetic database roles and RLS behavior
         run: make integration
+      - name: Verify native PostgreSQL synthetic recovery boundary
+        run: |
+          bash -n tools/postgrestest/check-platform-native-pitr.sh
+          set -o pipefail
+          bash tools/postgrestest/check-platform-native-pitr.sh | tee "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-01a PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-01b PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-01c PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
