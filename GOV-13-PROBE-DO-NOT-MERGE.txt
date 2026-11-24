@@ -1,0 +1,1 @@
+Temporary governance verification fixture. No product or workflow changes. DO NOT MERGE. Close this pull request after reading the missing required checks state.
