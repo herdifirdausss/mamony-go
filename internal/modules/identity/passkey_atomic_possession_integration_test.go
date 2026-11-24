@@ -232,9 +232,15 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		{"wrong COSE", func(x *usecase.PasskeyActivationFinishRequest) {
 			x.Expected.PublicKeyCOSE = bytes.Repeat([]byte{0xa1}, len(publicCOSE))
 		}},
-		{"stale sign count", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.SignCount = 2 }},
+		{"stale sign count", func(x *usecase.PasskeyActivationFinishRequest) {
+			x.Expected.SignCount = 1
+			x.Verified.Counter = 2
+		}},
 		{"missing UV", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.UserVerified = false }},
-		{"reversed counter", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.Counter = 0 }},
+		{"reversed counter", func(x *usecase.PasskeyActivationFinishRequest) {
+			x.Expected.SignCount = 2
+			x.Verified.Counter = 1
+		}},
 		{"wrong backup eligibility", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.BackupEligible = true }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -242,7 +248,10 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			claim.Expected.PublicKeyCOSE = append([]byte(nil), request.Expected.PublicKeyCOSE...)
 			tt.edit(&claim)
 			allowed, err := finishStore.Finish(ctx, claim)
-			if err != nil || allowed {
+			// Well-formed stale claims are denied by SQL. Invalid signed
+			// facts are rejected by the adapter before reaching SQL, with
+			// the same non-success security outcome and a sanitized error.
+			if allowed || err != nil && !errors.Is(err, usecase.ErrPasskeyActivationCommitUnavailable) {
 				t.Fatalf("untrusted SQL finish claim was accepted: allowed=%v err=%v", allowed, err)
 			}
 		})
