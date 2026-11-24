@@ -13,7 +13,7 @@
 - AC-to-test mapping; identify negative, concurrency, migration and recovery cases:
 - Any departure from accepted scope and its explicit acceptance:
 
-A PR link or checkbox is **not** evidence of product approval, independent review or successful tests. For Critical changes, record explicit owner and technical acceptance **before coding**; if a security hotfix used the expedited path, explain why and how the skipped evidence will be completed. See [change lifecycle](../docs/development-workflow.md).
+A PR link or checkbox is **not** evidence of product approval, independent review or successful tests. For Critical changes, record explicit owner and technical acceptance **before coding**, or the exact owner approval and containment/ACs for a bounded synthetic Draft lab under the lifecycle. Record pending independent technical acceptance as a merge blocker; separate production activation approval is required. If a security hotfix used the expedited path, explain why and how the skipped evidence will be completed. See [change lifecycle](../docs/development-workflow.md).
 
 ## Evidence
 
