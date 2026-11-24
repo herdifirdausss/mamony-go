@@ -7,11 +7,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Lab-only binding and decision oracle. No application imports this code,
@@ -86,7 +91,7 @@ func restoreReviewCatalog(t *testing.T, ctx context.Context, conn *pgx.Conn) (st
 // The process-local file survives database restore only in the lab. Its
 // existence is not proof of independent custody, durability or completeness.
 func checkHeldRestoreReviewRecord(t *testing.T, ctx context.Context, source, target *pgx.Conn,
-	containerID string, dump []byte, checkpoint string, held, checkpointPresent bool) {
+	containerID string, dump []byte, checkpoint string, held, checkpointPresent bool) (string, restoreReviewBinding) {
 	t.Helper()
 	sourceSchema, sourceRoles := restoreReviewCatalog(t, ctx, source)
 	targetSchema, targetRoles := restoreReviewCatalog(t, ctx, target)
@@ -157,4 +162,86 @@ func checkHeldRestoreReviewRecord(t *testing.T, ctx context.Context, source, tar
 	// is NOT an observation of complete evidence on the real restore.
 	assertDecision(path, observed, true, true, "REVIEW_ONLY")
 	t.Log("IRF-REVIEW RECORD MECHANISM PASS: actual stale target held for missing checkpoint; missing corrupt and mismatched bindings rejected; synthetic review only")
+	return path, expected
+}
+
+
+// A second actual restore never receives the deliberate replay bypass. Even
+// identical backup bytes and catalog summaries cannot authorize a new attempt
+// using the first attempt's record. This is a review oracle, not a release gate.
+func checkRepeatedRestoreReviewRecord(t *testing.T, ctx context.Context, target *pgx.Conn,
+	containerID, port string, dump []byte, recordPath string, first restoreReviewBinding,
+	sessionDSN, readerDSN, finishDSN string) {
+	t.Helper()
+	second := first
+	second.AttemptID = randomSyntheticID(t, "rec_")
+	second.ContainerID = containerID
+	second.BackupSHA = restoreReviewDigest(dump)
+	second.SchemaSHA, second.RoleNamesSHA = restoreReviewCatalog(t, ctx, target)
+	if err := target.QueryRow(ctx, `SELECT system_identifier::text,current_database(),
+		(SELECT oid::text FROM pg_database WHERE datname=current_database())
+		FROM pg_control_system()`).Scan(&second.ClusterID, &second.Database, &second.DatabaseOID); err != nil {
+		t.Fatal("cannot identify repeated restore")
+	}
+	if second.AttemptID == first.AttemptID || second.ContainerID == first.ContainerID ||
+		second.ClusterID == first.ClusterID || second.Database != first.Database ||
+		second.BackupSHA != first.BackupSHA || second.SchemaSHA != first.SchemaSHA ||
+		second.RoleNamesSHA != first.RoleNamesSHA {
+		t.Fatal("repeated restore must be a distinct cluster with matching backup and metadata")
+	}
+	var held, missing bool
+	if err := target.QueryRow(ctx, `SELECT
+		NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+		 WHERE rolname LIKE 'mamony_%' AND rolname<>'mamony_test_admin' AND rolcanlogin)
+		AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity
+		 WHERE datname=current_database() AND usename LIKE 'mamony_%' AND usename<>'mamony_test_admin'),
+		NOT EXISTS (SELECT 1 FROM mamony_identity.security_outbox WHERE event_id=$1)
+		AND NOT EXISTS (SELECT 1 FROM mamony_identity.passkey_activation_notices WHERE event_id=$1)`,
+		first.Checkpoint).Scan(&held, &missing); err != nil || !held || !missing {
+		t.Fatal("repeated candidate is not held or unexpectedly contains the missing checkpoint")
+	}
+	if got := restoreReviewDecision(recordPath, second, second, held, false); got != "HOLD_BINDING_MISMATCH" {
+		t.Fatalf("first recovery record was not rejected on second cluster: %s", got)
+	}
+	// This synthetic completeness override isolates the binding rejection
+	// from the missing-checkpoint rejection. It never authorizes access.
+	if got := restoreReviewDecision(recordPath, second, second, held, true); got != "HOLD_BINDING_MISMATCH" {
+		t.Fatalf("first recovery record bypassed target binding: %s", got)
+	}
+	for _, runtime := range []struct{ dsn, role string }{
+		{sessionDSN, "mamony_identity_session_runtime"},
+		{readerDSN, "mamony_identity_passkey_activation_reader_runtime"},
+		{finishDSN, "mamony_identity_passkey_activation_finisher_runtime"},
+	} {
+		u, err := url.Parse(runtime.dsn)
+		if err != nil || u.User == nil || u.User.Username() != runtime.role {
+			t.Fatal("invalid repeat runtime fixture")
+		}
+		u.Host = net.JoinHostPort("127.0.0.1", port)
+		u.Path = "/mamony_test_stale_restore"
+		attempt, cancel := context.WithTimeout(ctx, 3*time.Second)
+		conn, err := pgx.Connect(attempt, u.String())
+		cancel()
+		if err == nil {
+			_ = conn.Close(context.Background())
+			t.Fatal("repeated held runtime unexpectedly connected")
+		}
+		var denied *pgconn.PgError
+		if !errors.As(err, &denied) || denied.Code != "28000" {
+			t.Fatal("repeated runtime login not authoritatively denied")
+		}
+	}
+	// A new record with correct bindings still cannot resolve absent history.
+	path := filepath.Join(t.TempDir(), "repeat-review.json")
+	raw, err := json.Marshal(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal("cannot write repeated synthetic review record")
+	}
+	if got := restoreReviewDecision(path, second, second, held, false); got != "HOLD_EVIDENCE_INCOMPLETE" {
+		t.Fatalf("new record incorrectly resolved missing checkpoint: %s", got)
+	}
+	t.Log("IRF-REPEAT RESTORE MECHANISM PASS: actual second cluster rejects first review record; new record remains held; three runtime logins denied")
 }
