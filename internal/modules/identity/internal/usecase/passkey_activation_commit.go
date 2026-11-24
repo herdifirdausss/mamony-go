@@ -15,7 +15,7 @@ var (
 
 // PasskeyActivationFinishRequest is the ONE cryptographically verified v35
 // snapshot paired with its original v34 nonce. It is not an approval, session,
-// or independent recovery factor. A future isolated SQL authority MUST compare
+// or independent recovery factor. The isolated SQL authority MUST compare
 // every expected value to freshly locked server rows before any transition.
 type PasskeyActivationFinishRequest struct {
 	SessionDigest [32]byte
@@ -25,8 +25,8 @@ type PasskeyActivationFinishRequest struct {
 	EventID       string
 }
 
-// PasskeyActivationFinishStore is intentionally UNIMPLEMENTED by any runtime.
-// The future EXECUTE-only PostgreSQL role must perform nonce consumption,
+// PasskeyActivationFinishStore is deliberately absent from HTTP/runtime wiring.
+// The separately privileged SQL adapter in draft PR #81 implements nonce consumption,
 // credential state/counter transition, identifier-only audit and mandatory
 // notice as ONE transaction. No caller may implement this with independent
 // UPDATEs or use its boolean result as a login/recovery authorization.
@@ -35,9 +35,9 @@ type PasskeyActivationFinishStore interface {
 }
 
 // PasskeyActivationCommitter prepares an exact signature-to-SQL handoff.
-// It is intentionally unmounted and has no concrete SQL store/role. No
-// POSSESSION_VERIFIED or ACTIVE state exists yet. The implementation cannot
-// be used until the Critical design is accepted and independently reviewed.
+// It remains unmounted. Draft migration 000035 and a concrete SQL adapter
+// can persist POSSESSION_VERIFIED only, with no ACTIVE/login authority.
+// Neither draft component is approved for deployment or public use.
 type PasskeyActivationCommitter struct {
 	proof  *PasskeyActivationAssertionVerifier
 	store  PasskeyActivationFinishStore
