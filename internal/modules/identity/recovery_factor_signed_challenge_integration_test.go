@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -370,4 +371,75 @@ func TestIdentityZRecoveryFactorSignedChallenge(t *testing.T) {
 		revokedSubject).Scan(&revokedCodes, &revokedCodeEvents); err != nil || revokedCodes != 0 || revokedCodeEvents != 0 {
 		t.Fatal("revoked factor produced codes or an enrollment audit")
 	}
+
+	// Keep the revoked key and outstanding approval intact. A fresh
+	// session/reauth grant must not reopen initial enrollment.
+	tag, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1", revokedSubject)
+	if err != nil || tag.RowsAffected() != 1 {
+		t.Fatal("scoped revoked-factor epoch mutation failed")
+	}
+	grantConn, err := pgx.Connect(ctx, grantDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = grantConn.Close(context.Background()) }()
+	sessionConn, err := pgx.Connect(ctx, sessionDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sessionConn.Close(context.Background()) }()
+	loginDigest := sha256.Sum256([]byte("synthetic factor recovery login " + revokedSubject))
+	sessionDigest := sha256.Sum256([]byte("synthetic factor recovery session " + revokedSubject))
+	rotationDigest := sha256.Sum256([]byte("synthetic factor recovery rotation " + revokedSubject))
+	var allowed bool
+	if err := grantConn.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
+		revokedSubject, revokedEpoch+1, loginDigest[:]).Scan(&allowed); err != nil || !allowed {
+		t.Fatal("fresh factor fixture login grant denied")
+	}
+	if err := sessionConn.QueryRow(ctx, "SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+		loginDigest[:], sessionDigest[:], randomSyntheticID(t, "evt_")).Scan(&allowed); err != nil || !allowed {
+		t.Fatal("fresh factor fixture session denied")
+	}
+	var owner string
+	if err := sessionConn.QueryRow(ctx, "SELECT coalesce(mamony_identity.resolve_opaque_session($1),'')",
+		sessionDigest[:]).Scan(&owner); err != nil || owner != revokedSubject {
+		t.Fatal("fresh factor fixture session not valid")
+	}
+	if err := grantConn.QueryRow(ctx, "SELECT mamony_identity.stage_recovery_code_rotation_grant($1,$2,$3)",
+		revokedSubject, revokedEpoch+1, rotationDigest[:]).Scan(&allowed); err != nil || !allowed {
+		t.Fatal("fresh factor fixture rotation grant denied")
+	}
+	approvalDigest, err := usecase.RecoveryEnrollmentApprovalDigest(revokedApproval.ForTrustedEnrollment())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var replacement [5][32]byte
+	for i := range replacement {
+		replacement[i] = sha256.Sum256([]byte("synthetic factor recovery code " + revokedSubject + string(rune('a'+i))))
+	}
+	if ok, err := managerStore.Replace(ctx, sessionDigest, rotationDigest, approvalDigest,
+		replacement, randomSyntheticID(t, "evt_")); err != nil || ok {
+		t.Fatal("revoked prior-epoch approval accepted with fresh authority")
+	}
+	var retained bool
+	if err := admin.QueryRow(ctx, `SELECT
+		EXISTS (SELECT 1 FROM mamony_identity.recovery_code_factor_keys
+		 WHERE subject_id=$1 AND bound_epoch=$2 AND revoked_at IS NOT NULL)
+		AND EXISTS (SELECT 1 FROM mamony_identity.password_recovery_code_enrollment_approvals
+		 WHERE subject_id=$1 AND subject_epoch=$2 AND proof_digest=$3
+		   AND consumed_at IS NULL AND expires_at>clock_timestamp())
+		AND EXISTS (SELECT 1 FROM mamony_identity.recovery_code_factor_challenges
+		 WHERE challenge_id=$4 AND consumed_at IS NOT NULL)
+		AND EXISTS (SELECT 1 FROM mamony_identity.password_login_grants
+		 WHERE grant_digest=$5 AND consumed_at IS NULL AND expires_at>clock_timestamp())
+		AND NOT EXISTS (SELECT 1 FROM mamony_identity.password_recovery_offline_codes WHERE subject_id=$1)
+		AND (SELECT count(*)=1 FROM mamony_identity.security_outbox
+		 WHERE subject_id=$1 AND event_type='RECOVERY_FACTOR_APPROVED')
+		AND NOT EXISTS (SELECT 1 FROM mamony_identity.security_outbox
+		 WHERE subject_id=$1 AND event_type='RECOVERY_CODES_ENROLLED')
+		AND NOT EXISTS (SELECT 1 FROM mamony_identity.password_recovery_code_notices WHERE subject_id=$1)`,
+		revokedSubject, revokedEpoch, approvalDigest[:], revokedChallenge.ChallengeID(), rotationDigest[:]).Scan(&retained); err != nil || !retained {
+		t.Fatal("factor denial failed to preserve revocation, approval, challenge or audit history")
+	}
+	t.Log("IRF-FACTOR MECHANISM PASS: revoked prior-epoch approval denied with fresh authority; revocation and proof history retained")
 }
