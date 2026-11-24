@@ -1,6 +1,6 @@
 # Platform native PostgreSQL recovery lab
 
-**Status:** OWNER LAB SCOPE ACCEPTED; independent G3 technical acceptance pending; implementation NOT RUN.
+**Status:** OWNER LAB SCOPE ACCEPTED; independent G3 technical acceptance pending; RH-01 candidate implemented, execution NOT RUN at this revision.
 **Owner:** Platform/database foundation ([Issue #14](https://github.com/herdifirdausss/mamony-go/issues/14), PGF-06). Identity dependency: #78; separate Draft #81 is unchanged.
 **Decision record:** [owner acceptance](https://github.com/herdifirdausss/mamony-go/issues/14#issuecomment-7133295432). Risk path: Critical recovery verification. No production behavior is approved.
 **Contracts:** [PostgreSQL](../contracts/postgresql.md), [Platform](../contracts/platform.md) FND-08/FND-12, [recovery runbook](../runbooks/recovery.md), DEC-01/12/17. Checked 2026-11-24.
@@ -42,8 +42,14 @@ Physical restore preserves the source system identifier; do not reuse the logica
 
 Trust model: trusted synthetic lab administrator/runner; source state and known commit boundary are controlled by the fixture. No claim about a malicious privileged writer, archive tampering by administrator, production durability, or acknowledged tail when source is lost. The lab boundary is not a general commit watermark. No production security policy selection.
 
-**Technical acceptance:** pending. Main currently requires independent Critical technical approval before coding. The earlier draft-only exception was proposed within unmerged #81; it is not active on main. This design-only PR does not change the workflow or import #81. Do not code the lab until independent technical acceptance or a separately adopted governance decision permits the bounded synthetic slice.
+**Technical acceptance:** pending. Governance PR [#89](https://github.com/herdifirdausss/mamony-go/pull/89) is now merged and the active main lifecycle permits an explicitly owner-approved bounded synthetic Draft experiment. The recorded #14 scope covers this RH-01/RH-02 lab only. Independent technical acceptance is not claimed, and no synthetic merge or production release is authorized.
 
 ## G4–G5 — Implementation handoff
 
-After the gate, implement the positive native restore first, then required-segment and metadata/boundary negatives, with mandatory case markers and actual CI log verification. Use existing PostgreSQL integration workflow, no new runtime package. Record exact SHA and individual results in Issue #14. All RH-01/RH-02 cases NOT RUN. No merge or release approval. Follow independent review and exact-head CI before merge. Later RH-03–05 remain separate decisions.
+Implement the positive native restore first, then required-segment and metadata/boundary negatives, with mandatory case markers and actual CI log verification. Use existing PostgreSQL integration workflow, no new runtime package. Record exact SHA and individual results in Issue #14. All RH-01/RH-02 cases NOT RUN. No merge or release approval. Follow independent review and exact-head CI before merge. Later RH-03–05 remain separate decisions.
+
+### RH-01 candidate — 2026-11-24
+
+- `tools/postgrestest/check-platform-native-pitr.sh` (a83b295, 1a5ab68) implements the bounded synthetic marker experiment in two newly created PostgreSQL 18.7 containers with network mode none. No external database arguments, published ports or application runtime. Local socket trust is restricted to disposable fixtures; not a production authentication pattern.
+- Separate committed transactions establish pre/post-backup markers; a rolled-back marker and a later committed marker must be absent at the selected boundary. Verify native backup manifest, post-backup archive segment outside base WAL, source physical lineage, external process-local boundary record, named target pause and exact restored rows. Record backup/restore elapsed seconds; do not claim RTO/RPO or independent custody. The fixture intentionally commits a later marker to distinguish target-specific replay from latest-state recovery, then stops the source before copying the archive.
+- CI step e1afee7 requires all three RH-01 case markers and successful script exit; no existing checks removed. RH-01a/b/c candidate **NOT RUN** pending exact-head GitHub CI. RH-02a/b/c **NOT RUN** (not implemented). No release, reconciliation or production changes. The working environment has no local Docker executable; actual execution must be verified in CI. Independent review and exact-head verification remain pending.
