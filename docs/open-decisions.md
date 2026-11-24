@@ -349,10 +349,12 @@ factor, real delivered security notice, or production authorization.
 
 **Unverified release-sensitive scenarios** remain distinct from achieved CI checks: cross-role
 provisioning outside disposable fixtures, arbitrary network partitions during COMMIT
-(disposable PostgreSQL now passes **pre-COMMIT-request TCP disconnect**,
-**post-server-CommandComplete TCP-ACK disconnect**, and
-application-side post-COMMIT acknowledgment loss, but arbitrary mid-COMMIT
-partitions, server crash, failover and restore remain unproven),
+(disposable PostgreSQL now passes **pre-COMMIT-request disconnect**,
+**full COMMIT TCP write followed by disconnect before any response**
+with either atomic outcome accepted, **post-server-CommandComplete
+ACK disconnect**, and application-side acknowledgment loss; arbitrary
+partitions during server processing, crashes, failover and restore
+remain unproven),
 counter/backup handling on real production authenticators (synthetic real-ES256
 PostgreSQL counter/BE/BS fixtures now exist), genuine
 registration-intent/admission replacement during concurrent writes, rollback
