@@ -80,3 +80,7 @@ jobs:
         env:
           PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
         run: bash tools/postgrestest/check-passkey-crash-recovery.sh
+      - name: Verify v36 logical backup restore on separate disposable PostgreSQL
+        env:
+          PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: bash tools/postgrestest/check-passkey-backup-restore.sh
