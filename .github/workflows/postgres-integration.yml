@@ -74,7 +74,9 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Verify synthetic database roles and RLS behavior
+      - name: Verify synthetic database roles and RLS behavior (including stale-restore negative control)
+        env:
+          PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
         run: make integration
       - name: Verify v36 passkey persistence after forced PostgreSQL SIGKILL/restart
         env:
