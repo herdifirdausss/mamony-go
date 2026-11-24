@@ -1350,27 +1350,10 @@ func captureStalePasskeyDump(t *testing.T, ctx context.Context, dsn string, admi
 	return dump
 }
 
-func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Conn, dump []byte,
-	sessionDSN, readerDSN, finishDSN, bearer, challenge string, assertion []byte, account string, credential []byte) {
+// openHeldStalePasskeyTarget owns a fresh disposable restore container.
+// Recreated roles must be NOLOGIN; callers never pass production backups.
+func openHeldStalePasskeyTarget(t *testing.T, ctx context.Context, sourceID string, roles, dump []byte) (string, string, *pgx.Conn) {
 	t.Helper()
-	// Source commit has been verified and its original assertion denied on
-	// replay. Keep the source event identifier outside the restored database.
-	var sourceEvent string
-	if err := source.QueryRow(ctx, "SELECT possession_event_id FROM mamony_identity.passkey_credentials "+
-		"WHERE credential_id=$1 AND state='POSSESSION_VERIFIED'", credential).Scan(&sourceEvent); err != nil {
-		t.Fatal("source possession event absent")
-	}
-	sourceID := os.Getenv("MAMONY_TEST_PG_SERVICE_CONTAINER_ID")
-	roles := stalePasskeyDocker(t, ctx, nil, "exec", sourceID, "psql", "-XAt", "-v", "ON_ERROR_STOP=1",
-		"-U", "mamony_test_admin", "-d", "mamony_test_ci", "-c",
-		"SELECT format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;', rolname) "+
-			"FROM pg_catalog.pg_roles WHERE rolname LIKE 'mamony_%' AND rolname <> 'mamony_test_admin' ORDER BY rolname")
-	// Preserve object ownership/ACLs. Set test-only passwords for the three
-	// later negative-control roles but leave all restored principals NOLOGIN.
-	roles = append(roles, []byte(
-		"ALTER ROLE mamony_identity_session_runtime NOLOGIN PASSWORD 'local-test-identity-session';\n"+
-			"ALTER ROLE mamony_identity_passkey_activation_reader_runtime NOLOGIN PASSWORD 'local-test-passkey-activation-reader';\n"+
-			"ALTER ROLE mamony_identity_passkey_activation_finisher_runtime NOLOGIN PASSWORD 'local-test-passkey-activation-finisher';\n")...)
 	target := strings.TrimSpace(string(stalePasskeyDocker(t, ctx, nil, "run", "--rm", "-d",
 		"-e", "POSTGRES_DB=mamony_test_stale_restore", "-e", "POSTGRES_USER=mamony_test_admin",
 		"-e", "POSTGRES_PASSWORD=local-test-stale-admin", "-p", "127.0.0.1::5432", "postgres:18.7")))
@@ -1404,11 +1387,36 @@ func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Con
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	defer func() { _ = admin.Close(context.Background()) }()
+	t.Cleanup(func() { _ = admin.Close(context.Background()) })
 	stalePasskeyDocker(t, ctx, roles, "exec", "-i", target, "psql", "-Xq", "-v", "ON_ERROR_STOP=1",
 		"-U", "mamony_test_admin", "-d", "mamony_test_stale_restore")
 	stalePasskeyDocker(t, ctx, dump, "exec", "-i", target, "pg_restore", "-U", "mamony_test_admin",
 		"-d", "mamony_test_stale_restore", "--single-transaction", "--exit-on-error")
+	return target, port, admin
+}
+
+func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Conn, dump []byte,
+	sessionDSN, readerDSN, finishDSN, bearer, challenge string, assertion []byte, account string, credential []byte) {
+	t.Helper()
+	// Source commit has been verified and its original assertion denied on
+	// replay. Keep the source event identifier outside the restored database.
+	var sourceEvent string
+	if err := source.QueryRow(ctx, "SELECT possession_event_id FROM mamony_identity.passkey_credentials "+
+		"WHERE credential_id=$1 AND state='POSSESSION_VERIFIED'", credential).Scan(&sourceEvent); err != nil {
+		t.Fatal("source possession event absent")
+	}
+	sourceID := os.Getenv("MAMONY_TEST_PG_SERVICE_CONTAINER_ID")
+	roles := stalePasskeyDocker(t, ctx, nil, "exec", sourceID, "psql", "-XAt", "-v", "ON_ERROR_STOP=1",
+		"-U", "mamony_test_admin", "-d", "mamony_test_ci", "-c",
+		"SELECT format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;', rolname) "+
+			"FROM pg_catalog.pg_roles WHERE rolname LIKE 'mamony_%' AND rolname <> 'mamony_test_admin' ORDER BY rolname")
+	// Preserve object ownership/ACLs. Set test-only passwords for the three
+	// later negative-control roles but leave all restored principals NOLOGIN.
+	roles = append(roles, []byte(
+		"ALTER ROLE mamony_identity_session_runtime NOLOGIN PASSWORD 'local-test-identity-session';\n"+
+			"ALTER ROLE mamony_identity_passkey_activation_reader_runtime NOLOGIN PASSWORD 'local-test-passkey-activation-reader';\n"+
+			"ALTER ROLE mamony_identity_passkey_activation_finisher_runtime NOLOGIN PASSWORD 'local-test-passkey-activation-finisher';\n")...)
+	target, port, admin := openHeldStalePasskeyTarget(t, ctx, sourceID, roles, dump)
 	var state string
 	var consumed, fresh bool
 	var events, notices int
@@ -1486,7 +1494,7 @@ func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Con
 		t.Fatal("held restore changed stale fixture or challenge expired")
 	}
 	t.Log("IRF-RESTORE HOLD MECHANISM PASS: actual stale Identity target denies three runtime logins; surviving event/notice absent; no release authorized")
-	checkHeldRestoreReviewRecord(t, ctx, source, admin, target, dump, sourceEvent, held, targetEvidence)
+	recordPath, firstBinding := checkHeldRestoreReviewRecord(t, ctx, source, admin, target, dump, sourceEvent, held, targetEvidence)
 
 	// Deliberately remove the lab hold ONLY to run the existing exposure
 	// negative control below. This is not a recovery release transition.
@@ -1564,4 +1572,13 @@ func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Con
 		t.Fatal("stale replay did not atomically commit a distinct possession event")
 	}
 	t.Log("PKA-R01 NEGATIVE CONTROL: previously consumed signed assertion accepted on stale restore; original audit/notice absent, distinct event committed; recovery protection NOT IMPLEMENTED")
+
+	// The second candidate uses the same captured backup and role DDL,
+	// but never enables its runtime logins, even for the exposure control.
+	repeat, repeatPort, repeatAdmin := openHeldStalePasskeyTarget(t, ctx, sourceID, roles, dump)
+	if repeat == target || repeatPort == port {
+		t.Fatal("repeated restore did not create a distinct target")
+	}
+	checkRepeatedRestoreReviewRecord(t, ctx, repeatAdmin, repeat, repeatPort, dump,
+		recordPath, firstBinding, sessionDSN, readerDSN, finishDSN)
 }
