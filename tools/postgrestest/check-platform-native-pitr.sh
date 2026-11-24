@@ -43,7 +43,7 @@ prepare() {
 source_id=$(new_container)
 check_container "$source_id"
 prepare "$source_id"
-pg "$source_id" initdb -D "$root/data" -U lab_admin --auth-local=trust --auth-host=scram-sha-256 >/dev/null
+pg "$source_id" initdb -D "$root/data" -U lab_admin --auth-local=trust --auth-host=trust >/dev/null
 docker exec -i -u postgres "$source_id" sh -c "cat >> $root/data/postgresql.conf" <<'CONF'
 listen_addresses = ''
 unix_socket_directories = '/tmp/mamony-pitr/socket'
@@ -59,7 +59,8 @@ pg "$source_id" pg_verifybackup "$root/base"
 echo "RH-01a PASS: native backup verified; elapsed_seconds=$((SECONDS-started))"
 # Force the post-backup boundary into WAL beyond the streamed backup.
 sql "$source_id" -c "SELECT pg_switch_wal();" >/dev/null
-sql "$source_id" -c "INSERT INTO lab_marker VALUES (2); BEGIN; INSERT INTO lab_marker VALUES (3); ROLLBACK;" >/dev/null
+sql "$source_id" -c "INSERT INTO lab_marker VALUES (2);" >/dev/null
+sql "$source_id" -c "BEGIN; INSERT INTO lab_marker VALUES (3); ROLLBACK;" >/dev/null
 boundary=$(sql "$source_id" -c "SELECT pg_create_restore_point('mamony_lab_boundary');")
 [[ "$boundary" =~ ^[0-9A-F]+/[0-9A-F]+$ ]] || fail "invalid boundary"
 segment=$(sql "$source_id" -c "SELECT pg_walfile_name('$boundary'::pg_lsn);")
