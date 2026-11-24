@@ -1,6 +1,6 @@
 # Ledger and cross-border payments: financial architecture proposal
 
-- Status: **PROPOSED — Critical; G0/G1 research consolidated; G2/G3 unaccepted.**
+- Status: **Critical — G0/G1 research consolidated; owner accepted the scoped Ledger Core G2 and selected Option A; G3 independent technical acceptance pending.** Downstream financial scope remains proposed; canonical promotion and implementation blocked. See Stage L for the decision record.
 - Intake: [#86](https://github.com/herdifirdausss/mamony-go/issues/86); review: [PR #87](https://github.com/herdifirdausss/mamony-go/pull/87).
 - Research baseline: main f82b47c5a198e731f652053bc050aace3d91f58c. Consolidation: 2026-11-24.
 - Owner: repository owner; independent technical reviewer not designated.
