@@ -27,6 +27,7 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	platformpg "github.com/herdifirdausss/mamony-go/internal/platform/postgres"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // syntheticPostCommitAckLoss runs the real PostgreSQL SQL transaction to
@@ -1364,12 +1365,12 @@ func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Con
 		"-U", "mamony_test_admin", "-d", "mamony_test_ci", "-c",
 		"SELECT format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;', rolname) "+
 			"FROM pg_catalog.pg_roles WHERE rolname LIKE 'mamony_%' AND rolname <> 'mamony_test_admin' ORDER BY rolname")
-	// Preserve object ownership/ACLs, but provision only the three synthetic
-	// runtime logins needed for this experiment, not source role passwords.
+	// Preserve object ownership/ACLs. Set test-only passwords for the three
+	// later negative-control roles but leave all restored principals NOLOGIN.
 	roles = append(roles, []byte(
-		"ALTER ROLE mamony_identity_session_runtime LOGIN PASSWORD 'local-test-identity-session';\n"+
-			"ALTER ROLE mamony_identity_passkey_activation_reader_runtime LOGIN PASSWORD 'local-test-passkey-activation-reader';\n"+
-			"ALTER ROLE mamony_identity_passkey_activation_finisher_runtime LOGIN PASSWORD 'local-test-passkey-activation-finisher';\n")...)
+		"ALTER ROLE mamony_identity_session_runtime NOLOGIN PASSWORD 'local-test-identity-session';\n"+
+			"ALTER ROLE mamony_identity_passkey_activation_reader_runtime NOLOGIN PASSWORD 'local-test-passkey-activation-reader';\n"+
+			"ALTER ROLE mamony_identity_passkey_activation_finisher_runtime NOLOGIN PASSWORD 'local-test-passkey-activation-finisher';\n")...)
 	target := strings.TrimSpace(string(stalePasskeyDocker(t, ctx, nil, "run", "--rm", "-d",
 		"-e", "POSTGRES_DB=mamony_test_stale_restore", "-e", "POSTGRES_USER=mamony_test_admin",
 		"-e", "POSTGRES_PASSWORD=local-test-stale-admin", "-p", "127.0.0.1::5432", "postgres:18.7")))
@@ -1429,6 +1430,73 @@ func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Con
 	}
 	if !fresh {
 		t.Fatal("stale restore negative control inconclusive: challenge expired")
+	}
+	// Actual restored Identity schema, not the marker-only fencing drill.
+	// The source event is a surviving test oracle, not a production journal.
+	var sourceEvidence, targetEvidence, held bool
+	if err := source.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM mamony_identity.security_outbox o
+		JOIN mamony_identity.passkey_activation_notices n USING(event_id)
+		WHERE o.event_id=$1 AND o.subject_id=$2 AND n.subject_id=$2
+		  AND o.event_type='PASSKEY_POSSESSION_VERIFIED')`, sourceEvent, account).Scan(&sourceEvidence); err != nil || !sourceEvidence {
+		t.Fatal("surviving source event/notice evidence missing")
+	}
+	if err := admin.QueryRow(ctx, `SELECT
+		EXISTS (SELECT 1 FROM mamony_identity.security_outbox WHERE event_id=$1)
+		OR EXISTS (SELECT 1 FROM mamony_identity.passkey_activation_notices WHERE event_id=$1)`,
+		sourceEvent).Scan(&targetEvidence); err != nil || targetEvidence {
+		t.Fatal("expected exact source evidence absent from stale target")
+	}
+	if err := admin.QueryRow(ctx, `SELECT
+		NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+		 WHERE rolname LIKE 'mamony_%' AND rolname<>'mamony_test_admin' AND rolcanlogin)
+		AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity
+		 WHERE datname=current_database() AND usename LIKE 'mamony_%' AND usename<>'mamony_test_admin')`).Scan(&held); err != nil || !held {
+		t.Fatal("restored Identity fixture is not held")
+	}
+	targetRuntimeURL := func(raw, role string) string {
+		t.Helper()
+		u, err := url.Parse(raw)
+		if err != nil || u.User == nil || u.User.Username() != role {
+			t.Fatal("invalid runtime fixture")
+		}
+		u.Host = net.JoinHostPort("127.0.0.1", port)
+		u.Path = "/mamony_test_stale_restore"
+		return u.String()
+	}
+	for _, runtime := range []struct{ dsn, role string }{
+		{sessionDSN, "mamony_identity_session_runtime"},
+		{readerDSN, "mamony_identity_passkey_activation_reader_runtime"},
+		{finishDSN, "mamony_identity_passkey_activation_finisher_runtime"},
+	} {
+		attempt, cancel := context.WithTimeout(ctx, 3*time.Second)
+		conn, err := pgx.Connect(attempt, targetRuntimeURL(runtime.dsn, runtime.role))
+		cancel()
+		if err == nil {
+			_ = conn.Close(context.Background())
+			t.Fatal("held restored runtime unexpectedly connected")
+		}
+		var denied *pgconn.PgError
+		if !errors.As(err, &denied) || denied.Code != "28000" {
+			t.Fatal("held runtime connection did not return authoritative authorization denial")
+		}
+	}
+	checkState()
+	if state != "PENDING_ASSERTION" || consumed || !fresh || events != 0 || notices != 0 {
+		t.Fatal("held restore changed stale fixture or challenge expired")
+	}
+	t.Log("IRF-RESTORE HOLD MECHANISM PASS: actual stale Identity target denies three runtime logins; surviving event/notice absent; no release authorized")
+
+	// Deliberately remove the lab hold ONLY to run the existing exposure
+	// negative control below. This is not a recovery release transition.
+	if _, err := admin.Exec(ctx, "ALTER ROLE mamony_identity_session_runtime LOGIN"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, "ALTER ROLE mamony_identity_passkey_activation_reader_runtime LOGIN"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, "ALTER ROLE mamony_identity_passkey_activation_finisher_runtime LOGIN"); err != nil {
+		t.Fatal(err)
 	}
 	open := func(raw, role string) *platformpg.Pool {
 		t.Helper()
