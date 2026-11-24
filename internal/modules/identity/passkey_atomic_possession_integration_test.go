@@ -1166,7 +1166,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 				t.Fatalf("invalid signed counter/flags were not denied: %v", verifyErr)
 			}
 			var staleDump []byte
-			if tc.name == "counter_one_to_two" && os.Getenv("PG_SERVICE_CONTAINER_ID") != "" {
+			if tc.name == "counter_one_to_two" && os.Getenv("MAMONY_TEST_PG_SERVICE_CONTAINER_ID") != "" {
 				staleDump = captureStalePasskeyDump(t, ctx, adminDSN, admin)
 			}
 			var finishErr error
@@ -1315,7 +1315,7 @@ func stalePasskeyDocker(t *testing.T, ctx context.Context, input []byte, args ..
 
 func captureStalePasskeyDump(t *testing.T, ctx context.Context, dsn string, admin *pgx.Conn) []byte {
 	t.Helper()
-	id := os.Getenv("PG_SERVICE_CONTAINER_ID")
+	id := os.Getenv("MAMONY_TEST_PG_SERVICE_CONTAINER_ID")
 	if os.Getenv("GITHUB_ACTIONS") != "true" ||
 		dsn != "postgres://mamony_test_admin:local-test-admin@127.0.0.1:5432/mamony_test_ci?sslmode=disable" ||
 		!regexp.MustCompile("^[a-f0-9]{12,64}$").MatchString(id) {
@@ -1359,7 +1359,7 @@ func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Con
 		"WHERE credential_id=$1 AND state='POSSESSION_VERIFIED'", credential).Scan(&sourceEvent); err != nil {
 		t.Fatal("source possession event absent")
 	}
-	sourceID := os.Getenv("PG_SERVICE_CONTAINER_ID")
+	sourceID := os.Getenv("MAMONY_TEST_PG_SERVICE_CONTAINER_ID")
 	roles := stalePasskeyDocker(t, ctx, nil, "exec", sourceID, "psql", "-XAt", "-v", "ON_ERROR_STOP=1",
 		"-U", "mamony_test_admin", "-d", "mamony_test_ci", "-c",
 		"SELECT format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;', rolname) "+
