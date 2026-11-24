@@ -17,15 +17,15 @@ import (
 // Lab-only binding and decision oracle. No application imports this code,
 // and it cannot enable a login or release a recovery target.
 type restoreReviewBinding struct {
-	AttemptID   string
-	ContainerID string
-	ClusterID   string
-	Database    string
-	DatabaseOID string
-	BackupSHA   string
-	SchemaSHA   string
+	AttemptID    string
+	ContainerID  string
+	ClusterID    string
+	Database     string
+	DatabaseOID  string
+	BackupSHA    string
+	SchemaSHA    string
 	RoleNamesSHA string
-	Checkpoint  string
+	Checkpoint   string
 }
 
 func (b restoreReviewBinding) complete() bool {
