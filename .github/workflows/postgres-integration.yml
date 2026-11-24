@@ -87,6 +87,8 @@ jobs:
           grep -Fq 'IRF-RECOVERY MECHANISM PASS: live old challenge denied with synthetic current assurance; original positive control rolled back' "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'IRF-OFFLINE MECHANISM PASS: old code denied with fresh session and rotation grant; prior set and evidence retained' "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'IRF-FACTOR MECHANISM PASS: revoked prior-epoch approval denied with fresh authority; revocation and proof history retained' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-ASSURANCE MECHANISM PASS: old offline code denied with current challenge; current code accepted and old history retained' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-APPROVAL MECHANISM PASS: old enrollment approval denied with current key, session and rotation grant' "$RUNNER_TEMP/mamony-integration.log"
       - name: Verify Identity recovery inventory against migrated PostgreSQL catalog
         env:
           PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
