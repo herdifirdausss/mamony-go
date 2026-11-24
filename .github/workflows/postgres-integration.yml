@@ -82,6 +82,9 @@ jobs:
           set -o pipefail
           make integration | tee "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'PKA-R01 NEGATIVE CONTROL: previously consumed signed assertion accepted on stale restore' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-EMAIL NEGATIVE CONTROL: epoch-only change did not invalidate contact-bound proof' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-EMAIL REVOCATION MECHANISM PASS: old proof denied, history retained, fresh proof accepted' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-RECOVERY MECHANISM PASS: live old challenge denied with synthetic current assurance; original positive control rolled back' "$RUNNER_TEMP/mamony-integration.log"
       - name: Verify Identity recovery inventory against migrated PostgreSQL catalog
         env:
           PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
