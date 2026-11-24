@@ -57,7 +57,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		t.Cleanup(p.Close)
 		return p
 	}
-	sessStore, err := identitypg.NewOpaqueSessionStore(open(sessionDSN, "mamony_identity_session_runtime", 20))
+	sessStore, err := identitypg.NewOpaqueSessionStore(open(sessionDSN, "mamony_identity_session_runtime", 8))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readStore, err := identitypg.NewPasskeyActivationEvidenceStore(open(activationReaderDSN, "mamony_identity_passkey_activation_reader_runtime", 20))
+	readStore, err := identitypg.NewPasskeyActivationEvidenceStore(open(activationReaderDSN, "mamony_identity_passkey_activation_reader_runtime", 8))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		t.Fatal(err)
 	}
 	finishStore, err := identitypg.NewPasskeyActivationFinishStore(
-		open(finishDSN, "mamony_identity_passkey_activation_finisher_runtime", 20))
+		open(finishDSN, "mamony_identity_passkey_activation_finisher_runtime", 8))
 	if err != nil {
 		t.Fatal(err)
 	}
