@@ -187,3 +187,27 @@ The following review covers ten temporary-authority tables from migrations 00000
 | passkey_activation_challenges | credential/session binding, epoch/contact, policy generation, expiry, consumption | Deny outstanding activation; preserve links to verified possession records |
 
 Existing epoch checks in 000010/000011/000014 establish a local session/grant fence under the trusted current database. This does not establish anti-rollback currentness or invalidate every proof family (email verification has contact-version binding, not a subject epoch in its creation definition). A recovery design must explicitly address each family; never mark an unused proof as consumed solely to simulate a successful user action. The first proposed lab negative test must verify old sessions and grants are denied while the restored authority stays held; fresh acceptance can be tested only against a separately approved reconciled synthetic fixture. The broader requirements still need current-column and function dependency inventory, retention/FK review, surviving evidence and explicit release policy. No data repair, epoch update, credential mutation, new runtime authority or release code was added in this iteration. Independent review remains required before merge.
+
+
+## G5 corrected inventory evidence and G3 binding/provenance review — 2026-11-24
+
+[PostgreSQL integration 45388769073](https://github.com/herdifirdausss/mamony-go/actions/runs/45388769073), exact SHA `3828a60f298486342ad7031f45dbfc32c8a8730a`, explicitly logged 30 classified tables, no missing/unexpected/duplicate names, and IRF-F01–04 PASS, bounded observation refusal and F05/F06 PARTIAL. This supersedes the failed 29-table inventory evidence, not the unverified recovery requirements.
+
+### Durable binding fields (source-level review; proposed dispositions)
+
+| Table | Reviewed field families | Restore concern and disposition |
+|---|---|---|
+| subjects | subject ID, status, session epoch, creation time | Reconcile current restriction and identity ownership; never thaw by default. |
+| email_aliases | canonical alias, subject, contact version, verified timestamp | Verify current binding and proof status independently; stale verified flag is not current proof. |
+| password_verifiers | subject, KDF version/parameters, salt/digest, creation time | Reconcile latest authorized verifier; do not log or export verifier bytes in recovery evidence. |
+| password_recovery_offline_codes | subject, enrolled epoch/contact, consume timestamp | Restore can resurrect consumed or rotated codes; preserve/reconcile history, do not infer current membership from backup. |
+| recovery_code_factor_keys | subject/public key, bound epoch/contact, revocation timestamp | Reconcile authorized binding and latest revocation; uncertainty stays held. |
+| passkey_credentials | subject, intent, RP/origin, registration provenance, state, counter/backup state, possession event and challenge | Preserve provenance; reconcile latest authoritative credential state. POSSESSION_VERIFIED does not authorize login/recovery. |
+
+Sources: migrations 000001, 000002, 000010, 000014, 000024, 000028, 000033 and 000035. Reviewed creation definitions and selected later changes, not an exhaustive field-level current schema review. Actual reconciliation policy requires owner decision on missing/incomplete evidence and surviving authority; no mutation is authorized here.
+
+### Audit, proof delivery and notice dependency review
+
+The five notice tables reference both the security event and subject. Both proof-delivery tables reference their respective challenge. Passkey credentials reference original registration and possession events; activation challenges reference the credential. Deleting these parents or reconstructing events with a fabricated successful action is not a valid recovery procedure. Migration 000035's possession notice trigger checks original runtime authority and trusted contact. A recovery operation may not silently bypass that policy. Provider receipt ledgers store digests and delivery-state evidence; the creation definitions in 000017/000023/000027 do not establish a direct foreign key to notice rows. Application-level matching, provider uncertainty, retention and suppression require separate review; a provider acceptance is not user receipt.
+
+Added [targeted read-only provenance guard](../../tools/postgrestest/identity-recovery-provenance.sql) for 17 selected single-column FK links. It requires a validated FK with NO ACTION or RESTRICT delete semantics. It is intentionally not a complete dependency inventory: it does not prove application-level semantic consistency, triggers, privileges, matching of notice destination/event type, immutable audit evidence, or anti-rollback. New CI step is NOT RUN pending exact-head verification. Full reconciliation and pre-recovery grant invalidation remain unimplemented. No production runtime, migration, role, route or release change.
