@@ -1600,3 +1600,71 @@ func TestPostgresIdentityZPasskeyActivationRoles(t *testing.T) {
 		}
 	}
 }
+
+// TestPostgresIdentityZPasskeyActivationFinisherRole proves that the new v36
+// signature-claim consumer is EXECUTE-only and isolated from all v30-v35
+// principals. A valid-looking call with no session must return false.
+func TestPostgresIdentityZPasskeyActivationFinisherRole(t *testing.T) {
+	const finish = "SELECT mamony_identity.finish_verified_passkey_possession(" +
+		"decode(repeat('11',32),'hex'),'pav_AAAAAAAAAAAAAAAAAAAAAA'," +
+		"decode(repeat('22',32),'hex'),1,'login.example.test'," +
+		"'https://login.example.test',decode(repeat('33',32),'hex')," +
+		"decode(repeat('44',64),'hex'),decode(repeat('00',16),'hex')," +
+		"0,false,false,1,false,false,true,true,'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL", "-c", finish)
+	if err != nil || out != "f" {
+		t.Fatalf("v36 unknown session was not denied: out=%q err=%v", out, err)
+	}
+	for _, sql := range []string{
+		"SELECT * FROM mamony_identity.passkey_credentials",
+		"SELECT * FROM mamony_identity.passkey_activation_challenges",
+		"SELECT * FROM mamony_identity.passkey_activation_notices",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.passkey_registration_intents",
+		"UPDATE mamony_identity.passkey_credentials SET state='POSSESSION_VERIFIED'",
+		"UPDATE mamony_identity.passkey_activation_challenges SET consumed_at=clock_timestamp()",
+		"DELETE FROM mamony_identity.passkey_activation_notices",
+		"SELECT mamony_identity.issue_passkey_activation_challenge(" +
+			"decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex')," +
+			"'pav_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('33',32),'hex')," +
+			"'login.example.test','https://login.example.test')",
+		"SELECT * FROM mamony_identity.read_passkey_activation_challenge(" +
+			"decode(repeat('11',32),'hex'),'pav_AAAAAAAAAAAAAAAAAAAAAA')",
+		"CREATE TABLE mamony_identity.passkey_finisher_escape(x int)",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("v36 finisher role bypassed limitation: sql=%q out=%q err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL",
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", finish)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("v36 other runtime acquired finisher: role=%s out=%q err=%v",
+				role, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL", "-c",
+		"SELECT (NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole "+
+			"AND NOT rolreplication AND NOT rolbypassrls)::text "+
+			"FROM pg_roles WHERE rolname=current_user")
+	if err != nil || out != "true" {
+		t.Fatalf("v36 finisher unexpectedly elevated: out=%q err=%v", out, err)
+	}
+}
