@@ -84,6 +84,7 @@ jobs:
           grep -Fq 'PKA-R01 NEGATIVE CONTROL: previously consumed signed assertion accepted on stale restore' "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'IRF-RESTORE HOLD MECHANISM PASS: actual stale Identity target denies three runtime logins; surviving event/notice absent; no release authorized' "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'IRF-REVIEW RECORD MECHANISM PASS: actual stale target held for missing checkpoint; missing corrupt and mismatched bindings rejected; synthetic review only' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-REPEAT RESTORE MECHANISM PASS: actual second cluster rejects first review record; new record remains held; three runtime logins denied' "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'IRF-EMAIL NEGATIVE CONTROL: epoch-only change did not invalidate contact-bound proof' "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'IRF-EMAIL REVOCATION MECHANISM PASS: old proof denied, history retained, fresh proof accepted' "$RUNNER_TEMP/mamony-integration.log"
           grep -Fq 'IRF-RECOVERY MECHANISM PASS: live old challenge denied with synthetic current assurance; original positive control rolled back' "$RUNNER_TEMP/mamony-integration.log"
