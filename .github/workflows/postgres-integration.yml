@@ -77,7 +77,11 @@ jobs:
       - name: Verify synthetic database roles and RLS behavior (including stale-restore negative control)
         env:
           MAMONY_TEST_PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
-        run: make integration
+        shell: bash
+        run: |
+          set -o pipefail
+          make integration | tee "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'PKA-R01 NEGATIVE CONTROL: previously consumed signed assertion accepted on stale restore' "$RUNNER_TEMP/mamony-integration.log"
       - name: Verify v36 passkey persistence after forced PostgreSQL SIGKILL/restart
         env:
           PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
