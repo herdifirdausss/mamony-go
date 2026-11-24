@@ -1,6 +1,6 @@
 # ADR-0041 — Proposed atomic possession verification of a staged passkey
 
-**Status: PROPOSED / UNACCEPTED.** Related [Critical issue #78](https://github.com/herdifirdausss/mamony-go/issues/78) and [G0–G4 proposal](../proposals/identity-passkey-atomic-activation.md). No implementation, migration, public route, session issuer, production role or security sender has been authorized.
+**Status: PROPOSED / UNACCEPTED.** Related [Critical issue #78](https://github.com/herdifirdausss/mamony-go/issues/78) and [G0–G4 proposal](../proposals/identity-passkey-atomic-activation.md). A **Draft, unmerged implementation candidate** exists in stacked [#80](https://github.com/herdifirdausss/mamony-go/pull/80) and [#81](https://github.com/herdifirdausss/mamony-go/pull/81), but **no activation deployment, public route, session issuer, production role, security sender, or Critical G2/G3 acceptance is authorized**. Code was prepared before the required design acceptance; this is a lifecycle deviation to reconcile before merge.
 
 ## Context
 
@@ -27,7 +27,7 @@ Require real signed WebAuthn assertion fixture coupled with real PostgreSQL test
 
 Remain strictly unmounted; `POSSESSION_VERIFIED` must NOT authorize password-independent account recovery, login, higher assurance or financial approval. The separate notification queue has no worker and `PENDING` is not evidence of delivery. Complete browser options, authorization, ingress/proxy, key custody, role isolation, device loss, backup/restore and alerting decisions before any public release.
 
-**Decision owner approval:** PENDING. **Independent technical acceptance:** PENDING. **Code/CI evidence:** NOT RUN.
+**Decision owner approval:** PENDING. **Independent technical acceptance:** PENDING. **Code/CI evidence:** candidate migration, bounded-role tests and synthetic PostgreSQL/WebAuthn tests exist in Draft #81; see the exact-SHA CI ledger in [#78](https://github.com/herdifirdausss/mamony-go/issues/78), not a production deployment claim.
 
 ## Concurrency and code-review findings (2026-11-23)
 
@@ -37,4 +37,4 @@ The finisher must be given **the exact v35 evidence snapshot**, including byte-i
 
 V34 can overwrite a consumed nonce row. Review whether the credential needs a non-secret `possession_challenge_id`/audit relation to preserve original challenge lineage after overwrite; storing the random nonce or any bearer in audit is out of scope.
 
-The detailed proposed **28-case** acceptance/test matrix and schema/role changes reside in [the Critical proposal](../proposals/identity-passkey-atomic-activation.md#g4-supplement--executable-test-matrix-for-the-future-accepted-slice). All cases are **NOT RUN** pending explicit G2/G3 acceptance.
+The detailed proposed **28-case** acceptance/test matrix and schema/role changes reside in [the Critical proposal](../proposals/identity-passkey-atomic-activation.md#g4-supplement--executable-test-matrix-for-the-future-accepted-slice). **Only a subset is currently exercised** in synthetic PostgreSQL CI; replay, signed snapshot binding, role separation, rollback, and the preverified 16-claim DB race have runnable tests. Distinct-subject, revoke/epoch/contact changes, replaced original intent, counter 0/0 and backup-state transitions, three-way reader/issuer/finisher deadlock, and unknown actual COMMIT outcome remain explicit coverage gaps; no PKA-T01–T28 blanket PASS is justified.

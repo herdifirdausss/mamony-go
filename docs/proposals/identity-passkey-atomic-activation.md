@@ -128,7 +128,7 @@ sequenceDiagram
 |---|---|
 | Existing v35 signed verifier source and existing v33/v34 DB boundaries inspected | REVIEWED |
 | W3C WebAuthn Level 3 and pinned library contract checked | RESEARCHED |
-| New SQL/Go integration test, race/role tests, migration fingerprint | **NOT RUN — not implemented** |
+| Candidate SQL/Go, ES256 race/replay, SQL role tests, migration fingerprint | **IMPLEMENTED IN UNMERGED DRAFT #81; selected synthetic CI checks PASS, exact current SHA in Issue #78** |
 | Security review, owner G2/technical G3 approval | **PENDING** |
 | Production/browser rollout and independent security-notice delivery | **NOT IMPLEMENTED** |
 
@@ -174,13 +174,13 @@ The proposed `POSSESSION_VERIFIED` state must not be treated by existing or futu
 
 ## G4 supplement — executable test matrix for the future accepted slice
 
-All cases below are **PLANNED / NOT RUN**. Run against disposable PostgreSQL with distinct principals and genuine v35 ES256 signing, not mocked storage. No test is allowed to make an unimplemented capability count as PASS.
+These are **PROPOSED acceptance cases, not a blanket PASS**. Draft #81 implements a subset with disposable PostgreSQL and genuine v35 ES256 signing. The coverage ledger below distinguishes executed test behavior from missing tests; reviewer acceptance is still pending.
 
 | ID | Failure/adversarial setup | Expected authoritative DB outcome |
 |---|---|---|
 | PKA-T01 | Signed ES256 assertion on matching staged credential + live original session/nonce | One `POSSESSION_VERIFIED` row, consumed challenge, one activation event and one pending activation notice |
 | PKA-T02 | Same signed assertion submitted again, even with signCount 0/0 | DENY, no second event/notice, no counter change |
-| PKA-T03 | **16 concurrent** finishes using pool with >=16 physical connections, synchronized at SQL admission | Exactly one commit; 15 non-success outcomes (denied, or sanitized unavailable for actual infrastructure failure); no unexpected deadlock or extra event |
+| PKA-T03 | **16 concurrent preverified ES256 SQL finish calls** using separately bounded pools (maximum 8 connections per pool, per repository guard), synchronized before SQL admission | Exactly one commit; 15 non-success outcomes (denied, or sanitized unavailable for actual infrastructure failure); no unexpected deadlock or extra event |
 | PKA-T04 | Valid but different live session of same subject | DENY; no cross-session adoption |
 | PKA-T05 | A different subject (even if it knows the challenge ID/credential ID) | DENY; subject derives only from live session |
 | PKA-T06 | Session revoked, epoch rotated or subject frozen after signature verification but before commit | DENY under locks; no mutation |
@@ -215,4 +215,4 @@ All cases below are **PLANNED / NOT RUN**. Run against disposable PostgreSQL wit
 - Migration file `000035` must include canonical `-- mamony:integrity:v1` trailer calculated over bytes preceding the marker; never edit applied v33/v34 SQL or manually change their fingerprints.
 - Separate human/technical review must inspect the new test assertions themselves to ensure a green test isn't obtained by relaxing the expected denial behavior.
 
-**Status:** all PKA-T cases NOT RUN; design acceptance remains pending in #78.
+**Candidate evidence and remaining gaps (unaccepted):** The new real-PostgreSQL test `TestIdentityZPasskeyAtomicPossession` exercises signed v35 ES256 evidence, exact original same-session nonce, negative RP/COSE/counter claims, forced notice-trigger failure and event-collision rollback, replay, a 16-preverified-claim SQL one-winner race, and expiration after subject-row lock contention. `TestPostgresIdentityZPasskeyActivationFinisherRole` covers restricted EXECUTE and cross-role denial. Existing browser, migration, and package gates run separately. **These tests do not exhaust PKA-T01–T28.** In particular, distinct-subject impersonation, session revoke/epoch/contact change during the finish, superseded registration intent/consumed admission, replaced challenge vs read snapshot, 0/0 and backup-state transition fixtures, three-way v34 issuer/reader vs finisher deadlock, and simulated lost real COMMIT ACK are **NOT RUN** as dedicated v36 DB cases. A synthetic Go fake-unit error cannot substitute for a definite-commit/lost-ack PostgreSQL test. Do not promote proposed PKA IDs into accepted Identity contract until G2/G3 decisions are recorded. Design acceptance remains pending in [#78](https://github.com/herdifirdausss/mamony-go/issues/78).
