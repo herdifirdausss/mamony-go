@@ -592,9 +592,42 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			results <- dbFinishResult{allowed: allowed, err: err}
 		})
 	}
+	// Include the actual v34 reader and issuer in the SAME contention
+	// window. Reader may see the pending proof or its consumed state;
+	// issuer must not replace an outstanding nonce or reactivate a
+	// credential after the finisher wins. Neither may deadlock (40P01).
+	type readResult struct {
+		evidence usecase.PasskeyActivationEvidence
+		err      error
+	}
+	readResults := make(chan readResult, 1)
+	issueResults := make(chan error, 1)
+	wg.Go(func() {
+		<-start
+		evidence, err := reader.Read(ctx, bearer, challenge.ChallengeID())
+		readResults <- readResult{evidence: evidence, err: err}
+	})
+	wg.Go(func() {
+		<-start
+		_, err := issuer.Begin(ctx, bearer, credID)
+		issueResults <- err
+	})
 	close(start)
 	wg.Wait()
 	close(results)
+	seenReader := <-readResults
+	if seenReader.err != nil && !errors.Is(seenReader.err, usecase.ErrPasskeyActivationDenied) {
+		t.Fatalf("v34 reader encountered an unexpected lock/deadlock failure: %v", seenReader.err)
+	}
+	if seenReader.err == nil &&
+		(seenReader.evidence.Subject != subject ||
+			seenReader.evidence.Nonce != evidence.Nonce ||
+			!bytes.Equal(seenReader.evidence.CredentialID, credID)) {
+		t.Fatal("v34 reader observed partially altered activation evidence")
+	}
+	if issuedErr := <-issueResults; !errors.Is(issuedErr, usecase.ErrPasskeyActivationDenied) {
+		t.Fatalf("v34 issuer raced existing nonce or finished credential incorrectly: %v", issuedErr)
+	}
 	successes, denials := 0, 0
 	for got := range results {
 		switch {
