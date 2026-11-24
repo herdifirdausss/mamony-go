@@ -223,12 +223,16 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tt := range []struct {
-		name string
-		edit func(*usecase.PasskeyActivationFinishRequest)
+		name          string
+		edit          func(*usecase.PasskeyActivationFinishRequest)
+		adapterReject bool
 	}{
 		{"other session", func(x *usecase.PasskeyActivationFinishRequest) { x.SessionDigest = otherDigest }},
 		{"wrong nonce", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.Nonce[0] ^= 1 }},
-		{"wrong RP", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.RPID = "different.example.test" }},
+		{"wrong RP", func(x *usecase.PasskeyActivationFinishRequest) {
+			x.Expected.RPID = "different.example.test"
+			x.Expected.Origin = "https://different.example.test"
+		}},
 		{"wrong COSE", func(x *usecase.PasskeyActivationFinishRequest) {
 			x.Expected.PublicKeyCOSE = bytes.Repeat([]byte{0xa1}, len(publicCOSE))
 		}},
@@ -236,23 +240,27 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			x.Expected.SignCount = 1
 			x.Verified.Counter = 2
 		}},
-		{"missing UV", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.UserVerified = false }},
+		{"missing UV", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.UserVerified = false }, true},
 		{"reversed counter", func(x *usecase.PasskeyActivationFinishRequest) {
 			x.Expected.SignCount = 2
 			x.Verified.Counter = 1
-		}},
-		{"wrong backup eligibility", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.BackupEligible = true }},
+		}, true},
+		{"wrong backup eligibility", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.BackupEligible = true }, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			claim := request
 			claim.Expected.PublicKeyCOSE = append([]byte(nil), request.Expected.PublicKeyCOSE...)
 			tt.edit(&claim)
 			allowed, err := finishStore.Finish(ctx, claim)
-			// Well-formed stale claims are denied by SQL. Invalid signed
-			// facts are rejected by the adapter before reaching SQL, with
-			// the same non-success security outcome and a sanitized error.
-			if allowed || err != nil && !errors.Is(err, usecase.ErrPasskeyActivationCommitUnavailable) {
-				t.Fatalf("untrusted SQL finish claim was accepted: allowed=%v err=%v", allowed, err)
+			// Precisely distinguish a well-formed stale SQL claim from a
+			// malformed signed claim rejected before the privileged SQL call.
+			// A generic error cannot substitute for an actual SQL denial.
+			if tt.adapterReject {
+				if allowed || !errors.Is(err, usecase.ErrPasskeyActivationCommitUnavailable) {
+					t.Fatalf("adapter did not reject invalid signed facts: allowed=%v err=%v", allowed, err)
+				}
+			} else if allowed || err != nil {
+				t.Fatalf("fresh SQL fence did not deny stale evidence: allowed=%v err=%v", allowed, err)
 			}
 		})
 	}
