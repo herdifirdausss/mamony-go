@@ -42,28 +42,46 @@ func (s syntheticPostCommitAckLoss) WithTx(ctx context.Context, work func(pgx.Tx
 	return errors.New("synthetic lost acknowledgement after definite database commit")
 }
 
-// wireCommitAckDropConn is test-only PostgreSQL wire fault injection.
-// TLS is disabled ONLY for the guarded disposable loopback database.
-// It watches the outbound COMMIT command and then reads server-framed
-// backend messages. On observing CommandComplete("COMMIT"), it closes
-// the real TCP socket BEFORE forwarding that acknowledgment to pgx.
-// Unlike a fake store, the actual PostgreSQL server has committed.
-type wireCommitAckDropConn struct {
+// wireCommitCutPoint is a deterministic, TEST-ONLY TCP failure point.
+// Pre-COMMIT prevents even sending the COMMIT request; post-COMMIT
+// closes after PostgreSQL has confirmed COMMIT but before pgx sees it.
+type wireCommitCutPoint uint8
+
+const (
+	wireNoCut wireCommitCutPoint = iota
+	wireBeforeCommit
+	wireAfterCommit
+)
+
+// wireCommitFaultConn reads raw PostgreSQL frames on disposable loopback
+// only (TLS disabled); it cannot be used on production connections.
+type wireCommitFaultConn struct {
 	net.Conn
-	armed        atomic.Bool
-	sawCommitted atomic.Bool
-	pending      []byte
+	cut              wireCommitCutPoint
+	armed            atomic.Bool
+	sawCommitRequest atomic.Bool
+	sawCommitted     atomic.Bool
+	pending          []byte
 }
 
-func (c *wireCommitAckDropConn) Write(p []byte) (int, error) {
+func (c *wireCommitFaultConn) Write(p []byte) (int, error) {
 	if bytes.Contains(bytes.ToUpper(p), []byte("COMMIT\x00")) {
-		c.armed.Store(true)
+		c.sawCommitRequest.Store(true)
+		if c.cut == wireBeforeCommit {
+			// No COMMIT request bytes reach the server. Closing this
+			// session aborts its outstanding transaction.
+			_ = c.Conn.Close()
+			return 0, io.ErrClosedPipe
+		}
+		if c.cut == wireAfterCommit {
+			c.armed.Store(true)
+		}
 	}
 	return c.Conn.Write(p)
 }
 
-func (c *wireCommitAckDropConn) Read(p []byte) (int, error) {
-	if !c.armed.Load() {
+func (c *wireCommitFaultConn) Read(p []byte) (int, error) {
+	if c.cut != wireAfterCommit || !c.armed.Load() {
 		return c.Conn.Read(p)
 	}
 	if len(c.pending) == 0 {
@@ -92,16 +110,16 @@ func (c *wireCommitAckDropConn) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// wireCommitAckDropTransactor executes the SAME real v36 SQL through the
-// production postgres repository adapter, but with a test-only net.Conn.
-// It does not change the platform pool, expose a privileged runtime, or
-// claim to simulate leader failover or a PostgreSQL crash before COMMIT.
-type wireCommitAckDropTransactor struct {
+// wireCommitFaultTransactor uses the original restricted finisher role,
+// real v36 SQL and repository adapter with a TEST-ONLY TCP dialer.
+// It does not alter the platform pool, privilege grants or public routes.
+type wireCommitFaultTransactor struct {
 	dsn  string
-	wire *wireCommitAckDropConn
+	cut  wireCommitCutPoint
+	wire *wireCommitFaultConn
 }
 
-func (t *wireCommitAckDropTransactor) WithTx(
+func (t *wireCommitFaultTransactor) WithTx(
 	ctx context.Context, operation func(pgx.Tx) error) error {
 	cfg, err := pgx.ParseConfig(t.dsn)
 	if err != nil {
@@ -117,7 +135,7 @@ func (t *wireCommitAckDropTransactor) WithTx(
 		if err != nil {
 			return nil, err
 		}
-		t.wire = &wireCommitAckDropConn{Conn: raw}
+		t.wire = &wireCommitFaultConn{Conn: raw, cut: t.cut}
 		return t.wire, nil
 	}
 	conn, err := pgx.ConnectConfig(ctx, cfg)
@@ -1012,19 +1030,20 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		signedFlags   byte
 		allow         bool
 		loseCommitAck bool
-		loseWireAck   bool
+		wireCut       wireCommitCutPoint
 	}{
-		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true, false, false},
-		{"counter_zero_to_one", 0, 1, false, false, 0x05, true, false, false},
-		{"counter_one_to_two", 1, 2, false, false, 0x05, true, false, false},
-		{"counter_two_to_two_denied", 2, 2, false, false, 0x05, false, false, false},
-		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false, false, false},
-		{"backup_false_to_true", 0, 1, true, false, 0x1d, true, false, false},
-		{"backup_true_to_false", 0, 1, true, true, 0x0d, true, false, false},
-		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false, false, false},
-		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false, false, false},
-		{"counter_one_to_two_definite_commit_ack_lost", 1, 2, false, false, 0x05, true, true, false},
-		{"counter_one_to_two_tcp_commit_ack_lost", 1, 2, false, false, 0x05, true, false, true},
+		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true, false, wireNoCut},
+		{"counter_zero_to_one", 0, 1, false, false, 0x05, true, false, wireNoCut},
+		{"counter_one_to_two", 1, 2, false, false, 0x05, true, false, wireNoCut},
+		{"counter_two_to_two_denied", 2, 2, false, false, 0x05, false, false, wireNoCut},
+		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false, false, wireNoCut},
+		{"backup_false_to_true", 0, 1, true, false, 0x1d, true, false, wireNoCut},
+		{"backup_true_to_false", 0, 1, true, true, 0x0d, true, false, wireNoCut},
+		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false, false, wireNoCut},
+		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false, false, wireNoCut},
+		{"counter_one_to_two_definite_commit_ack_lost", 1, 2, false, false, 0x05, true, true, wireNoCut},
+		{"counter_one_to_two_tcp_commit_ack_lost", 1, 2, false, false, 0x05, true, false, wireAfterCommit},
+		{"counter_one_to_two_tcp_commit_request_dropped", 1, 2, false, false, 0x05, true, false, wireBeforeCommit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			account := randomSyntheticID(t, "sub_")
@@ -1126,8 +1145,8 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 				t.Fatalf("invalid signed counter/flags were not denied: %v", verifyErr)
 			}
 			var finishErr error
-			if tc.loseWireAck {
-				wire := &wireCommitAckDropTransactor{dsn: finishDSN}
+			if tc.wireCut != wireNoCut {
+				wire := &wireCommitFaultTransactor{dsn: finishDSN, cut: tc.wireCut}
 				uncertainStore, err := identitypg.NewPasskeyActivationFinishStore(wire)
 				if err != nil {
 					t.Fatal(err)
@@ -1138,9 +1157,12 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 				}
 				finishErr = uncertainCommitter.Finish(ctx, session, ch.ChallengeID(), assertion)
 				if !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitUnavailable) ||
-					wire.wire == nil || !wire.wire.sawCommitted.Load() {
-					t.Fatalf("real TCP COMMIT ack loss was not observed and sanitized: "+
-						"err=%v committed=%v", finishErr,
+					wire.wire == nil || !wire.wire.sawCommitRequest.Load() ||
+					wire.wire.sawCommitted.Load() != (tc.wireCut == wireAfterCommit) {
+					t.Fatalf("TCP COMMIT cut not observed and sanitized at expected phase: "+
+						"err=%v cut=%v request=%v confirmed=%v",
+						finishErr, tc.wireCut,
+						wire.wire != nil && wire.wire.sawCommitRequest.Load(),
 						wire.wire != nil && wire.wire.sawCommitted.Load())
 				}
 			} else if tc.loseCommitAck {
@@ -1160,7 +1182,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			} else {
 				finishErr = committer.Finish(ctx, session, ch.ChallengeID(), assertion)
 			}
-			if tc.allow && !tc.loseCommitAck && !tc.loseWireAck && finishErr != nil {
+			if tc.allow && !tc.loseCommitAck && tc.wireCut == wireNoCut && finishErr != nil {
 				t.Fatalf("valid signed counter/backup assertion did not commit: %v", finishErr)
 			}
 			if !tc.allow && !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitDenied) {
@@ -1192,7 +1214,9 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 				account).Scan(&noticeCount); err != nil {
 				t.Fatal(err)
 			}
-			if tc.allow {
+			// A valid signature does not imply a durable write when
+			// the TCP socket closes without sending COMMIT.
+			if tc.allow && tc.wireCut != wireBeforeCommit {
 				signedBS := tc.signedFlags&0x10 != 0
 				if finalState != "POSSESSION_VERIFIED" || finalCount != int64(tc.signedCount) ||
 					finalBE != tc.originalBE || finalBS != signedBS || !consumedOnce ||
