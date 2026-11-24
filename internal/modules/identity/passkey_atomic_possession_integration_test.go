@@ -887,8 +887,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 						"state=%s counter=%d BE=%v BS=%v consumed=%v events=%d notices=%d",
 						finalState, finalCount, finalBE, finalBS, consumedOnce, auditCount, noticeCount)
 				}
-				if err := committer.Finish(ctx, session, ch.ChallengeID(), assertion);
-					!errors.Is(err, usecase.ErrPasskeyActivationCommitDenied) {
+				if err := committer.Finish(ctx, session, ch.ChallengeID(), assertion); !errors.Is(err, usecase.ErrPasskeyActivationCommitDenied) {
 					t.Fatalf("counter/backup signature replay was not denied: %v", err)
 				}
 			} else if finalState != "PENDING_ASSERTION" ||
