@@ -283,6 +283,121 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// A signature over the original epoch is not authorization after a
+	// subject session-epoch rollover. Even a still-live v34 nonce must fail
+	// the authoritative SQL recheck, independent of the earlier v35 reader.
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 "+
+			"WHERE subject_id=$1", subject); err != nil {
+		t.Fatal(err)
+	}
+	epochClaim := request
+	epochClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, epochClaim); err != nil || allowed {
+		t.Fatalf("old verified signature survived epoch rotation: allowed=%v err=%v", allowed, err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.subjects SET session_epoch=$1 WHERE subject_id=$2",
+		epoch, subject); err != nil {
+		t.Fatal(err)
+	}
+
+	// Changing a verified contact invokes the real v14 epoch-bump trigger.
+	// The test owner restores the original alias and epoch after verifying
+	// the stale proof is denied; no runtime can perform this restoration.
+	replacedEmail := strings.ToLower(randomSyntheticID(t, "changed_")) + "@example.test"
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.email_aliases SET canonical_email=$1 "+
+			"WHERE subject_id=$2", replacedEmail, subject); err != nil {
+		t.Fatal(err)
+	}
+	var contactChangedEpoch int64
+	if err := admin.QueryRow(ctx,
+		"SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1",
+		subject).Scan(&contactChangedEpoch); err != nil || contactChangedEpoch <= epoch {
+		t.Fatalf("contact update did not revoke original epoch: epoch=%d err=%v", contactChangedEpoch, err)
+	}
+	contactClaim := request
+	contactClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, contactClaim); err != nil || allowed {
+		t.Fatalf("old verified signature survived contact replacement: allowed=%v err=%v", allowed, err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.email_aliases SET canonical_email=$1 "+
+			"WHERE subject_id=$2", email, subject); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.subjects SET session_epoch=$1 WHERE subject_id=$2",
+		epoch, subject); err != nil {
+		t.Fatal(err)
+	}
+
+	// v30 upserts may supersede a consumed intent; old staged credentials
+	// must NEVER inherit a newer registration's admission or password proof.
+	supersedingIntent := randomSyntheticID(t, "wrg_")
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_registration_intents "+
+			"SET intent_id=$1 WHERE subject_id=$2", supersedingIntent, subject); err != nil {
+		t.Fatal(err)
+	}
+	intentClaim := request
+	intentClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, intentClaim); err != nil || allowed {
+		t.Fatalf("old signature survived replaced registration intent: allowed=%v err=%v", allowed, err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_registration_intents "+
+			"SET intent_id=$1 WHERE subject_id=$2", registration.IntentID(), subject); err != nil {
+		t.Fatal(err)
+	}
+
+	// Original v32 password-reauth admission must remain consumed, not
+	// merely present as a row that happens to have the same intent ID.
+	var originalAdmissionConsumed time.Time
+	if err := admin.QueryRow(ctx,
+		"SELECT consumed_at FROM mamony_identity.passkey_registration_admissions "+
+			"WHERE subject_id=$1", subject).Scan(&originalAdmissionConsumed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_registration_admissions "+
+			"SET consumed_at=NULL WHERE subject_id=$1", subject); err != nil {
+		t.Fatal(err)
+	}
+	admissionClaim := request
+	admissionClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, admissionClaim); err != nil || allowed {
+		t.Fatalf("old signature survived unconsumed password admission: allowed=%v err=%v", allowed, err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_registration_admissions "+
+			"SET consumed_at=$1 WHERE subject_id=$2", originalAdmissionConsumed, subject); err != nil {
+		t.Fatal(err)
+	}
+
+	// Rotation of the v34 random challenge bytes invalidates a signature
+	// even if the record keeps its original public challenge ID.
+	rotatedNonce := make([]byte, 32)
+	if _, err := rand.Read(rotatedNonce); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_activation_challenges "+
+			"SET challenge=$1 WHERE subject_id=$2", rotatedNonce, subject); err != nil {
+		t.Fatal(err)
+	}
+	nonceClaim := request
+	nonceClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, nonceClaim); err != nil || allowed {
+		t.Fatalf("old signature survived changed database nonce: allowed=%v err=%v", allowed, err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_activation_challenges "+
+			"SET challenge=$1 WHERE subject_id=$2", evidence.Nonce[:], subject); err != nil {
+		t.Fatal(err)
+	}
+
 	// A fresh challenge must not extend the original staged credential's
 	// ten-minute lifetime. This test-only owner rewrite intentionally
 	// simulates a forgotten PENDING_ASSERTION row and restores it afterward.
