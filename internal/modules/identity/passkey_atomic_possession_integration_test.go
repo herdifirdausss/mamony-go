@@ -264,6 +264,73 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			}
 		})
 	}
+	// A signed claim can be valid at v35 read time yet expire while the
+	// SQL finisher waits for the subject lock. The only acceptable decision
+	// uses PostgreSQL clock_timestamp AFTER the wait, not tx start time.
+	var originalExpires time.Time
+	if err := admin.QueryRow(ctx,
+		"SELECT expires_at FROM mamony_identity.passkey_activation_challenges WHERE subject_id=$1",
+		subject).Scan(&originalExpires); err != nil {
+		t.Fatal(err)
+	}
+	lockTx, err := admin.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lockedSubject string
+	if err := lockTx.QueryRow(ctx,
+		"SELECT subject_id FROM mamony_identity.subjects WHERE subject_id=$1 FOR UPDATE",
+		subject).Scan(&lockedSubject); err != nil || lockedSubject != subject {
+		_ = lockTx.Rollback(context.Background())
+		t.Fatalf("could not establish subject lock fixture: %v", err)
+	}
+	if _, err := lockTx.Exec(ctx,
+		"UPDATE mamony_identity.passkey_activation_challenges "+
+			"SET expires_at=clock_timestamp()+interval '250 milliseconds' "+
+			"WHERE subject_id=$1", subject); err != nil {
+		_ = lockTx.Rollback(context.Background())
+		t.Fatal(err)
+	}
+	lockResult := make(chan struct {
+		ok  bool
+		err error
+	}, 1)
+	expiringClaim := request
+	expiringClaim.EventID = randomSyntheticID(t, "evt_")
+	go func() {
+		ok, err := finishStore.Finish(ctx, expiringClaim)
+		lockResult <- struct {
+			ok  bool
+			err error
+		}{ok, err}
+	}()
+	// With the subject lock held, the claim must not finish prematurely.
+	select {
+	case got := <-lockResult:
+		_ = lockTx.Rollback(context.Background())
+		t.Fatalf("finisher bypassed live subject lock: allowed=%v err=%v", got.ok, got.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	// The challenge expires during the wait; releasing the lock must not
+	// let the stale signed evidence mutate state or consume the nonce.
+	time.Sleep(300 * time.Millisecond)
+	if err := lockTx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-lockResult:
+		if got.err != nil || got.ok {
+			t.Fatalf("post-lock expiry was not rejected: allowed=%v err=%v", got.ok, got.err)
+		}
+	case <-time.After(4 * time.Second):
+		t.Fatal("post-lock expiry finish did not return")
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_activation_challenges SET expires_at=$1 "+
+			"WHERE subject_id=$2", originalExpires, subject); err != nil {
+		t.Fatal(err)
+	}
+
 	// Inject a synthetic failure at the mandatory notice boundary. The
 	// DB function inserted the audit event first, but the statement must
 	// roll back every side effect including that event on trigger failure.
