@@ -1011,8 +1011,8 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		originalBS    bool
 		signedFlags   byte
 		allow         bool
-		loseCommitAck  bool
-		loseWireAck    bool
+		loseCommitAck bool
+		loseWireAck   bool
 	}{
 		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true, false, false},
 		{"counter_zero_to_one", 0, 1, false, false, 0x05, true, false, false},
