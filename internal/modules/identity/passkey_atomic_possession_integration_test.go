@@ -264,6 +264,58 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			}
 		})
 	}
+	// Inject a synthetic failure at the mandatory notice boundary. The
+	// DB function inserted the audit event first, but the statement must
+	// roll back every side effect including that event on trigger failure.
+	const failFunction = "mamony_identity.test_reject_possession_notice"
+	if _, err := admin.Exec(ctx,
+		"CREATE FUNCTION "+failFunction+"() RETURNS trigger LANGUAGE plpgsql "+
+			"AS $ BEGIN RAISE EXCEPTION 'synthetic notice failure' "+
+			"USING ERRCODE='23514'; END; $"); err != nil {
+		t.Fatal(err)
+	}
+	const failTrigger = "test_passkey_notice_failure"
+	if _, err := admin.Exec(ctx,
+		"CREATE TRIGGER "+failTrigger+" BEFORE INSERT ON mamony_identity.passkey_activation_notices "+
+			"FOR EACH ROW EXECUTE FUNCTION "+failFunction+"()"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_, _ = admin.Exec(context.Background(),
+			"DROP TRIGGER IF EXISTS "+failTrigger+" ON mamony_identity.passkey_activation_notices")
+		_, _ = admin.Exec(context.Background(), "DROP FUNCTION IF EXISTS "+failFunction+"()")
+	}()
+	noticeFailure := request
+	noticeFailure.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, noticeFailure); err == nil || allowed {
+		t.Fatal("synthetic mandatory notice failure did not fail the SQL transaction")
+	}
+	var state string
+	var consumed bool
+	var failedEventCount int
+	if err := admin.QueryRow(ctx,
+		"SELECT state FROM mamony_identity.passkey_credentials WHERE credential_id=$1",
+		credID).Scan(&state); err != nil || state != "PENDING_ASSERTION" {
+		t.Fatal("mandatory notice failure changed credential state")
+	}
+	if err := admin.QueryRow(ctx,
+		"SELECT consumed_at IS NOT NULL FROM mamony_identity.passkey_activation_challenges WHERE subject_id=$1",
+		subject).Scan(&consumed); err != nil || consumed {
+		t.Fatal("mandatory notice failure consumed challenge")
+	}
+	if err := admin.QueryRow(ctx,
+		"SELECT count(*) FROM mamony_identity.security_outbox WHERE event_id=$1",
+		noticeFailure.EventID).Scan(&failedEventCount); err != nil || failedEventCount != 0 {
+		t.Fatal("mandatory notice failure left a committed audit event")
+	}
+	if _, err := admin.Exec(ctx,
+		"DROP TRIGGER "+failTrigger+" ON mamony_identity.passkey_activation_notices"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx, "DROP FUNCTION "+failFunction+"()"); err != nil {
+		t.Fatal(err)
+	}
+
 	// Late event collision must roll back nonce, credential and notice.
 	event := randomSyntheticID(t, "evt_")
 	if _, err := admin.Exec(ctx,
@@ -276,8 +328,6 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	if ok, err := finishStore.Finish(ctx, claim); err == nil || ok {
 		t.Fatal("duplicate event did not abort whole passkey commit")
 	}
-	var state string
-	var consumed bool
 	if err := admin.QueryRow(ctx,
 		"SELECT state FROM mamony_identity.passkey_credentials WHERE credential_id=$1", credID).Scan(&state); err != nil || state != "PENDING_ASSERTION" {
 		t.Fatal("event collision left a partially activated credential")
