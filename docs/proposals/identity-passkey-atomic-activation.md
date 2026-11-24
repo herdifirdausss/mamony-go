@@ -33,7 +33,7 @@ The user has completed a valid WebAuthn registration staging and a fresh, signed
 
 The source of truth for accepted requirements remains `docs/contracts/identity.md`. After approval, promote stable AC IDs there. These are **proposed IDs**.
 
-| Proposed AC | Requirement | Evidence (all NOT RUN) |
+| Proposed AC | Requirement | Required evidence (candidate results below) |
 |---|---|---|
 | PKA-01 | The exact response validated once by the pinned WebAuthn library and the original v34 evidence is passed into a dedicated trusted finish; it cannot bind another credential/subject/RP/nonce. | Go unit + real DB |
 | PKA-02 | One v34 nonce can commit **once**, including under at least 16 concurrent finishes; all replays denied. | PostgreSQL real concurrency/barriers |
@@ -50,19 +50,19 @@ The source of truth for accepted requirements remains `docs/contracts/identity.m
 
 ### Trust boundary and authority
 
-- Go `PasskeyActivationFinisher` has a **concrete** `*PasskeyActivationAssertionVerifier` (not an injectable fake allow decision in production composition) and calls its internal `verifyForActivation(ctx,bearer,challengeID,raw)`, obtaining **one exact evidence snapshot** paired with the signed assertion facts.
+- Go `PasskeyActivationCommitter` has a **concrete** `*PasskeyActivationAssertionVerifier` (not an injectable fake allow decision in production composition) and calls its internal `verifyForActivation(ctx,bearer,challengeID,raw)`, obtaining **one exact evidence snapshot** paired with the signed assertion facts.
 - The verifier verifies exact original v34 nonce, RP origin and hash, credential ID/userHandle, COSE signature, UP/UV, sign count, BE/BS via `go-webauthn v0.18.2`. Public untrusted bytes never become a direct SQL role/subject choice.
-- The coordinator derives the opaque session digest from the *server-validated* bearer, creates a random identifier-only audit event, and calls **one** `PasskeyActivationFinisherStore.Finish(ctx, request)` through the new isolated `mamony_identity_passkey_activation_finisher_runtime` DB credential. No untrusted HTTP path can call it.
-- PostgreSQL `SECURITY DEFINER` `finish_passkey_activation` is deliberately a **trusted Go assertion oracle**: it cannot cryptographically verify WebAuthn within SQL. A compromised finisher DB credential or Identity DB owner can forge metadata under Profile A; it must **not** be shared with public ingress or the v34 issuer/reader/registration/other roles.
+- The coordinator derives the opaque session digest from the *server-validated* bearer, creates a random identifier-only audit event, and calls **one** `PasskeyActivationFinishStore.Finish(ctx, request)` through the new isolated `mamony_identity_passkey_activation_finisher_runtime` DB credential. No untrusted HTTP path can call it.
+- PostgreSQL `SECURITY DEFINER` `finish_verified_passkey_possession` is deliberately a **trusted Go assertion oracle**: it cannot cryptographically verify WebAuthn within SQL. A compromised finisher DB credential or Identity DB owner can forge metadata under Profile A; it must **not** be shared with public ingress or the v34 issuer/reader/registration/other roles.
 
 ### Proposed schema and forward migration
 
-**Identity capability v36 requires SQL migration `000035_passkey-atomic-activation.up.sql` (fingerprint version 35)**; v35 assertion verification added no SQL migration. Never rewrite v33/v34 migrations.
+**Identity capability v36 requires SQL migration `000035_passkey-atomic-possession.up.sql` (fingerprint version 35)**; v35 assertion verification added no SQL migration. Never rewrite v33/v34 migrations.
 
 1. Change `passkey_credentials.state` CHECK from `PENDING_ASSERTION` to `PENDING_ASSERTION | POSSESSION_VERIFIED`. Add nullable `possession_verified_at` and `possession_event_id` (unique FK to security event), with a consistency CHECK ensuring both non-null exactly when possession verified. Existing rows remain pending; no backfill or silent activation.
 2. Extend `security_outbox` event type allowlist with `PASSKEY_POSSESSION_VERIFIED`; never change generic event permissions.
 3. Add `passkey_activation_notices` with verified recipient snapshot, event/subject/timestamp and strict `PENDING` only. Trigger only when `event_type=PASSKEY_POSSESSION_VERIFIED` and original `session_user=...finisher_runtime`. Failure aborts activation. No sender is created.
-4. Add only schema USAGE + EXECUTE on `finish_passkey_activation` for separately provisioned finisher role. Revoke PUBLIC and deny other runtime roles. No direct SELECT/UPDATE on credential/session/challenge/outbox/notice tables.
+4. Add only schema USAGE + EXECUTE on `finish_verified_passkey_possession` for separately provisioned finisher role. Revoke PUBLIC and deny other runtime roles. No direct SELECT/UPDATE on credential/session/challenge/outbox/notice tables.
 
 ### Proposed commit sequence (one SQL transaction)
 
@@ -117,7 +117,7 @@ sequenceDiagram
 
 ## G4 — Implementation slice (planned, gated)
 
-1. After D1–D3 accepted, update `docs/contracts/identity.md` with stable agreed ACs.
+1. After applicable D1–D4 and independent G3 accepted, update `docs/contracts/identity.md` with stable agreed ACs.
 2. New forward-only SQL `000035`, migration fingerprint + migration canary, synthetic role bootstrap, workflow DSNs and testgate required test.
 3. Go finisher usecase + restricted repository adapter, unit negatives and real PostgreSQL 16-way replay, freeze/counter/role, late event collision and rollback integration. Use existing genuine signed ES256 fixture; mocked cryptography alone is not sufficient.
 4. ADR-0041 accepted revision, runbook/contract updates, PR risk and CI record. Keep Draft until exact final SHA checks and independent reviewer signoff.
@@ -224,3 +224,44 @@ These are **PROPOSED acceptance cases, not a blanket PASS**. Draft #81 implement
 **G4 disposable logical backup-to-second-instance restore evidence (not PITR/failover):** [PostgreSQL integration #45373784654](https://github.com/herdifirdausss/mamony-go/actions/runs/45373784654) PASSED on code SHA `37ab47cc`, including the existing real PostgreSQL integration and SIGKILL/restart gates. After all test transactions completed, `tools/postgrestest/check-passkey-backup-restore.sh` used PostgreSQL 18 `pg_dump` to create a custom-format backup of `mamony_test_ci`. It started a **second** isolated `postgres:18.7` container with its own `mamony_test_restore` database, created NOLOGIN role identifiers needed by RLS policies, and ran `pg_restore --single-transaction --exit-on-error --no-owner --no-acl`. The same shared read-only snapshot query checked that **9 possession-verified credentials have 9 consumed challenge links, 9 possession audit events and 9 PENDING notices**, and that the complete credential/challenge/notice/possession-audit row digest matches the source. The dump is ephemeral and discarded with the test container; the source is never overwritten. The restore is intentionally **data-only authority coverage**: it does not restore/test original SQL role ownership, access grants, role passwords, independently provisioned credentials, notification delivery or production backup encryption/key custody. Critically it backs up the database **after** commit: restoring a **stale pre-commit/pre-consumption backup may resurrect consumed nonces or erase security events**. Prevention/detection of such rollback requires a separately approved external continuity/fencing and reconciliation policy. No PITR, server/volume loss, standby replication/failover or rollback-to-old-backup scenario has passed.
 
 **G2/G3 blocker:** define allowed recovery points, outage-time stop-the-world/ingress controls, external rollback detection or irreversible replay fence, notification backfill and independent verification before activation after a restore. A matching post-commit logical dump is not this policy.
+
+
+## D4 supplement — restore continuity and fail-closed recovery (PROPOSED, 2026-11-24)
+
+### Problem and scope
+
+A logical backup taken *after* a successful commit establishes preservation of that committed snapshot only. A backup taken *before* the v36 finish may contain a live session, the same unconsumed nonce and pending credential, with no possession audit or notice. A consistent restore of that backup can roll all of those facts back together. The current SQL finisher compares only local state and the current DB clock: if restored timestamps are still within their original validity windows, a previous assertion may again satisfy those checks. Expiration narrows the window, not the underlying rollback risk; a later restore can also reintroduce revoked sessions or omit security changes. This is a code/design inference, **not an executed stale-backup replay test**. Snapshot equality, local epoch increments and signatures are not independent continuity evidence.
+
+The CIAM design requirement R-OP03 applies to Profile A as well as B: reconcile surviving deny/revocation/checkpoint authority or invalidate old grants. Stage 2 V32 is the applicable stale-backup test family; V40/current-head and R-SI04/R-GL04 apply to the stronger protected-state profiles. Stage 3 D15/I09 describe recovery hold, surviving checkpoints and explicit release. Do not claim B/G guarantees for the present trusted Identity database.
+
+### Options and recommended decision for this internal Profile A slice
+
+| Option | Properties and cost | Disposition |
+|---|---|---|
+| Restart directly on a logically consistent backup, relying on TTL or local epoch | Fast, but restores the proof, epoch and consume state together; missing audit/notice and revocation history remain possible | Reject |
+| Keep Identity offline during restore; require externally controlled release, reconcile trusted history, invalidate outstanding sessions/proofs and require fresh enrollment where continuity is uncertain | Smaller initial scope; user interruption and possibly manual recovery; requires an actual enforcement boundary outside the restored database and explicit release evidence | Recommend for owner consideration for Profile A |
+| Independent current-head/authority-generation and protected consume/revocation evidence, checked at security decisions | Stronger currentness boundary; introduces a new trusted persistence/administration and availability dependency | Separate Profile B design, not implemented here |
+
+A conservative hold is not proof that a backup is current. If reliable evidence of password/contact/factor changes or freezes after the restore point cannot be recovered, do **not** reopen affected identities just because sessions were revoked. Hold the affected scope (all Identity if scope is unknown) until trusted reconciliation or separately reviewed re-proofing/re-enrollment is possible. Missing mandatory notification obligations must be reconciled from surviving trusted event evidence; never fabricate delivery or mark a restored PENDING row delivered. No live sender exists in v36.
+
+### Proposed recovery sequence (not an implemented runbook)
+
+1. Stop admission/issuance, finishers and workers; drain or fence in-flight connections and block all affected runtime access through controls not rolled back with Identity SQL. A public-router 404 alone does not fence internal SQL callers.
+2. Establish recovery scope and a clean deployment/admin root; obtain trusted backup provenance and independently surviving event/revocation/consume checkpoint evidence. A matching checksum alone does not establish freshness. If proof of currentness is missing, remain held.
+3. Restore into an isolated target, not the live authority. Verify migration fingerprints, owner/grants and role isolation separately (existing pg_restore --no-owner --no-acl intentionally excludes them). Confirm trustworthy time and verify recovery state before enabling runtime credentials.
+4. Reconcile revoked sessions, disabled/frozen accounts, credential/contact changes, consumed proofs and mandatory audit/notification obligations against the surviving evidence. Invalidate pre-recovery sessions, pending grants and staged challenges before admitting fresh requests. Quarantine uncertain credential bindings; no implicit promotion to login or independent recovery.
+5. Verify old credentials/proofs cannot be used in any affected flow, including after restart or a repeated restore. Record a redacted recovery decision and obtain explicit independently reviewed release; resume only the approved scope. If reconciliation or fencing fails, do not resume.
+
+The enforcement mechanism, evidence store, recovery generation representation, operational principal custody, authorized release procedure, retention/notification reconciliation and measured RTO/RPO remain open. Do not add a mutable local boolean to the restored database and call it an independent recovery fence. Do not modify SQL 000035 for this design supplement.
+
+### Proposed recovery verification (all NOT RUN)
+
+| ID (proposed; not accepted contract) | Test | Required outcome |
+|---|---|---|
+| PKA-R01 | Real disposable pre-finish logical backup; subsequently finish once with real ES256, record external test-oracle evidence, restore the prior backup into a second isolated database; check restored state within original validity window | Negative control demonstrates stale pending/unconsumed state and lost event/notice; actual replay result recorded separately from data-state observation. Do not label exposure a security-control PASS. If expired, fixture is inconclusive for replay. |
+| PKA-R02 | After separately accepted recovery fence, repeat R01 with restored roles correctly provisioned; exercise old session/assertion and internal issuer/reader/finisher while hold active | All affected calls denied/unavailable, no mutation or new event/notice; no automatic retries. Test a live connection/in-flight caller and repeated restore, not only fresh requests. |
+| PKA-R03 | Backup predates revocation/freeze, contact/factor update and consume; trusted history present, missing, or inconsistent | Reconciliation never reinstates revoked authority; incomplete/uncertain scope remains held; all outstanding pre-recovery grants invalidated before fresh admission. |
+| PKA-R04 | Restored audit/notice prefix omits a known committed event; provider outcome ambiguous | Missing obligation detected against external evidence; stable event correlation and explicit unknown delivery, no fabricated or uncontrolled duplicate delivery. |
+| PKA-R05 | Verify fresh post-recovery enrollment, role/grant checks, old-generation workers and repeat restore | Only explicitly released scope accepts fresh proof; old workers/old grants denied, no cross-role access; measure recovery duration and data loss rather than assuming RTO/RPO. |
+
+**Gate disposition:** current v36 remains Draft/unmerged. These recommendations do not record D4 owner acceptance or independent G3 technical acceptance; no production role, restore mechanism, public route or security-notice sender is added. The exact pre-supplement head 90f9b120 has 5/5 passing CI; that evidence does not transfer to subsequent commits automatically.
