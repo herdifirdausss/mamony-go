@@ -103,6 +103,20 @@ deny_all() {
   [[ "$(admin_sql "$id" "$db" -c 'SELECT current_database()')" == "$db" ]] || fail "admin inspection unavailable"
 }
 
+# Bounded independent observation. Nonzero means the barrier is NOT verified;
+# this test helper is not a production recovery controller.
+wait_quiescent() {
+  local id="$1" db="$2" attempts="$3" remaining attempt
+  [[ "$attempts" =~ ^[1-9][0-9]?$ ]] || return 1
+  for ((attempt=1; attempt<=attempts; attempt++)); do
+    remaining="$(admin_sql "$id" "$db" -c "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND usename LIKE 'mamony_identity_%'")" || return 1
+    [[ "$remaining" =~ ^[0-9]+$ ]] || return 1
+    if [[ "$remaining" == 0 ]]; then return 0; fi
+    if (( attempt < attempts )); then sleep 1; fi
+  done
+  return 1
+}
+
 source_db=mamony_test_irf_source
 target_db=mamony_test_irf_target
 repeat_db=mamony_test_irf_repeat
@@ -128,6 +142,8 @@ held_target() {
   docker exec -i "$id" pg_restore -U "$admin" -d "$db" --no-owner --no-acl --single-transaction --exit-on-error < "$scratch/marker.dump"
   [[ "$(admin_sql "$id" "$db" -c 'SELECT count(*) FROM public.irf_marker WHERE id=1')" == 1 ]] || fail "restore marker missing"
   [[ "$(admin_sql "$id" "$db" -c "SELECT count(*) FROM pg_authid WHERE rolname LIKE 'mamony_identity_%' AND rolpassword IS NOT NULL")" == 0 ]] || fail "target unexpectedly has runtime passwords"
+  [[ "$(admin_sql "$id" "$db" -c "SELECT count(*) FROM pg_roles WHERE rolname LIKE 'mamony_identity_%' AND has_database_privilege(oid, current_database(), 'CONNECT')")" == 0 ]] ||
+    fail "held target has effective CONNECT privilege"
   deny_all "$id" "$db"
 }
 target_id="$(start "$target_db")"
@@ -157,11 +173,18 @@ done
 while IFS= read -r role; do printf 'ALTER ROLE %s NOLOGIN;\n' "$role"; done < "$scratch/roles" |
   admin_sql "$source_id" "$source_db"
 deny_all "$source_id" "$source_db"
+# NOLOGIN is deliberately not enough: the original connections remain.
+# With no termination yet, a bounded barrier observation MUST fail.
+if wait_quiescent "$source_id" "$source_db" 2; then
+  fail "barrier incorrectly acknowledged with existing sessions"
+fi
+[[ "$(admin_sql "$source_id" "$source_db" -c "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND usename LIKE 'mamony_identity_%'")" == 2 ]] ||
+  fail "timeout fixture did not retain both existing backends"
+echo "IRF-F05 BOUNDED OBSERVATION: active connections prevented barrier acknowledgment"
 admin_sql "$source_id" "$source_db" -c "SELECT pg_terminate_backend(pid, 5000) FROM pg_stat_activity WHERE datname=current_database() AND usename LIKE 'mamony_identity_%' AND pid <> pg_backend_pid()" > "$scratch/signals"
 [[ "$(grep -c '^t$' "$scratch/signals")" == 2 && "$(wc -l < "$scratch/signals" | tr -d ' ')" == 2 ]] ||
   fail "termination did not confirm both backends"
-[[ "$(admin_sql "$source_id" "$source_db" -c "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND usename LIKE 'mamony_identity_%'")" == 0 ]] ||
-  fail "runtime connections remain"
+wait_quiescent "$source_id" "$source_db" 5 || fail "runtime connection barrier not verified"
 printf 'SELECT 1;\n' >&3
 exec 3>&-
 # Client error is not by itself outcome evidence; confirm state separately.
@@ -175,11 +198,11 @@ echo "IRF-F03 PASS: fresh admission denied and two observed backends terminated"
   fail "committed/uncommitted marker invariant failed"
 echo "IRF-F04 PASS: committed marker retained; known uncommitted marker rolled back"
 
-# Selected negative preconditions, not a simulated recovery-controller timeout.
+# Selected negative preconditions plus the earlier real bounded observation.
 if target_ok "$source_id" "$target_db"; then fail "wrong-target guard accepted"; fi
 head -n -1 "$scratch/roles" > "$scratch/incomplete"
 if check_inventory "$source_id" "$source_db" "$scratch/incomplete"; then fail "incomplete inventory accepted"; fi
-echo "IRF-F05 PARTIAL: wrong target and incomplete inventory refused; timeout NOT RUN"
+echo "IRF-F05 PARTIAL: wrong target, incomplete inventory and nonquiescent observation refused; external controller NOT RUN"
 repeat_id="$(start "$repeat_db")"
 [[ "$repeat_id" != "$source_id" && "$repeat_id" != "$target_id" ]] || fail "repeat target not distinct"
 ready "$repeat_id" "$repeat_db"
