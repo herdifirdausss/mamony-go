@@ -41,7 +41,7 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 | `make lint`, `make security`, `make archlint` | Static/vulnerability/dependency gates; not a substitute for behavioral proof. |
 | `make test-report` | Test evidence for base Go suite via gotestsum; does not cover absent database tests. |
 
-Run targeted tests while implementing, then required CI gates. For critical changes, independent review must inspect **both code and tests**: an AI can weaken a test to make an incorrect behavior pass. CI must not assume a changed test is trustworthy merely because it is green.
+Run targeted tests while implementing, then required CI gates. For Critical changes, review must inspect **both code and tests**: an AI can weaken a test to make an incorrect behavior pass. Independent review remains the ordinary gate; the adopted solo synthetic mode permits only the explicitly owner-authorized synthetic merge defined in the lifecycle, with recorded review and deferred independent acceptance, not production readiness. CI must not assume a changed test is trustworthy merely because it is green.
 
 ## PostgreSQL integration stages
 
