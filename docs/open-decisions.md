@@ -354,9 +354,11 @@ provisioning outside disposable fixtures, arbitrary network partitions during CO
 with either atomic outcome accepted, **post-server-CommandComplete
 ACK disconnect**, and application-side acknowledgment loss; arbitrary
 partitions during server processing, node crash **during** COMMIT,
-standby failover and backup restore remain unproven; a **separate
-after-test, one-node SIGKILL/restart** of the same disposable PostgreSQL
-volume passed with 9 linked credentials/audits/notices),
+standby failover and **stale-backup recovery** remain unproven;
+a **separate after-test, one-node SIGKILL/restart** and a full **post-commit
+logical dump restored on a second disposable PostgreSQL instance** passed
+with 9 linked credentials/audits/notices; logical restore intentionally
+omits ownership, grants and secrets),
 counter/backup handling on real production authenticators (synthetic real-ES256
 PostgreSQL counter/BE/BS fixtures now exist), genuine
 registration-intent/admission replacement during concurrent writes, rollback
