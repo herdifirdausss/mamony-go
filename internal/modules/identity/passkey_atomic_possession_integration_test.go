@@ -337,16 +337,32 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		subject).Scan(&consumed); err != nil || consumed {
 		t.Fatal("event collision consumed activation nonce")
 	}
-	// A real competing same-assertion race, not a fake store's replay flag.
-	// All goroutines verify the same ES256 proof; DB has exactly one winner.
+	// Pre-verify EVERY caller's ES256 proof while v34 is still readable.
+	// This tests 16 distinct SQL finish attempts at the same one-use fence,
+	// not 15 requests denied early by the read-only v35 evidence reader.
 	const count = 16
-	results := make(chan error, count)
+	claims := make([]usecase.PasskeyActivationFinishRequest, count)
+	for i := range claims {
+		signed, err := proof.VerifyOnly(ctx, bearer, challenge.ChallengeID(), raw)
+		if err != nil || signed.Counter != 1 || !signed.UserVerified {
+			t.Fatalf("pre-race signed proof %d was not verified: %v", i, err)
+		}
+		claims[i] = request
+		claims[i].Verified = signed
+		claims[i].EventID = randomSyntheticID(t, "evt_")
+	}
+	type dbFinishResult struct {
+		allowed bool
+		err     error
+	}
+	results := make(chan dbFinishResult, count)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
-	for range count {
+	for _, claim := range claims {
 		wg.Go(func() {
 			<-start
-			results <- committer.Finish(ctx, bearer, challenge.ChallengeID(), raw)
+			allowed, err := finishStore.Finish(ctx, claim)
+			results <- dbFinishResult{allowed: allowed, err: err}
 		})
 	}
 	close(start)
@@ -355,16 +371,16 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	successes, denials := 0, 0
 	for got := range results {
 		switch {
-		case got == nil:
+		case got.err == nil && got.allowed:
 			successes++
-		case errors.Is(got, usecase.ErrPasskeyActivationCommitDenied):
+		case got.err == nil && !got.allowed:
 			denials++
 		default:
-			t.Fatalf("unexpected concurrent finish failure: %v", got)
+			t.Fatalf("SQL one-use race returned an unexpected error: %v", got.err)
 		}
 	}
 	if successes != 1 || denials != count-1 {
-		t.Fatalf("one-winner replay fence failed: success=%d denied=%d", successes, denials)
+		t.Fatalf("16 signed SQL finish claims were not one-winner: success=%d denied=%d", successes, denials)
 	}
 	var storedCounter int64
 	var storedEvent, storedChallenge, noticeRecipient string
