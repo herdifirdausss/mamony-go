@@ -348,7 +348,8 @@ factor, real delivered security notice, or production authorization.
 | D4 — expiration and operations | **PENDING**: accept 3-minute v34 nonce, 10-minute staging cap, abandonment/cleanup, durable replay/restore protections, key/security-role provision, and public ingress/CSRF policy |
 
 **Unverified release-sensitive scenarios** remain distinct from achieved CI checks: cross-role
-provisioning outside disposable fixtures, lost-acknowledgment after definite COMMIT,
+provisioning outside disposable fixtures, network-level lost-acknowledgment after
+COMMIT (synthetic application-side ack loss with durable SQL state now tested),
 counter/backup handling on real production authenticators (synthetic real-ES256
 PostgreSQL counter/BE/BS fixtures now exist), genuine
 registration-intent/admission replacement during concurrent writes, rollback
