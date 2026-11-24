@@ -163,3 +163,27 @@ Reviewed all 35 Identity forward migrations on the above SHA. Their CREATE TABLE
 | Total | 29 | All are classified; none modified by the inventory |
 
 A class is not a delete/update directive. Several tables also contain historical provenance required by downstream checks. Revocation or invalidation must not erase evidence or accidentally reinstate consumed recovery codes, replaced credentials or old contact bindings. A fresh login or local epoch increase is not independent evidence that the restored password/contact/freeze state is current. The next bounded design must inventory per-table fields, referencing functions and lifecycle constraints, specify a surviving history source, and define which old proofs are invalidated versus retained as non-authoritative evidence. If history is missing, keep scope held. No external recovery control store or production policy has been chosen; no SQL mutations, runtime changes or release implementation in this slice. IRF-03/04 and PKA-R02–R05 remain unverified; independent review still required before merge.
+
+
+## G5 inventory correction and G3 temporary-authority field review — 2026-11-24
+
+**Actual CI finding:** SHA `576c4ad949c444b4b7aedbb6691667c85c7a8c06` had four successful workflows and [PostgreSQL integration 45388202024](https://github.com/herdifirdausss/mamony-go/actions/runs/45388202024) failed the new inventory check with `29|30|0|1|0|-|schema_migrations`. The preceding integration suite passed; subsequent durability/fencing steps were skipped, not failed or passed on that SHA. The migration driver creates its own metadata table outside the 35 SQL migration bodies. It is security-relevant: the migration runbook distinguishes version/dirty metadata from the SQL-body/fingerprint transaction. Corrected inventory: **30 tables**, with **2 schema_integrity** and all other class counts unchanged. Both metadata tables must be checked against the independently reviewed artifact and expected schema version, including dirty state; do not force-clean metadata or edit fingerprints to make restore pass. The guard remains strict and does not exclude the unexpected table. Corrected CI evidence pending.
+
+### Temporary authority: source-level field and provenance map
+
+The following review covers ten temporary-authority tables from migrations 000002, 000010, 000011, 000019, 000021, 000025, 000028, 000030, 000032 and 000034. These are observed field families from the creation definitions (and relevant later session/epoch changes), not an exhaustive current-column catalog or an approved repair algorithm.
+
+| Table | Authority / lifecycle evidence | Proposed recovery disposition |
+|---|---|---|
+| email_verification_challenges | subject, contact version, expiry, consumed/revoked timestamps | Invalidate outstanding proof; preserve historical consume/revoke evidence and delivery dependency |
+| opaque_sessions | subject epoch, expiry, revocation | Deny every pre-recovery session; retain security history |
+| password_login_grants | subject epoch, purpose, expiry, consume timestamp | Deny outstanding grants without representing invalidation as successful consumption |
+| password_recovery_challenges | subject epoch, contact version, expiry, consumed/revoked timestamps | Invalidate outstanding recovery proofs; reconcile delivery obligations |
+| password_recovery_assurance_grants | subject epoch, approval/expiry/consume timestamps | Deny outstanding grants; review later provenance fields before designing repair |
+| password_recovery_code_enrollment_approvals | subject epoch, approval/expiry/consume timestamps | Deny old approvals without altering durable factor history |
+| recovery_code_factor_challenges | subject epoch, expiry, failure count, consume timestamp | Deny outstanding challenges; preserve evidence of use and abuse |
+| passkey_registration_intents | subject epoch, contact version, session binding, intent and consumption | Deny outstanding registration; preserve provenance referenced by staged credential evidence |
+| passkey_registration_admissions | intent/session binding, epoch/contact, provenance, expiry, consumption | Deny outstanding admission; do not erase historical verified registration provenance |
+| passkey_activation_challenges | credential/session binding, epoch/contact, policy generation, expiry, consumption | Deny outstanding activation; preserve links to verified possession records |
+
+Existing epoch checks in 000010/000011/000014 establish a local session/grant fence under the trusted current database. This does not establish anti-rollback currentness or invalidate every proof family (email verification has contact-version binding, not a subject epoch in its creation definition). A recovery design must explicitly address each family; never mark an unused proof as consumed solely to simulate a successful user action. The first proposed lab negative test must verify old sessions and grants are denied while the restored authority stays held; fresh acceptance can be tested only against a separately approved reconciled synthetic fixture. The broader requirements still need current-column and function dependency inventory, retention/FK review, surviving evidence and explicit release policy. No data repair, epoch update, credential mutation, new runtime authority or release code was added in this iteration. Independent review remains required before merge.
