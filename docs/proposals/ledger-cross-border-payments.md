@@ -154,6 +154,121 @@ Late/duplicate reports, missing files, cutoff/timezone, partial settlements, pro
 
 Candidate metrics: unbalanced journal count, balance drift count, negative restricted balance count, duplicate financial effect count (all must be zero in verified fixture); unknown payout age, missing provider/ledger references, unexplained cash by currency, suspense difference, reserve/position exposure, quote expiry, outbox lag, account lock wait and posting latency. Define performance/RPO/RTO thresholds before testing (DEC-12); do not derive them from Stripe/Uber numbers. No real infrastructure tests run in this research.
 
+## Deep dive A — Financial accounting and ledger domain model
+
+**Reviewed 2026-11-24; candidate G2/G3, not accepted.** This expands sections G1 and G3, rather than introducing a parallel normative specification. The earlier simplified USD example is illustrative; the more precise cash-debit/beneficiary-finality and return fixtures below show why the timing matters.
+
+### A.1 — Source-backed boundaries and accounting policy
+
+| Primary source, checked 2026-11-24 | Finding and use | Limit |
+|---|---|---|
+| [IFRS Conceptual Framework (2018)](https://www.ifrs.org/issued-standards/list-of-standards/conceptual-framework/) | Distinguish economic resources, obligations, equity, income and expenses; define reporting entity and recognition. | Framework is not itself an IFRS Standard; legal/economic role determines actual reporting. |
+| [IFRS 15](https://www.ifrs.org/issued-standards/list-of-standards/ifrs-15-revenue-from-contracts-with-customers/), [2016 clarifications](https://www.ifrs.org/news-and-events/news/2016/04/amendment-issued-ifrs-revenue-from-contracts-with-customers/) | Revenue is linked to satisfaction of performance obligations; principal/agent assessment matters to gross/net treatment. | Capture-time fee revenue below is a synthetic policy, not a conclusion for a real PSP. |
+| [IAS 21](https://www.ifrs.org/issued-standards/list-of-standards/ias-21-the-effects-of-changes-in-foreign-exchange-rates/) | Functional currency and foreign-currency accounting require separate measurement policy. | Operational minor units and per-currency zero-sum are not a statutory consolidated GL. |
+| [TigerBeetle financial accounting](https://docs.tigerbeetle.com/coding/financial-accounting/), [data model](https://docs.tigerbeetle.com/coding/data-modeling/), [two-phase transfers](https://docs.tigerbeetle.com/coding/two-phase-transfers/) | Normal side, currency partition, reservation and resolution primitives. | Compare semantics, not implementation or throughput. |
+| [Modern Treasury account model](https://docs.moderntreasury.com/ledgers/docs/ledger-accounts-overview), [transaction status](https://docs.moderntreasury.com/ledgers/docs/transaction-status-and-balances), [guarantees](https://docs.moderntreasury.com/ledgers/docs/ledgers-guarantees), [version locking](https://docs.moderntreasury.com/ledgers/docs/lock-on-account-balance-or-version) | Separate pending/posted/available balances, atomicity, version guards, posted immutability. | Mamony can model named balance accounts instead; never mix reservation models without a proof. |
+| [Stripe Ledger](https://stripe.com/blog/ledger-stripe-system-for-tracking-and-validating-money-movement), [currency rules](https://docs.stripe.com/currencies) | Financial flow completeness, provider-specific amount restrictions. | Provider amount format is not canonical ledger scale. |
+| [Adyen accounting report](https://docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report/), [reporting](https://docs.adyen.com/platforms/quickstart-guide/reporting/) | Transfer/transaction IDs, booking and value dates, currency and balance evidence. | Provider terminology is specific to the selected contract. |
+| [FCA safeguarding](https://www.fca.org.uk/firms/emi-payment-institutions-safeguarding-requirements), [CASS 15](https://handbook.fca.org.uk/handbook/cass15) | UK-specific separation/protection of relevant funds and associated obligations. | Not a universal legal rule, not approval for a UK or Indonesian business, and not established by separate database rows. |
+
+**Product assumption to approve:** one synthetic payment intermediary legal entity, one operational book partitioned by currency. The platform recognizes contractual customer claims as liabilities and cash/receivables as assets for the following fixtures. Actual agency/trust/safeguarding arrangements may require other treatment; real accounting and jurisdiction-specific advice are outside the pilot. No customer funds are company revenue by default.
+
+### A.2 — Vocabulary, chart and ownership
+
+- Book: reporting/ownership boundary, not a tenant. Tenant: authorization/resource scope. Currency: unit-of-account partition. Ledger account: one immutable book/currency/type/opaque owner identity. Account type: reusable category and normal side. Balance account: business-facing grouping of named ledger accounts owned by accounts capability. Journal: one atomic financial fact, with at least two entries, one book and one currency. Entry: positive amount and debit/credit direction. External bank account: separate external cash/evidence identity, not a customer account.
+- Operational financial ledger is authoritative for transaction-level balances and movements. Later finance reporting projects immutable entries to versioned general-ledger codes, effective periods and functional currency; a report may not post, repair, or authorize spending. Do not maintain two independently writable financial truths.
+- Debit-normal asset/expense balances increase by debit; credit-normal liability/equity/revenue balances increase by credit. Contra-accounts, sign exceptions and negative policy are explicit future chart decisions. Never infer debit/credit from inbound/outbound labels. Define normal-side balance as sum of signed effects, opening = zero (seed funding via posted journals), closing = opening + movements. Trial balance compares debit and credit totals within the same currency/book; never sum different currencies without a measurement policy.
+
+Candidate codes are classifications, not unique IDs, and not migrations. Floor is the normal-side lower bound; the synthetic pilot defaults to zero on all listed classes (later exceptions require explicit approval).
+
+| Code/type | Category/normal side | Scope / intent |
+|---|---|---|
+| 1100 collection_cash | Asset/debit | per provider bank/account/currency; not automatically safeguarded |
+| 1110 operating_cash | Asset/debit | per operating bank/currency; separate from customer cash |
+| 1120 prefunded_partner_cash | Asset/debit | per partner account/currency; externally confirmed cash/claim classification required |
+| 1200 provider_receivable | Asset/debit | per provider/account/currency; evidenced claim, not spendable cash |
+| 1210 payout_clearing | Asset/debit | per provider/account/currency; cash sent or return receivable supported by evidence and accounting policy |
+| 1300 merchant_receivable | Asset/debit | per merchant/currency; approved recoverable shortfall, not available funds; disabled initially |
+| 2100 customer_available | Liability/credit | per authorized owner/currency; spendable within current policy |
+| 2110 customer_pending | Liability/credit | per owner/currency; recognized but not spendable |
+| 2120 customer_in_transit | Liability/credit | per owner/currency; obligation held for dispatch/return |
+| 2130 customer_reserve | Liability/credit | per owner/currency; separately governed release |
+| 2140 dispute_held | Liability/credit | per owner/currency; disabled until dispute design |
+| 2200 provider_payable | Liability/credit | per provider/currency; explicit fee/settlement obligation |
+| 3100 platform_capital | Equity/credit | book/currency; initial operating funding, never user-facing |
+| 4100 payment_fee_revenue | Revenue/credit | book/currency; approved recognition milestone |
+| 4110 payout_fee_revenue | Revenue/credit | book/currency; approved recognition milestone |
+| 5100 provider_fee_expense | Expense/debit | book/currency; supported provider cost |
+| 5200 operational_loss | Expense/debit | book/currency; approved write-off, not automatic |
+ 
+FX position/bridge accounts need explicit sign and exposure limits; suspense asset/liability types need evidence and aging; deferred revenue, taxes, FX gains/losses and financial close entries need separate policy. An operational FX bridge is a control account, not automatically a recognized statutory asset or liability. No generic signed clearing bucket or balancing plug. Account type/normal side/currency exponent are immutable once referenced. Display names and external mappings can be versioned without reinterpreting past journals. External cash account ownership, fiduciary segregation and bank statement evidence must be separately verified. Tenant-facing reads expose only authorized account mappings, never a global bank balance.
+
+### A.3 — Compare balance representations
+
+A: separate named liability accounts (existing ACC contract). Every reserve, release, consume and eligibility change is an immutable journal. Available balance already excludes held amount; do not subtract a reservation a second time. B: one ledger account with native pending and posted balance dimensions (Modern Treasury). Strong abstraction but introduces mutable pending lifecycle/version semantics. C: native pending transfer primitive (TigerBeetle), reserve/resolve with invariant protection; implementing it locally is additional complexity. Recommend A for first slice, while preserving per-operation hold identity in the owning workflow. Pending is an economic availability category, not permission to mutate a posted journal. A mere attempted payment or authorization without a recognized asset/obligation remains workflow state and does not fabricate a journal.
+
+Aggregate in-transit is not proof that a particular payout is funded. Each payout has one immutable hold ID and exact amount/currency/account/intent version, stable hold journal, lifecycle and resolved amount. Two distinct payouts must not consume each other's funds. Hold creation, release/consume and relevant local workflow fence require one specified atomic authority boundary; if not established, do not enable dispatch. Definitive failure before debit releases once; timeout after dispatch keeps hold; evidence of partial settlement/return needs an accepted amount allocation policy. No expiration based solely on wall time after external send.
+
+### A.4 — Worked posting fixtures (USD cents)
+
+Policy assumptions: single synthetic book, no tax, captured claim enforceable, 300 fee earned at capture, 100 provider fee deducted from settlement and borne by Mamony, customer funds become available only after cash evidence, payout without additional fee. All values integer minor units. These do not prescribe real revenue recognition or safeguarding. Positive entries shown as D/C; no zero entries. Journal key is derived from business operation and transition, not retry attempt or external webhook delivery ID.
+
+| Journal / trigger | Debit | Credit |
+|---|---|---|
+| J1: confirmed pay-in; recognized receivable | provider_receivable 10000 | customer_pending 9700 + payment_fee_revenue 300 |
+| J2: report and bank credit 9900; provider cost 100 | collection_cash 9900 + provider_fee_expense 100 | provider_receivable 10000 |
+| J3: availability evidence | customer_pending 9700 | customer_available 9700 |
+| J4: payout hold 4000 | customer_available 4000 | customer_in_transit 4000 |
+| J5: evidenced external cash debit; obligation not yet extinguished | payout_clearing 4000 | collection_cash 4000 |
+| J6: definitive fulfillment under selected rail policy | customer_in_transit 4000 | payout_clearing 4000 |
+| J7: later valid partial return 1000; recognized return receivable and renewed obligation | payout_clearing 1000 | customer_in_transit 1000 |
+| J8: returned cash credited | collection_cash 1000 | payout_clearing 1000 |
+| J9: return funds become eligible | customer_in_transit 1000 | customer_available 1000 |
+
+After every journal, these are normal-side balances. R = revenue (300 after J1), E = expense (100 after J2); both zero initially.
+
+| State | Receivable | Cash | Clearing | Pending | Available | In-transit | R | E |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| J1 | 10000 | 0 | 0 | 9700 | 0 | 0 | 300 | 0 |
+| J2 | 0 | 9900 | 0 | 9700 | 0 | 0 | 300 | 100 |
+| J3 | 0 | 9900 | 0 | 0 | 9700 | 0 | 300 | 100 |
+| J4 | 0 | 9900 | 0 | 0 | 5700 | 4000 | 300 | 100 |
+| J5 | 0 | 5900 | 4000 | 0 | 5700 | 4000 | 300 | 100 |
+| J6 | 0 | 5900 | 0 | 0 | 5700 | 0 | 300 | 100 |
+| J7 | 0 | 5900 | 1000 | 0 | 5700 | 1000 | 300 | 100 |
+| J8 | 0 | 6900 | 0 | 0 | 5700 | 1000 | 300 | 100 |
+| J9 | 0 | 6900 | 0 | 0 | 6700 | 0 | 300 | 100 |
+
+Cash + receivable + clearing = customer liabilities + revenue - expense at every state. All nine journals and running balances were independently recomputed with a small arithmetic script during research; no Go code or PostgreSQL tests executed. This verifies the illustrative numbers only. J5 is valid only if the clearing asset satisfies the accepted economic definition and supported evidence; a cash debit is not beneficiary credit. J7 similarly requires an evidenced enforceable return claim, not merely an untrusted return message. J7–9 can be combined only when the necessary evidence and policy are simultaneous.
+
+Alternative branches (not appended to J1–J9):
+- After J4 and definitive failure with no external debit: D customer_in_transit 4000 / C customer_available 4000. Cash remains 9900; available becomes 9700. Unknown outcome does not post this journal.
+- If J5 has happened and the payout fails but money has not returned, keep the relevant obligation and clearing asset visible; do not mark funds available based on timeout. On evidenced cash return: D collection_cash 4000 / C payout_clearing 4000; then release the hold with the preceding failure journal when eligible.
+- Internal transfer from customer A to customer B within the same book/currency: D A_available 2000 / C B_available 2000; platform cash unchanged. Authorization, product scope and owner checks required; no cross-currency journal.
+- Reserve: D customer_available 1000 / C customer_reserve 1000; release reverses those economic effects with a new authorized journal, not mutation. Release may be partial subject to total remaining amount.
+- Initial prefunding from platform operating cash: D prefunded_partner_cash / C operating_cash only when the corresponding asset/evidence policy applies; opening capital uses D operating_cash / C platform_capital. Never fund a balance by unbalanced UPDATE or fictitious opening entries.
+- Partial refund of a captured payment: refund workflow owns refundable cap and fee policy; reserve funds before external send, and use the same cash/clearing/fulfillment separation when applicable. If insufficient funds, refuse initially; debt recovery/chargebacks require approved receivable/loss accounting and may not be silently dropped or bypass balance floors.
+
+### A.5 — Posting authority, templates and time
+
+The ledger domain checks math and account classes; allowed business owners determine economic meaning and evidence. Candidate registered, versioned posting templates: payin_recognized, payin_cash_settled, availability_release, payout_reserve, payout_cash_debit, payout_fulfilled, payout_release, payout_return_recognized, return_cash_received, return_availability, internal_transfer, reserve_hold/release, full_reversal and approved_adjustment. First ledger gate uses synthetic funding/transfer/reversal templates only; others remain disabled until owning capabilities and contract checks exist. A posting template constrains allowed account types, book/currency/owner binding, direction, amount relationships, operation ID, evidence/approval policy and stable key. No client arbitrary debit/credit, even if balanced. Each economic fact has one stable identity independent of delivery ID; multiple distinct facts can reference one payment.
+
+Journal immutability includes financial reference, amounts, account, direction and committed sequence. Record recorded_at (database recording time, not a guaranteed commit-order clock), effective date under accepted accounting policy, and optional external event/booking/value times in provider evidence or authorized mapping. Reject arbitrary backdating by clients. Account sequence + entry position is authoritative account order; statements pin a sequence watermark; cross-account reports use a consistent snapshot and explicit cutoff. Closed-period correction policy remains FIN-04. A journal reversal offsets the whole original and must pass current gates; a partial refund, return, fee adjustment and dispute is a distinct financial fact, not reuse of a full-reversal ID. For FX, balance USD and SGD independently and keep linked group identity, rates and source evidence; accounting valuation and real liquidity are separate.
+
+### A.6 — Candidate acceptance and decision records
+
+| Trace | Testable candidate (not accepted, NOT RUN in repo) |
+|---|---|
+| LGR-01/09 | Reject mismatched book, currency, invalid direction or normal side, zero/negative entries, immutable classification changes, overflow and arbitrary opening balance. |
+| LGR-02/04, ACC-03 | Reproduce nine journal fixture and each state; rebuild from entries; independently prove balance equation and per-currency debit/credit totals. |
+| LGR-12 | Reject balanced but unauthorized posting template, wrong account owner/type, missing or substituted evidence and duplicate economic identity. |
+| ACC-02, OUT-01/02 | Available excludes holds once; two concurrent payouts cannot consume the same funds or another payout's hold. Unknown/failure-after-debit cannot prematurely release. |
+| PAY-04, LGR-05 | Full reversal distinct from partial refund and return; concurrent cumulative refund/return cap, duplicate callbacks, original journal unchanged. |
+| REC-02/05, FIN-02 | J2 reconciles gross 10000, fee 100 and bank net 9900; missing fee or cash event creates case despite balanced journal. J5 and J6 cannot be collapsed without evidence. |
+| FIN-01/03/04 | Statements preserve entry sequence, immutable close watermark, booking/value provenance and separate functional-currency mapping; later correction not silent historic mutation. |
+
+Proposed choices requiring owner/technical review: (1) synthetic intermediary and single accounting book, customer balances as liabilities; (2) named balance accounts and operation-specific holds; (3) chart/type immutability and default zero floors, exception governance; (4) economic posting templates and evidence authority, not generic user journal writes; (5) fee recognition, cash clearing, return and availability policy; (6) GL mapping and functional-currency policy deferred to accounting stage. No change to accepted LGR/ACC/FIN or ADR-0002 before explicit acceptance. Next deep dive B: Go/PostgreSQL transaction model, database enforcement, key and sequence semantics, actual concurrency/failure test design (DEC-02). No runtime work authorized.
+
 ## G4 — Reviewable implementation sequence (blocked until G2/G3 acceptance)
 
 | Slice | Scope / trace | Evidence |
