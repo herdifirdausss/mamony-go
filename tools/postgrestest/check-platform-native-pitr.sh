@@ -8,9 +8,10 @@ work=$(mktemp -d)
 source_id=
 target_id=
 negative_id=
+gap_id=
 cleanup() {
   local id
-  for id in "$negative_id" "$target_id" "$source_id"; do
+  for id in "$gap_id" "$negative_id" "$target_id" "$source_id"; do
     if [[ "$id" =~ ^[a-f0-9]{64}$ ]]; then
       docker rm -f -v "$id" >/dev/null 2>&1 || true
     fi
@@ -172,5 +173,64 @@ if pg "$negative_id" pg_verifybackup "$root/data" > "$work/invalid-backup.log" 2
 fi
 grep -Ei 'manifest.*(parse|invalid|error)|error.*manifest' "$work/invalid-backup.log" >/dev/null || fail "native verification failure not attributable to manifest"
 echo "RH-02c PASS: missing and incomplete evidence denied; native verifier rejected corrupt manifest"
-# The actual WAL-gap recovery case remains separate from the metadata check.
-echo "RH-02a NOT RUN: native required-WAL-gap recovery pending"
+# RH-02a: a fourth disposable container receives a verified base and
+# an archive copy excluding only the required post-backup segment.
+# Never modify the original archive, source, or positive recovery target.
+gap_id=$(new_container)
+check_container "$gap_id"
+[[ "$gap_id" != "$source_id" && "$gap_id" != "$target_id" && "$gap_id" != "$negative_id" ]] || fail "gap target not distinct"
+prepare "$gap_id"
+docker exec "$gap_id" mkdir "$root/data"
+docker cp "$work/base/." "$gap_id:$root/data"
+mkdir "$work/gap-archive"
+for file in "$work/archive/"*; do
+  [[ -f "$file" ]] || fail "unexpected synthetic archive entry"
+  [[ "${file##*/}" != "$segment" ]] || continue
+  cp -- "$file" "$work/gap-archive/"
+done
+[[ -s "$work/archive/$segment" && ! -e "$work/gap-archive/$segment" ]] || fail "gap fixture not established"
+docker cp "$work/gap-archive/." "$gap_id:$root/archive"
+docker exec "$gap_id" chown -R postgres:postgres "$root"
+docker exec "$gap_id" chmod 700 "$root/data"
+pg "$gap_id" pg_verifybackup "$root/data"
+pg "$gap_id" test ! -e "$root/data/pg_wal/$segment" || fail "required segment available locally"
+pg "$gap_id" test ! -e "$root/archive/$segment" || fail "required segment available in copied archive"
+expect_record_denial "$work/boundary.txt" "$work/base/backup_manifest" "$work/gap-archive"
+# Exercise the native engine independently of the lab evidence predicate.
+docker exec -i -u postgres "$gap_id" sh -c "cat >> $root/data/postgresql.conf" <<CONF
+archive_mode = off
+restore_command = 'cp /tmp/mamony-pitr/archive/%f %p'
+recovery_target_name = 'mamony_lab_boundary'
+recovery_target_timeline = '$timeline'
+recovery_target_action = 'pause'
+hot_standby = on
+CONF
+pg "$gap_id" touch "$root/data/recovery.signal"
+# pg_ctl may briefly observe a ready hot standby before recovery fails.
+# Its exit status alone is not evidence of the required native failure.
+pg "$gap_id" pg_ctl -D "$root/data" -l "$root/gap.log" -W start >/dev/null || fail "could not initiate gap test"
+for ((i=0; i<45; i++)); do
+  if pg "$gap_id" grep -F "recovery ended before configured recovery target was reached" "$root/gap.log" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+pg "$gap_id" grep -F "recovery ended before configured recovery target was reached" "$root/gap.log" >/dev/null || fail "native target-not-reached failure not observed"
+pg "$gap_id" grep -F "$segment" "$root/gap.log" >/dev/null || fail "required segment missing from native failure evidence"
+for ((i=0; i<15; i++)); do
+  if ! pg "$gap_id" pg_ctl -D "$root/data" status >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+# Require pg_ctl's documented no-server status rather than any failure.
+status=0
+pg "$gap_id" pg_ctl -D "$root/data" status >/dev/null 2>&1 || status=$?
+[[ "$status" == 3 ]] || fail "failed recovery server not confirmed stopped"
+if pg "$gap_id" grep -F "recovery stopping at restore point" "$root/gap.log" >/dev/null; then
+  fail "gap target unexpectedly reached restore point"
+fi
+[[ "$(sql "$target_id" -c "SELECT pg_is_in_recovery() AND pg_get_wal_replay_pause_state() = 'paused';")" == t ]] || fail "positive control no longer held"
+[[ "$(sql "$target_id" -c "SELECT string_agg(id::text, ',' ORDER BY id) FROM lab_marker;")" == "1,2" ]] || fail "positive control changed"
+echo "RH-02a PASS: verified base with required WAL omitted from isolated archive copy; native target-not-reached failure and stopped server observed; positive control remains paused"
+
