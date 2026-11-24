@@ -38,6 +38,57 @@ func (s syntheticPostCommitAckLoss) WithTx(ctx context.Context, work func(pgx.Tx
 	return errors.New("synthetic lost acknowledgement after definite database commit")
 }
 
+// resolveThenGateActivationIssuer proves that the genuine v10 session
+// Resolve completed BEFORE the v34 SQL issuer is released. Without this
+// barrier, an admin-held subject row would block v10's FOR SHARE rather
+// than the actual issuer SQL whose lock ordering we need to exercise.
+type resolveThenGateActivationIssuer struct {
+	delegate usecase.PasskeyActivationChallengeStore
+	arrived  chan<- struct{}
+	release  <-chan struct{}
+}
+
+func (s resolveThenGateActivationIssuer) Issue(ctx context.Context,
+	sessionDigest [32]byte, credentialID []byte, challengeID string,
+	nonce [32]byte, rpID, origin string) (bool, error) {
+	select {
+	case s.arrived <- struct{}{}:
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+	select {
+	case <-s.release:
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+	return s.delegate.Issue(ctx, sessionDigest, credentialID, challengeID,
+		nonce, rpID, origin)
+}
+
+// resolveThenGateActivationReader uses the same post-Resolve barrier to
+// ensure that the real v34 reader, not only the shared session resolver,
+// contends for the exact subject lock held by the disposable test owner.
+type resolveThenGateActivationReader struct {
+	delegate usecase.PasskeyActivationEvidenceStore
+	arrived  chan<- struct{}
+	release  <-chan struct{}
+}
+
+func (s resolveThenGateActivationReader) Read(ctx context.Context,
+	sessionDigest [32]byte, challengeID string) (usecase.PasskeyActivationEvidence, bool, error) {
+	select {
+	case s.arrived <- struct{}{}:
+	case <-ctx.Done():
+		return usecase.PasskeyActivationEvidence{}, false, ctx.Err()
+	}
+	select {
+	case <-s.release:
+	case <-ctx.Done():
+		return usecase.PasskeyActivationEvidence{}, false, ctx.Err()
+	}
+	return s.delegate.Read(ctx, sessionDigest, challengeID)
+}
+
 // TestIdentityZPasskeyAtomicPossession exercises a REAL ES256 authenticator
 // signature plus isolated PostgreSQL roles and the v36 atomic finish. This
 // is a synthetic, unmounted fixture; it does not test production login.
@@ -625,10 +676,10 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	// Pre-verify EVERY caller's ES256 proof while v34 is still readable.
 	// This tests 16 distinct SQL finish attempts at the same one-use fence,
 	// not 15 requests denied early by the read-only v35 evidence reader.
-	// Hold the subject row BEFORE the 18 SQL actors enter their respective
-	// PostgreSQL functions, and observe blocked backends by blocker PID.
-	// This proves real row-lock contention rather than merely concurrent
-	// Go function invocations.
+	// First let v34 issuer/reader each finish real v10 session resolution,
+	// then hold the subject row before releasing their specialized SQL
+	// functions. This prevents a false-positive observation in which only
+	// session resolution waits for the subject lock.
 	const count = 16
 	claims := make([]usecase.PasskeyActivationFinishRequest, count)
 	for i := range claims {
@@ -639,6 +690,47 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		claims[i] = request
 		claims[i].Verified = signed
 		claims[i].EventID = randomSyntheticID(t, "evt_")
+	}
+	activationArrived := make(chan struct{}, 2)
+	activationGate := make(chan struct{})
+	var activationGateOnce sync.Once
+	releaseActivation := func() { activationGateOnce.Do(func() { close(activationGate) }) }
+	defer releaseActivation()
+	contendingIssuer, err := usecase.NewPasskeyActivationChallengeIssuer(
+		sessions, resolveThenGateActivationIssuer{
+			delegate: nonceStore, arrived: activationArrived, release: activationGate,
+		}, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contendingReader, err := usecase.NewPasskeyActivationEvidenceReader(
+		sessions, resolveThenGateActivationReader{
+			delegate: readStore, arrived: activationArrived, release: activationGate,
+		}, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type readResult struct {
+		evidence usecase.PasskeyActivationEvidence
+		err      error
+	}
+	readResults := make(chan readResult, 1)
+	issueResults := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		evidence, err := contendingReader.Read(ctx, bearer, challenge.ChallengeID())
+		readResults <- readResult{evidence: evidence, err: err}
+	})
+	wg.Go(func() {
+		_, err := contendingIssuer.Begin(ctx, bearer, credID)
+		issueResults <- err
+	})
+	for i := 0; i < 2; i++ {
+		select {
+		case <-activationArrived:
+		case <-ctx.Done():
+			t.Fatalf("v34 contender failed to pass the session resolver: %v", ctx.Err())
+		}
 	}
 	lockTx, err = admin.Begin(ctx)
 	if err != nil {
@@ -667,8 +759,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	}
 	results := make(chan dbFinishResult, count)
 	start := make(chan struct{})
-	arrived := make(chan struct{}, count+2)
-	var wg sync.WaitGroup
+	arrived := make(chan struct{}, count)
 	for _, claim := range claims {
 		wg.Go(func() {
 			arrived <- struct{}{}
@@ -677,32 +768,11 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			results <- dbFinishResult{allowed: allowed, err: err}
 		})
 	}
-	// Include the actual v34 reader and issuer in the SAME contention
-	// window. Reader may see the pending proof or its consumed state;
-	// issuer must not replace an outstanding nonce or reactivate a
-	// credential after the finisher wins. Neither may deadlock (40P01).
-	type readResult struct {
-		evidence usecase.PasskeyActivationEvidence
-		err      error
-	}
-	readResults := make(chan readResult, 1)
-	issueResults := make(chan error, 1)
-	wg.Go(func() {
-		arrived <- struct{}{}
-		<-start
-		evidence, err := reader.Read(ctx, bearer, challenge.ChallengeID())
-		readResults <- readResult{evidence: evidence, err: err}
-	})
-	wg.Go(func() {
-		arrived <- struct{}{}
-		<-start
-		_, err := issuer.Begin(ctx, bearer, credID)
-		issueResults <- err
-	})
-	// All actors are live before releasing the start barrier; subject
-	// state is still locked by the admin transaction. Pool size remains
-	// max 8, so do not claim 16 simultaneous physical connections.
-	for i := 0; i < count+2; i++ {
+	// Both v34 actors have already passed v10 Resolve and are gated
+	// immediately before their dedicated SQL calls. All 16 finisher
+	// goroutines are live before opening the start barrier. Pools stay
+	// limited to 8 physical connections each.
+	for i := 0; i < count; i++ {
 		select {
 		case <-arrived:
 		case <-ctx.Done():
@@ -710,6 +780,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		}
 	}
 	close(start)
+	releaseActivation()
 	var finisherBlocked, readerBlocked, issuerBlocked bool
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
