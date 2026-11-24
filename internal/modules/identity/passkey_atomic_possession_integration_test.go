@@ -1486,6 +1486,7 @@ func checkStalePasskeyRestore(t *testing.T, ctx context.Context, source *pgx.Con
 		t.Fatal("held restore changed stale fixture or challenge expired")
 	}
 	t.Log("IRF-RESTORE HOLD MECHANISM PASS: actual stale Identity target denies three runtime logins; surviving event/notice absent; no release authorized")
+	checkHeldRestoreReviewRecord(t, ctx, source, admin, target, dump, sourceEvent, held, targetEvidence)
 
 	// Deliberately remove the lab hold ONLY to run the existing exposure
 	// negative control below. This is not a recovery release transition.
