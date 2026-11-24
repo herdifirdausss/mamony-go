@@ -230,3 +230,17 @@ New synthetic candidates in existing required integration tests:
 - CI evidence markers are required in addition to existing parent testgate checks (cb929f4). All three new cases NOT RUN pending exact-head verification; negative-control success exposes a limitation and is not recovery-security PASS.
 
 Source: migration 000002 and ProofStore.Consume bind email verification to contact/status and challenge lifecycle, not session_epoch. Migration 000019 and replacement redeem_password_recovery in 000024 bind password recovery to the current subject epoch and challenge-specific assurance. No production mutations, migration, route, release or surviving evidence authority introduced. Pending worker/provider, proof-family coverage, actual stale restore, reconciliation and independent review remain blocking for release.
+
+
+## G5 contact proof evidence and recovery-code/factor candidates — 2026-11-24
+
+Exact SHA `62c1bfd4d8526b406592f9064b4ac70a2115defc` completed 5/5 workflows. [PostgreSQL integration 45391602066](https://github.com/herdifirdausss/mamony-go/actions/runs/45391602066) explicitly logged the email epoch-only negative control (old proof still accepted), email revocation mechanism PASS, old password recovery challenge with current assurance denial PASS, and local epoch/change-grant PASS. Negative-control success is evidence of a limitation, not recovery acceptance.
+
+Reviewed migrations 000024/000025/000028/000029. Saved-code rotation atomically deletes the previous set and inserts the new set; it does not retain old code digests as tombstones. Thus a stale backup can contain a formerly rotated-out set, and local epoch comparison is not an independent history check. The recovery factor challenge and enrollment approval also depend on epoch and current bound/unrevoked key; these can roll back together. Do not automatically rebind factor keys or re-enable saved codes on restore. The existing rotation path marks prior assurance consumed as a terminal transition; this does not authorize fabricating successful consumption in recovery.
+
+New bounded mechanism tests:
+- 2a8a77c: extend existing recovery-code enrollment/rotation test after its positive and concurrent rotation controls. Retain five old-epoch saved-code rows; advance the synthetic subject epoch; mint fresh session and rotation grant via restricted SQL roles. Both old rotation grant and old code with fresh grant must be denied; rows, grant state, event and notice counts must remain intact. This checks rotation, not the offline-code password-recovery approval path.
+- 259a4f0: extend existing signed-factor test after genuine signature approval and revocation. Keep key revoked and approval on old epoch; create fresh session and rotation grant. Enrollment must be denied and revocation, original consumed factor challenge, outstanding approval, grant, and event evidence retained. This checks combined stale/revoked denial, not independent currentness or factor re-provisioning.
+- e51d597: require both evidence markers in CI in addition to existing mandatory parent testgate tests. New cases NOT RUN pending exact-head CI.
+
+No new grant authority, production mutation, route, migration, release or credential reconciliation implemented. Future coverage: offline-code assurance approval, isolated stale enrollment approval versus current factor, passkey proof family, actual stale restore and surviving trusted history. Independent review before merge remains mandatory.
