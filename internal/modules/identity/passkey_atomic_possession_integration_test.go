@@ -283,6 +283,48 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// An unrelated account may have a fully valid separate session and
+	// the same session epoch. The SQL finisher must derive the subject from
+	// the live digest and reject the original credential/nonce ownership.
+	unrelatedSubject := randomSyntheticID(t, "sub_")
+	unrelatedEmail := strings.ToLower(randomSyntheticID(t, "unrelated_")) + "@example.test"
+	if _, err := admin.Exec(ctx,
+		"INSERT INTO mamony_identity.subjects(subject_id,created_at) "+
+			"VALUES($1,clock_timestamp())", unrelatedSubject); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx,
+		"INSERT INTO mamony_identity.email_aliases(canonical_email,subject_id,verified_at,created_at) "+
+			"VALUES($1,$2,clock_timestamp(),clock_timestamp())",
+		unrelatedEmail, unrelatedSubject); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1",
+		unrelatedSubject); err != nil {
+		t.Fatal(err)
+	}
+	var unrelatedEpoch int64
+	if err := admin.QueryRow(ctx,
+		"SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1",
+		unrelatedSubject).Scan(&unrelatedEpoch); err != nil || unrelatedEpoch != epoch {
+		t.Fatalf("unrelated account must have matching valid epoch for ownership test: %d %v",
+			unrelatedEpoch, err)
+	}
+	_, unrelatedDigest := newBearer()
+	if _, err := admin.Exec(ctx,
+		"INSERT INTO mamony_identity.opaque_sessions(token_digest,subject_id,subject_epoch,issued_at,expires_at) "+
+			"VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '12 hours')",
+		unrelatedDigest[:], unrelatedSubject, unrelatedEpoch); err != nil {
+		t.Fatal(err)
+	}
+	crossSubjectClaim := request
+	crossSubjectClaim.SessionDigest = unrelatedDigest
+	crossSubjectClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, crossSubjectClaim); err != nil || allowed {
+		t.Fatalf("another subject's live session adopted a staged passkey: allowed=%v err=%v", allowed, err)
+	}
+
 	// A signature over the original epoch is not authorization after a
 	// subject session-epoch rollover. Even a still-live v34 nonce must fail
 	// the authoritative SQL recheck, independent of the earlier v35 reader.
