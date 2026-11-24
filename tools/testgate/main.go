@@ -63,6 +63,7 @@ var requiredTests = []string{
 	"TestIdentityZSessionIdleExpiry",
 	"TestIdentityZMaxActiveSessions",
 	"TestIdentityZAuthMaterialEpochFence",
+	"TestIdentityZRecoveryEpochInvalidationMechanism",
 	"TestIdentityZAuthenticatedPasswordChange",
 	"TestIdentityZPasswordRecoveryRedemption",
 	"TestIdentityZRecoveryOfflineAssurance",
@@ -312,7 +313,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZPasskeyRegistrationAtomicStage|ZPasskeyActivationChallenge|ZPasskeyAtomicPossession|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZRecoveryEpochInvalidationMechanism|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZPasskeyRegistrationAtomicStage|ZPasskeyActivationChallenge|ZPasskeyAtomicPossession|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -415,6 +416,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZSessionIdleExpiry") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZMaxActiveSessions") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZAuthMaterialEpochFence") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryEpochInvalidationMechanism") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZAuthenticatedPasswordChange") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZPasswordRecoveryRedemption") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryOfflineAssurance") ||
