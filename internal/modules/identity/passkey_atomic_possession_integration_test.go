@@ -227,19 +227,19 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		edit          func(*usecase.PasskeyActivationFinishRequest)
 		adapterReject bool
 	}{
-		{"other session", func(x *usecase.PasskeyActivationFinishRequest) { x.SessionDigest = otherDigest }},
-		{"wrong nonce", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.Nonce[0] ^= 1 }},
+		{"other session", func(x *usecase.PasskeyActivationFinishRequest) { x.SessionDigest = otherDigest }, false},
+		{"wrong nonce", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.Nonce[0] ^= 1 }, false},
 		{"wrong RP", func(x *usecase.PasskeyActivationFinishRequest) {
 			x.Expected.RPID = "different.example.test"
 			x.Expected.Origin = "https://different.example.test"
-		}},
+		}, false},
 		{"wrong COSE", func(x *usecase.PasskeyActivationFinishRequest) {
 			x.Expected.PublicKeyCOSE = bytes.Repeat([]byte{0xa1}, len(publicCOSE))
-		}},
+		}, false},
 		{"stale sign count", func(x *usecase.PasskeyActivationFinishRequest) {
 			x.Expected.SignCount = 1
 			x.Verified.Counter = 2
-		}},
+		}, false},
 		{"missing UV", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.UserVerified = false }, true},
 		{"reversed counter", func(x *usecase.PasskeyActivationFinishRequest) {
 			x.Expected.SignCount = 2
