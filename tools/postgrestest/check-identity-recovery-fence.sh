@@ -139,11 +139,11 @@ echo "IRF-F02 PASS: isolated restored marker; all fixture roles denied"
 # One idle session and one known uncommitted transaction in the source.
 mkfifo "$scratch/idle-input"
 exec 3<>"$scratch/idle-input"
-runtime_sql "$source_id" "$source_db" mamony_identity_runtime < "$scratch/idle-input" > "$scratch/idle-log" 2>&1 &
+runtime_sql "$source_id" "$source_db" mamony_identity_runtime < "$scratch/idle-input" > "$scratch/idle-log" 2>&1 3>&- &
 idle_pid=$!
 printf "SET application_name='irf_idle';\nSELECT 1;\n" >&3
 runtime_sql "$source_id" "$source_db" mamony_identity_runtime -c \
-  "SET application_name='irf_tx'; BEGIN; INSERT INTO public.irf_marker VALUES (2); SELECT pg_sleep(60); COMMIT;" > "$scratch/tx-log" 2>&1 &
+  "SET application_name='irf_tx'; BEGIN; INSERT INTO public.irf_marker VALUES (2); SELECT pg_sleep(60); COMMIT;" > "$scratch/tx-log" 2>&1 3>&- &
 tx_pid=$!
 observed=false
 for _ in $(seq 1 20); do
@@ -162,6 +162,7 @@ admin_sql "$source_id" "$source_db" -c "SELECT pg_terminate_backend(pid, 5000) F
   fail "termination did not confirm both backends"
 [[ "$(admin_sql "$source_id" "$source_db" -c "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND usename LIKE 'mamony_identity_%'")" == 0 ]] ||
   fail "runtime connections remain"
+printf 'SELECT 1;\n' >&3
 exec 3>&-
 # Client error is not by itself outcome evidence; confirm state separately.
 if wait "$tx_pid"; then fail "uncommitted client unexpectedly succeeded"; fi
