@@ -625,6 +625,10 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	// Pre-verify EVERY caller's ES256 proof while v34 is still readable.
 	// This tests 16 distinct SQL finish attempts at the same one-use fence,
 	// not 15 requests denied early by the read-only v35 evidence reader.
+	// Hold the subject row BEFORE the 18 SQL actors enter their respective
+	// PostgreSQL functions, and observe blocked backends by blocker PID.
+	// This proves real row-lock contention rather than merely concurrent
+	// Go function invocations.
 	const count = 16
 	claims := make([]usecase.PasskeyActivationFinishRequest, count)
 	for i := range claims {
@@ -636,15 +640,38 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		claims[i].Verified = signed
 		claims[i].EventID = randomSyntheticID(t, "evt_")
 	}
+	lockTx, err = admin.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lockTx.Rollback(context.Background()) }()
+	var blockerPID int32
+	if err := lockTx.QueryRow(ctx,
+		"SELECT pg_backend_pid()").Scan(&blockerPID); err != nil {
+		t.Fatal(err)
+	}
+	if err := lockTx.QueryRow(ctx,
+		"SELECT subject_id FROM mamony_identity.subjects "+
+			"WHERE subject_id=$1 FOR UPDATE", subject).Scan(&lockedSubject); err != nil ||
+		lockedSubject != subject {
+		t.Fatalf("cannot acquire real subject lock for three-way contention: %v", err)
+	}
+	observer, err := pgx.Connect(ctx, adminDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = observer.Close(context.Background()) }()
 	type dbFinishResult struct {
 		allowed bool
 		err     error
 	}
 	results := make(chan dbFinishResult, count)
 	start := make(chan struct{})
+	arrived := make(chan struct{}, count+2)
 	var wg sync.WaitGroup
 	for _, claim := range claims {
 		wg.Go(func() {
+			arrived <- struct{}{}
 			<-start
 			allowed, err := finishStore.Finish(ctx, claim)
 			results <- dbFinishResult{allowed: allowed, err: err}
@@ -661,16 +688,65 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	readResults := make(chan readResult, 1)
 	issueResults := make(chan error, 1)
 	wg.Go(func() {
+		arrived <- struct{}{}
 		<-start
 		evidence, err := reader.Read(ctx, bearer, challenge.ChallengeID())
 		readResults <- readResult{evidence: evidence, err: err}
 	})
 	wg.Go(func() {
+		arrived <- struct{}{}
 		<-start
 		_, err := issuer.Begin(ctx, bearer, credID)
 		issueResults <- err
 	})
+	// All actors are live before releasing the start barrier; subject
+	// state is still locked by the admin transaction. Pool size remains
+	// max 8, so do not claim 16 simultaneous physical connections.
+	for i := 0; i < count+2; i++ {
+		select {
+		case <-arrived:
+		case <-ctx.Done():
+			t.Fatalf("could not start all three-way lock contenders: %v", ctx.Err())
+		}
+	}
 	close(start)
+	var finisherBlocked, readerBlocked, issuerBlocked bool
+	deadline := time.Now().Add(8 * time.Second)
+	for time.Now().Before(deadline) {
+		var nf, nr, ni int
+		err := observer.QueryRow(ctx,
+			"SELECT count(*) FILTER (WHERE usename=$2), "+
+				"count(*) FILTER (WHERE usename=$3), "+
+				"count(*) FILTER (WHERE usename=$4) "+
+				"FROM pg_stat_activity WHERE datname=current_database() "+
+				"AND wait_event_type='Lock' "+
+				"AND $1=ANY(pg_blocking_pids(pid))",
+			blockerPID,
+			"mamony_identity_passkey_activation_finisher_runtime",
+			"mamony_identity_passkey_activation_reader_runtime",
+			"mamony_identity_passkey_activation_issuer_runtime",
+		).Scan(&nf, &nr, &ni)
+		if err != nil {
+			t.Fatalf("cannot observe PostgreSQL lock waiters: %v", err)
+		}
+		finisherBlocked = finisherBlocked || nf > 0
+		readerBlocked = readerBlocked || nr > 0
+		issuerBlocked = issuerBlocked || ni > 0
+		if finisherBlocked && readerBlocked && issuerBlocked {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if !finisherBlocked || !readerBlocked || !issuerBlocked {
+		t.Fatalf("not all three SQL principals waited on the SAME subject row: "+
+			"finisher=%v reader=%v issuer=%v", finisherBlocked, readerBlocked, issuerBlocked)
+	}
+	if len(results) != 0 || len(readResults) != 0 || len(issueResults) != 0 {
+		t.Fatal("an actor returned before the PostgreSQL row lock was released")
+	}
+	if err := lockTx.Commit(ctx); err != nil {
+		t.Fatalf("could not release subject lock for three-way race: %v", err)
+	}
 	wg.Wait()
 	close(results)
 	seenReader := <-readResults
