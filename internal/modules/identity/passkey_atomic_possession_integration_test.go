@@ -229,7 +229,9 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		{"other session", func(x *usecase.PasskeyActivationFinishRequest) { x.SessionDigest = otherDigest }},
 		{"wrong nonce", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.Nonce[0] ^= 1 }},
 		{"wrong RP", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.RPID = "different.example.test" }},
-		{"wrong COSE", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.PublicKeyCOSE = bytes.Repeat([]byte{0xa1}, len(publicCOSE)) }},
+		{"wrong COSE", func(x *usecase.PasskeyActivationFinishRequest) {
+			x.Expected.PublicKeyCOSE = bytes.Repeat([]byte{0xa1}, len(publicCOSE))
+		}},
 		{"stale sign count", func(x *usecase.PasskeyActivationFinishRequest) { x.Expected.SignCount = 2 }},
 		{"missing UV", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.UserVerified = false }},
 		{"reversed counter", func(x *usecase.PasskeyActivationFinishRequest) { x.Verified.Counter = 0 }},
