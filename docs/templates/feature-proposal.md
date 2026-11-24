@@ -52,7 +52,7 @@ For accepted changes, update the **owning capability contract** with the final A
 
 **Compatibility, observability and rollout:** Migration/rollback, release ordering, alerts, feature flags, safe disable behavior and repair path.
 
-**Decision status:** Proposed | Accepted | Blocked. Record technical acceptance reference and create/update an ADR only for a lasting architecture decision.
+**Decision status:** Proposed | Owner-approved draft scope / independent review pending | Accepted | Blocked. Record owner approval and independent technical acceptance references separately and create/update an ADR only for a lasting architecture decision.
 
 ## G4 — Implementation slices
 
@@ -60,7 +60,7 @@ For accepted changes, update the **owning capability contract** with the final A
 |---|---|---|---|---|---|
 | Pending | Pending | Pending | NOT RUN | Pending | PLANNED |
 
-Avoid mixing broad refactoring, speculative infrastructure and new product behavior in one PR. Block coding on unresolved money/security/irreversible-state decisions.
+Avoid mixing broad refactoring, speculative infrastructure and new product behavior in one PR. Block coding on unresolved money/security/irreversible-state decisions affecting the slice. An owner-approved, documented synthetic slice may be implemented in a Draft PR under the workflow exception; independent technical acceptance is required before merge and separate approval before production activation.
 
 For AC-to-test mapping, use the [test-plan checklist](test-plan.md) inside this proposal or the PR. A default `go test` PASS is not evidence for real PostgreSQL integration tests.
 
