@@ -1,6 +1,6 @@
 # Identity recovery fencing — Profile A
 
-**Status:** PROPOSED / NOT ACCEPTED. Critical design; no runtime, schema, deployment or release change.
+**Status:** OWNER DIRECTION ACCEPTED / G3 TECHNICAL ACCEPTANCE PENDING. Critical design; no runtime, schema, deployment or release change. [Owner decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7130151646).
 **Tracking:** [Identity #78](https://github.com/herdifirdausss/mamony-go/issues/78) D4; [Platform #14](https://github.com/herdifirdausss/mamony-go/issues/14) PGF-06; [Identity #20](https://github.com/herdifirdausss/mamony-go/issues/20).
 **Owner:** Platform/recovery operator for containment; Identity owner for credential and proof reconciliation. Independent technical reviewer not yet recorded.
 **Evidence reviewed:** 2026-11-24. Related: [ADR-0041](../adr/0041-passkey-atomic-activation.md), [recovery runbook](../runbooks/recovery.md), [platform contract](../contracts/platform.md) FND-08/09/12, [Identity contract](../contracts/identity.md) IAM-08/10/11, DEC-12/14/17.
@@ -33,7 +33,7 @@ Non-goals: always-available identity, automatic failover, distributed consensus/
 | IRF-05 | Release is explicitly approved for the exact recovery target and evidence revision; previous release cannot authorize another restore. Old runtime credentials cannot connect to the new authority | Repeated restore, old process and stale release tests |
 | IRF-06 | Record privacy-safe containment/recovery decisions, unknown outcomes, elapsed time and lost data; failure to write required release evidence prevents reopening | Fault/cancellation tests and recovery drill |
 
-All IRF requirements are proposed, NOT RUN. Existing PKA-R01 is separate evidence of a limitation. Stable accepted IDs belong in the owning contract after G2 approval.
+IRF-01–06 are owner-approved lab verification targets; all remain NOT RUN. Existing PKA-R01 is separate evidence of a limitation. The owner has not selected the evidence-store implementation, recovery targets or production topology. Independent technical acceptance remains pending.
 
 ## G3 — Recommended first deployment boundary
 
@@ -78,3 +78,33 @@ This first approach does not continuously detect a silent in-place rollback whil
 | Explicit release and repeated-restore drill | Platform + Identity | IRF-05/06, PKA-R02–R05; independent review | NOT RUN |
 
 The existing runbook stays the authoritative procedure until an accepted, verified refinement is made. No SQL migration or role grant change is proposed for this documentation-only slice. Before any implementation, record G2 owner decisions on outage scope, recovery evidence ownership/completeness, handling unrecoverable bindings, operator approval and acceptable recovery targets; record independent G3 technical acceptance of the actual access boundary and test plan. Keep PR #79–#81 draft/unmerged. No new login entitlement.
+
+## G3 supplement — first disposable PostgreSQL fencing drill
+
+Owner direction accepted 2026-11-24 (see decision record above). The initial drill is deliberately narrower than the full IRF requirements. It is an infrastructure mechanism test, not release orchestration, identity reconciliation, or proof of rollback resistance. No code implementation is approved by independent G3 review yet.
+
+### Test boundary and preconditions
+
+- A fresh disposable PostgreSQL 18.7 instance with a separate lifecycle from existing integration fixtures; no production endpoint, credential, backup or customer data. Derive a synthetic runtime-role inventory from the actual fixture/bootstrap and compare it with live catalog membership; refuse an unexpected target or role.
+- Use a separate trusted test administrator and runtime test principals. The administrator and external test oracle are outside the runtime privileges. Start with a known valid connection and a harmless committed synthetic operation, to distinguish real fencing from an already broken login.
+- Use fresh connections and pre-opened runtime sessions; include an idle connection and a deliberately uncommitted synthetic write. Assert actual database identity and principal for positive checks. Bound waits; classify environmental/transport failure separately from policy denial.
+- Restore target must start with runtime login disabled, no reusable source secrets, and explicit access policy. Database role identifiers required by grants/definers are not the same as usable credentials. Verify effective privileges, including indirect membership and alternate connection paths. Do not simply rely on absence of HTTP routes.
+
+### Proposed test matrix
+
+| Drill case | Observable expectation | Coverage limit |
+|---|---|---|
+| IRF-F01 baseline | A known-good synthetic runtime connects and performs its allowed harmless operation; unrelated admin remains distinct | Establishes a valid positive baseline |
+| IRF-F02 held target | Every inventoried runtime principal is denied a new connection while the restore target remains available to the test administrator | Partial IRF-01; no external recovery record yet |
+| IRF-F03 source containment | After the barrier is acknowledged, new runtime connections and pre-opened sessions cannot perform operations on the disposable old authority; administrator verifies no remaining affected connections | Partial IRF-02; not deployed network/secret custody |
+| IRF-F04 transaction boundary | Known committed synthetic marker persists; known uncommitted write is absent after containment; any unknown result is explicitly held for reconciliation rather than classified by socket closure | Partial IRF-02; not a general in-flight outcome resolver |
+| IRF-F05 failure handling | Incomplete inventory, unexpected target, timeout or unverifiable fence cannot produce an acknowledged hold/release | Partial IRF-01/02/06 |
+| IRF-F06 repeat check | A newly initialized isolated candidate remains inaccessible without a new release decision | Partial IRF-05; no actual release authority exercised |
+
+**Mechanism review:** PostgreSQL LOGIN/NOLOGIN and database CONNECT controls apply to connection admission; they cannot substitute for verifying existing sessions have ended. A bounded shutdown/termination operation and subsequent independent observation are separate checks. See [role attributes](https://www.postgresql.org/docs/18/role-attributes.html), [privileges](https://www.postgresql.org/docs/18/ddl-priv.html), [shutdown](https://www.postgresql.org/docs/18/server-shutdown.html), and [activity monitoring](https://www.postgresql.org/docs/18/monitoring-stats.html) (checked 2026-11-24).
+
+### Evidence and approval gates
+
+Each case remains NOT RUN. No local PostgreSQL server/client or Docker was available in the review environment. A later approved test-only implementation should use disposable CI infrastructure, fail on missing/skipped required cases, report exact-head evidence and avoid changing any application runtime grant or migration. Passing IRF-F01–F06 cannot be reported as full IRF-01/02/05/06 acceptance, PKA-R02 PASS, reconciliation, production release, or Profile B currentness.
+
+Independent technical review must confirm actual source/target access fencing, principal inventory, barrier acknowledgment conditions, bounded failure behavior, and test isolation before code. Runtime rollout additionally needs a selected surviving evidence backend, explicit release authority, reconciliation policy, and tested old-credential denial. No change to the unrelated v36 D1–D3 decision status.
