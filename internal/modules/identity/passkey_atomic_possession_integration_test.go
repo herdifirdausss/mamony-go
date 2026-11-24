@@ -251,7 +251,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	event := randomSyntheticID(t, "evt_")
 	if _, err := admin.Exec(ctx,
 		"INSERT INTO mamony_identity.security_outbox(event_id,subject_id,event_type,occurred_at) "+
-			"VALUES($1,$2,'SESSION_CREATED',clock_timestamp())", event, subject); err != nil {
+			"VALUES($1,$2,'ENROLLMENT_PENDING',clock_timestamp())", event, subject); err != nil {
 		t.Fatal(err)
 	}
 	claim := request
