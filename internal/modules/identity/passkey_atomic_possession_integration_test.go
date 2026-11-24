@@ -722,4 +722,183 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	if _, err := issuer.Begin(ctx, otherBearer, credID); !errors.Is(err, usecase.ErrPasskeyActivationDenied) {
 		t.Fatal("second session promoted an already-verified credential")
 	}
+
+	// Distinct fully staged, real-ES256 credentials for counter and backup
+	// semantics. Do not rewrite the already-verified credential to fake a
+	// new ceremony: every case independently uses the original v30/v32/v33
+	// provenance, fresh v34 nonce, v35 signature and v36 SQL transaction.
+	for _, tc := range []struct {
+		name          string
+		originalCount uint32
+		signedCount   uint32
+		originalBE    bool
+		originalBS    bool
+		signedFlags   byte
+		allow         bool
+	}{
+		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true},
+		{"counter_zero_to_one", 0, 1, false, false, 0x05, true},
+		{"counter_one_to_two", 1, 2, false, false, 0x05, true},
+		{"counter_two_to_two_denied", 2, 2, false, false, 0x05, false},
+		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false},
+		{"backup_false_to_true", 0, 1, true, false, 0x1d, true},
+		{"backup_true_to_false", 0, 1, true, true, 0x0d, true},
+		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false},
+		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			account := randomSyntheticID(t, "sub_")
+			contact := strings.ToLower(randomSyntheticID(t, "counter_")) + "@example.test"
+			if _, err := admin.Exec(ctx,
+				"INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())",
+				account); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admin.Exec(ctx,
+				"INSERT INTO mamony_identity.email_aliases(canonical_email,subject_id,verified_at,created_at) "+
+					"VALUES($1,$2,clock_timestamp(),clock_timestamp())", contact, account); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admin.Exec(ctx,
+				"UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1",
+				account); err != nil {
+				t.Fatal(err)
+			}
+			var accountEpoch int64
+			if err := admin.QueryRow(ctx,
+				"SELECT session_epoch FROM mamony_identity.subjects WHERE subject_id=$1",
+				account).Scan(&accountEpoch); err != nil {
+				t.Fatal(err)
+			}
+			session, sessionHash := newBearer()
+			if _, err := admin.Exec(ctx,
+				"INSERT INTO mamony_identity.opaque_sessions(token_digest,subject_id,subject_epoch,issued_at,expires_at) "+
+					"VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '12 hours')",
+				sessionHash[:], account, accountEpoch); err != nil {
+				t.Fatal(err)
+			}
+			reg, err := regIssuer.Begin(ctx, session)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admin.Exec(ctx,
+				"INSERT INTO mamony_identity.passkey_registration_admissions "+
+					"(subject_id,intent_id,session_digest,subject_epoch,contact_version,provenance,approved_at,expires_at) "+
+					"SELECT subject_id,intent_id,session_digest,subject_epoch,contact_version,"+
+					"'PASSWORD_REAUTH_ONLY',clock_timestamp(),expires_at "+
+					"FROM mamony_identity.passkey_registration_intents WHERE subject_id=$1 AND intent_id=$2",
+				account, reg.IntentID()); err != nil {
+				t.Fatal(err)
+			}
+			authenticator, err := identitywa.NewSyntheticActivationSigner()
+			if err != nil {
+				t.Fatal(err)
+			}
+			cose, err := authenticator.PublicCOSE()
+			if err != nil {
+				t.Fatal(err)
+			}
+			credential := make([]byte, 32)
+			if _, err := rand.Read(credential); err != nil {
+				t.Fatal(err)
+			}
+			var regNonce [32]byte
+			copy(regNonce[:], reg.Challenge())
+			ok, err := stageStore.Stage(ctx, sessionHash, reg.IntentID(),
+				usecase.PasskeyRegistrationEvidence{
+					Subject: account, Epoch: accountEpoch, Nonce: regNonce,
+					RPID: policy.RPID(), Origin: policy.Origin(), PolicyGeneration: 1,
+				},
+				usecase.PasskeyRegistrationCandidate{
+					CredentialID: credential, PublicKeyCOSE: cose,
+					AAGUID: make([]byte, 16), AttestationFormat: "none",
+					AttestationType: "none", UserPresent: true, UserVerified: true,
+					BackupEligible: tc.originalBE, BackupState: tc.originalBS,
+					AuthenticatorCount: tc.originalCount,
+				}, randomSyntheticID(t, "evt_"))
+			if err != nil || !ok {
+				t.Fatalf("staging real counter/backup fixture: allowed=%v err=%v", ok, err)
+			}
+			ch, err := issuer.Begin(ctx, session, credential)
+			if err != nil {
+				t.Fatal(err)
+			}
+			original, err := reader.Read(ctx, session, ch.ChallengeID())
+			if err != nil || original.SignCount != tc.originalCount ||
+				original.BackupEligible != tc.originalBE ||
+				original.BackupState != tc.originalBS {
+				t.Fatalf("original signed evidence mismatch: %+v err=%v", original, err)
+			}
+			assertion, err := authenticator.SignedResponseWithFlags(
+				original.Nonce, credential, account, tc.signedCount, tc.signedFlags)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Verify real maintained-library signature acceptance, not
+			// only the SQL adapter's independently asserted flag booleans.
+			checked, verifyErr := proof.VerifyOnly(ctx, session, ch.ChallengeID(), assertion)
+			if tc.allow && (verifyErr != nil || checked.Counter != tc.signedCount ||
+				checked.BackupEligible != tc.originalBE ||
+				checked.BackupState != (tc.signedFlags&0x10 != 0)) {
+				t.Fatalf("signed counter/backup assertion was not verified: %+v err=%v", checked, verifyErr)
+			}
+			if !tc.allow && !errors.Is(verifyErr, usecase.ErrPasskeyAssertionDenied) {
+				t.Fatalf("invalid signed counter/flags were not denied: %v", verifyErr)
+			}
+			finishErr := committer.Finish(ctx, session, ch.ChallengeID(), assertion)
+			if tc.allow && finishErr != nil {
+				t.Fatalf("valid signed counter/backup assertion did not commit: %v", finishErr)
+			}
+			if !tc.allow && !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitDenied) {
+				t.Fatalf("invalid counter/backup assertion reached commit: %v", finishErr)
+			}
+			var finalState string
+			var finalCount int64
+			var finalBE, finalBS, consumedOnce bool
+			if err := admin.QueryRow(ctx,
+				"SELECT state,sign_count,backup_eligible,backup_state "+
+					"FROM mamony_identity.passkey_credentials WHERE credential_id=$1",
+				credential).Scan(&finalState, &finalCount, &finalBE, &finalBS); err != nil {
+				t.Fatal(err)
+			}
+			if err := admin.QueryRow(ctx,
+				"SELECT consumed_at IS NOT NULL FROM mamony_identity.passkey_activation_challenges "+
+					"WHERE subject_id=$1", account).Scan(&consumedOnce); err != nil {
+				t.Fatal(err)
+			}
+			var auditCount, noticeCount int
+			if err := admin.QueryRow(ctx,
+				"SELECT count(*) FROM mamony_identity.security_outbox "+
+					"WHERE subject_id=$1 AND event_type='PASSKEY_POSSESSION_VERIFIED'",
+				account).Scan(&auditCount); err != nil {
+				t.Fatal(err)
+			}
+			if err := admin.QueryRow(ctx,
+				"SELECT count(*) FROM mamony_identity.passkey_activation_notices WHERE subject_id=$1",
+				account).Scan(&noticeCount); err != nil {
+				t.Fatal(err)
+			}
+			if tc.allow {
+				signedBS := tc.signedFlags&0x10 != 0
+				if finalState != "POSSESSION_VERIFIED" || finalCount != int64(tc.signedCount) ||
+					finalBE != tc.originalBE || finalBS != signedBS || !consumedOnce ||
+					auditCount != 1 || noticeCount != 1 {
+					t.Fatalf("valid signed counter/backup state not atomically committed: "+
+						"state=%s counter=%d BE=%v BS=%v consumed=%v events=%d notices=%d",
+						finalState, finalCount, finalBE, finalBS, consumedOnce, auditCount, noticeCount)
+				}
+				if err := committer.Finish(ctx, session, ch.ChallengeID(), assertion);
+					!errors.Is(err, usecase.ErrPasskeyActivationCommitDenied) {
+					t.Fatalf("counter/backup signature replay was not denied: %v", err)
+				}
+			} else if finalState != "PENDING_ASSERTION" ||
+				finalCount != int64(tc.originalCount) ||
+				finalBE != tc.originalBE || finalBS != tc.originalBS ||
+				consumedOnce || auditCount != 0 || noticeCount != 0 {
+				t.Fatalf("invalid counter/backup assertion mutated credential/nonce/notice: "+
+					"state=%s counter=%d BE=%v BS=%v consumed=%v events=%d notices=%d",
+					finalState, finalCount, finalBE, finalBS, consumedOnce, auditCount, noticeCount)
+			}
+		})
+	}
 }
