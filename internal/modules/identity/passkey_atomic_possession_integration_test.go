@@ -264,6 +264,51 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			}
 		})
 	}
+	// The signature was verified above while the original session was
+	// live. Revoking that session after verification must deny the trusted
+	// SQL snapshot rather than permit a commit based on earlier evidence.
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.opaque_sessions SET revoked_at=clock_timestamp() "+
+			"WHERE token_digest=$1", digest[:]); err != nil {
+		t.Fatal(err)
+	}
+	revokedClaim := request
+	revokedClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, revokedClaim); err != nil || allowed {
+		t.Fatalf("revoked original session finished signed assertion: allowed=%v err=%v", allowed, err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.opaque_sessions SET revoked_at=NULL "+
+			"WHERE token_digest=$1", digest[:]); err != nil {
+		t.Fatal(err)
+	}
+
+	// A fresh challenge must not extend the original staged credential's
+	// ten-minute lifetime. This test-only owner rewrite intentionally
+	// simulates a forgotten PENDING_ASSERTION row and restores it afterward.
+	var originalCreated time.Time
+	if err := admin.QueryRow(ctx,
+		"SELECT created_at FROM mamony_identity.passkey_credentials WHERE credential_id=$1",
+		credID).Scan(&originalCreated); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_credentials "+
+			"SET created_at=clock_timestamp()-interval '11 minutes' "+
+			"WHERE credential_id=$1", credID); err != nil {
+		t.Fatal(err)
+	}
+	staleStageClaim := request
+	staleStageClaim.EventID = randomSyntheticID(t, "evt_")
+	if allowed, err := finishStore.Finish(ctx, staleStageClaim); err != nil || allowed {
+		t.Fatalf("stale staged credential finished signed assertion: allowed=%v err=%v", allowed, err)
+	}
+	if _, err := admin.Exec(ctx,
+		"UPDATE mamony_identity.passkey_credentials SET created_at=$1 "+
+			"WHERE credential_id=$2", originalCreated, credID); err != nil {
+		t.Fatal(err)
+	}
+
 	// A signed claim can be valid at v35 read time yet expire while the
 	// SQL finisher waits for the subject lock. The only acceptable decision
 	// uses PostgreSQL clock_timestamp AFTER the wait, not tx start time.
