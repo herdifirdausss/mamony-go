@@ -52,7 +52,7 @@ For accepted changes, update the **owning capability contract** with the final A
 
 **Compatibility, observability and rollout:** Migration/rollback, release ordering, alerts, feature flags, safe disable behavior and repair path.
 
-**Decision status:** Proposed | Accepted | Blocked. Record technical acceptance reference and create/update an ADR only for a lasting architecture decision.
+**Decision status:** Proposed | Accepted | Blocked. For an owner-authorized bounded Critical Draft lab, record exact scope, synthetic containment, negative cases and explicit owner decision; mark independent technical acceptance pending until completed. Otherwise the ordinary G3 pre-code gate applies. Record technical acceptance reference and create/update an ADR only for a lasting architecture decision.
 
 ## G4 — Implementation slices
 
