@@ -140,3 +140,26 @@ Review the exact proposal and fixture baseline. Before G4, a designated reviewer
 ## Owner-approved draft implementation — 2026-11-24
 
 [Workflow option B approval](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7130263898) supersedes the earlier requirement for independent G3 acceptance before synthetic coding only. Independent acceptance remains mandatory before merge. The candidate `tools/postgrestest/check-identity-recovery-fence.sh` and PostgreSQL workflow step now exist on Draft #81. The drill creates three separate network-isolated PostgreSQL 18.7 containers, derives role names from the actual bootstrap, uses new synthetic credentials, and restores only a harmless committed marker table. It does not restore Identity tables or application ACLs and never modifies the shared CI service database. It exercises positive logins, held target admission, idle and in-flight backend termination, committed/uncommitted marker consistency, wrong-target and incomplete-inventory refusal, and repeated held target. IRF-F05 timeout and IRF-F06 actual release authority remain NOT RUN; their implemented checks are partial. All executed results require exact-head CI evidence; no full IRF-01–06 or PKA-R02 acceptance is implied. External worker/provider, reconciliation, actual role parity, evidence store, recovery generation, production release and independent review remain outstanding.
+
+
+## G5 evidence and G3 reconciliation inventory — 2026-11-24
+
+Exact SHA `0598b238a454b99fe1f164b2a13678bd4dbab1f9` completed five of five workflows. [PostgreSQL integration 45387092315](https://github.com/herdifirdausss/mamony-go/actions/runs/45387092315) logged IRF-F01–04 PASS and the new bounded observation refusal while existing connections remained. Both held restore targets passed effective CONNECT denial. F05/F06 remain partial (external controller and release authority absent). The synthetic marker is not restored Identity authority.
+
+### Classification of restored security state
+
+Reviewed all 35 Identity forward migrations on the above SHA. Their CREATE TABLE declarations enumerate 29 ordinary tables. The new read-only [catalog inventory](../../tools/postgrestest/identity-recovery-inventory.sql) classifies each by its primary recovery responsibility; the new integration workflow requires exact equality with actual migrated table names, reporting missing, unexpected or duplicate classifications. This is a table inventory guard, not a proof of complete field/permission/sequence coverage. New CI check is NOT RUN until exact-head evidence is recorded.
+
+| Class | Count | Proposed disposition while held |
+|---|---:|---|
+| schema_integrity | 1 | Verify migration history and independently reviewed artifact/role parity |
+| binding_reconcile | 6 | Reconcile authoritative account, credential/contact, freeze, factor and offline-code state against surviving evidence; uncertain bindings remain held |
+| temporary_authority | 10 | Deny pre-recovery sessions, grants, challenges and admissions through a reviewed invalidation policy; preserve necessary consumption/provenance evidence |
+| proof_delivery | 2 | Reconcile outstanding proof delivery and prevent obsolete proof delivery; no blind resend |
+| notice_obligation | 5 | Preserve mandatory event linkage, reconcile missing obligations and uncertain delivery |
+| provider_receipt | 3 | Reconcile with surviving provider evidence; do not manufacture delivery state |
+| security_event | 1 | Preserve evidence, identify missing event history, reconcile stable identifiers |
+| abuse_budget | 1 | Review safe restart of rate budgets; never silently relax abuse restrictions |
+| Total | 29 | All are classified; none modified by the inventory |
+
+A class is not a delete/update directive. Several tables also contain historical provenance required by downstream checks. Revocation or invalidation must not erase evidence or accidentally reinstate consumed recovery codes, replaced credentials or old contact bindings. A fresh login or local epoch increase is not independent evidence that the restored password/contact/freeze state is current. The next bounded design must inventory per-table fields, referencing functions and lifecycle constraints, specify a surviving history source, and define which old proofs are invalidated versus retained as non-authoritative evidence. If history is missing, keep scope held. No external recovery control store or production policy has been chosen; no SQL mutations, runtime changes or release implementation in this slice. IRF-03/04 and PKA-R02–R05 remain unverified; independent review still required before merge.
