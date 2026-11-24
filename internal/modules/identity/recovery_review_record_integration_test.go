@@ -165,7 +165,6 @@ func checkHeldRestoreReviewRecord(t *testing.T, ctx context.Context, source, tar
 	return path, expected
 }
 
-
 // A second actual restore never receives the deliberate replay bypass. Even
 // identical backup bytes and catalog summaries cannot authorize a new attempt
 // using the first attempt's record. This is a review oracle, not a release gate.
