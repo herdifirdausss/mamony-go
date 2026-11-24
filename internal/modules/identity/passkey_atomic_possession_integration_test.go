@@ -43,14 +43,17 @@ func (s syntheticPostCommitAckLoss) WithTx(ctx context.Context, work func(pgx.Tx
 }
 
 // wireCommitCutPoint is a deterministic, TEST-ONLY TCP failure point.
-// Pre-COMMIT prevents even sending the COMMIT request; post-COMMIT
-// closes after PostgreSQL has confirmed COMMIT but before pgx sees it.
+// Pre-COMMIT prevents even sending the request. Post-write closes
+// immediately after the full COMMIT request is accepted by the local TCP
+// socket but before any server response; the outcome is intentionally
+// uncertain. Post-COMMIT closes after PostgreSQL confirms COMMIT.
 type wireCommitCutPoint uint8
 
 const (
 	wireNoCut wireCommitCutPoint = iota
 	wireBeforeCommit
 	wireAfterCommit
+	wireAfterCommitWrite
 )
 
 // wireCommitFaultConn reads raw PostgreSQL frames on disposable loopback
@@ -60,6 +63,7 @@ type wireCommitFaultConn struct {
 	cut              wireCommitCutPoint
 	armed            atomic.Bool
 	sawCommitRequest atomic.Bool
+	sentCommitWrite  atomic.Bool
 	sawCommitted     atomic.Bool
 	pending          []byte
 }
@@ -75,6 +79,17 @@ func (c *wireCommitFaultConn) Write(p []byte) (int, error) {
 		}
 		if c.cut == wireAfterCommit {
 			c.armed.Store(true)
+		}
+		if c.cut == wireAfterCommitWrite {
+			n, err := c.Conn.Write(p)
+			if n == len(p) && err == nil {
+				// The local TCP stack accepted the complete COMMIT
+				// request. The PostgreSQL server may or may not have
+				// committed before its socket is disconnected.
+				c.sentCommitWrite.Store(true)
+				_ = c.Conn.Close()
+			}
+			return n, err
 		}
 	}
 	return c.Conn.Write(p)
@@ -114,9 +129,10 @@ func (c *wireCommitFaultConn) Read(p []byte) (int, error) {
 // real v36 SQL and repository adapter with a TEST-ONLY TCP dialer.
 // It does not alter the platform pool, privilege grants or public routes.
 type wireCommitFaultTransactor struct {
-	dsn  string
-	cut  wireCommitCutPoint
-	wire *wireCommitFaultConn
+	dsn        string
+	cut        wireCommitCutPoint
+	wire       *wireCommitFaultConn
+	backendPID int32
 }
 
 func (t *wireCommitFaultTransactor) WithTx(
@@ -144,7 +160,8 @@ func (t *wireCommitFaultTransactor) WithTx(
 	}
 	defer func() { _ = conn.Close(context.Background()) }()
 	var principal string
-	if err := conn.QueryRow(ctx, "SELECT current_user").Scan(&principal); err != nil {
+	if err := conn.QueryRow(ctx, "SELECT current_user, pg_backend_pid()").
+		Scan(&principal, &t.backendPID); err != nil {
 		return err
 	}
 	if principal != "mamony_identity_passkey_activation_finisher_runtime" {
@@ -1044,6 +1061,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		{"counter_one_to_two_definite_commit_ack_lost", 1, 2, false, false, 0x05, true, true, wireNoCut},
 		{"counter_one_to_two_tcp_commit_ack_lost", 1, 2, false, false, 0x05, true, false, wireAfterCommit},
 		{"counter_one_to_two_tcp_commit_request_dropped", 1, 2, false, false, 0x05, true, false, wireBeforeCommit},
+		{"counter_one_to_two_tcp_commit_write_no_response", 1, 2, false, false, 0x05, true, false, wireAfterCommitWrite},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			account := randomSyntheticID(t, "sub_")
@@ -1158,12 +1176,39 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 				finishErr = uncertainCommitter.Finish(ctx, session, ch.ChallengeID(), assertion)
 				if !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitUnavailable) ||
 					wire.wire == nil || !wire.wire.sawCommitRequest.Load() ||
-					wire.wire.sawCommitted.Load() != (tc.wireCut == wireAfterCommit) {
+					wire.wire.sawCommitted.Load() != (tc.wireCut == wireAfterCommit) ||
+					wire.wire.sentCommitWrite.Load() != (tc.wireCut == wireAfterCommitWrite) {
 					t.Fatalf("TCP COMMIT cut not observed and sanitized at expected phase: "+
-						"err=%v cut=%v request=%v confirmed=%v",
+						"err=%v cut=%v request=%v sent=%v confirmed=%v",
 						finishErr, tc.wireCut,
 						wire.wire != nil && wire.wire.sawCommitRequest.Load(),
+						wire.wire != nil && wire.wire.sentCommitWrite.Load(),
 						wire.wire != nil && wire.wire.sawCommitted.Load())
+				}
+				if tc.wireCut == wireAfterCommitWrite {
+					// Ensure the disconnected server backend is gone
+					// before independently observing committed state.
+					// Otherwise a slow server could make a valid commit
+					// look like a temporarily uncommitted transaction.
+					if wire.backendPID <= 0 {
+						t.Fatal("missing real PostgreSQL backend PID")
+					}
+					deadline := time.Now().Add(5 * time.Second)
+					for {
+						var gone bool
+						if err := admin.QueryRow(ctx,
+							"SELECT NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid=$1)",
+							wire.backendPID).Scan(&gone); err != nil {
+							t.Fatal(err)
+						}
+						if gone {
+							break
+						}
+						if time.Now().After(deadline) {
+							t.Fatal("TCP-cut PostgreSQL backend did not terminate")
+						}
+						time.Sleep(20 * time.Millisecond)
+					}
 				}
 			} else if tc.loseCommitAck {
 				uncertainStore, err := identitypg.NewPasskeyActivationFinishStore(
@@ -1214,9 +1259,13 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 				account).Scan(&noticeCount); err != nil {
 				t.Fatal(err)
 			}
-			// A valid signature does not imply a durable write when
-			// the TCP socket closes without sending COMMIT.
-			if tc.allow && tc.wireCut != wireBeforeCommit {
+			// A fully sent COMMIT request with no server response is
+			// deliberately ambiguous. Accept ONLY fully rolled back
+			// or fully committed database states; all related rows
+			// must agree, and the usecase must not auto-retry.
+			committed := tc.allow && tc.wireCut != wireBeforeCommit &&
+				(tc.wireCut != wireAfterCommitWrite || finalState == "POSSESSION_VERIFIED")
+			if committed {
 				signedBS := tc.signedFlags&0x10 != 0
 				if finalState != "POSSESSION_VERIFIED" || finalCount != int64(tc.signedCount) ||
 					finalBE != tc.originalBE || finalBS != signedBS || !consumedOnce ||
