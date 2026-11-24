@@ -244,3 +244,15 @@ New bounded mechanism tests:
 - e51d597: require both evidence markers in CI in addition to existing mandatory parent testgate tests. New cases NOT RUN pending exact-head CI.
 
 No new grant authority, production mutation, route, migration, release or credential reconciliation implemented. Future coverage: offline-code assurance approval, isolated stale enrollment approval versus current factor, passkey proof family, actual stale restore and surviving trusted history. Independent review before merge remains mandatory.
+
+
+## G5 saved-code/factor evidence and isolated assurance/approval candidates — 2026-11-24
+
+Exact SHA `859f89ba39656c2b2500f09277ddf38d18594184` completed 5/5 workflows. [PostgreSQL integration 45392368342](https://github.com/herdifirdausss/mamony-go/actions/runs/45392368342) explicitly logged IRF-OFFLINE and IRF-FACTOR mechanism PASS; prior email/recovery/epoch/change evidence also passed within its bounded scope. No independent restore-currentness proof follows.
+
+Added two previously unisolated cases in existing mandatory parent integration tests:
+- 61b8e03: a live current recovery challenge with an unused prior-epoch offline code must deny assurance without consuming the code, creating a grant or emitting an approval event. A separate current-epoch synthetic code succeeds against the same challenge. Pre-enrollment is a privileged fixture, not a supported recovery enrollment flow.
+- 0bcaa38: a separate synthetic subject has an outstanding prior-epoch enrollment approval, matching current non-revoked factor key, fresh session and current rotation grant. Denial must retain approval/grant state and create no code/event/notice. Current factor binding is deliberately simulated by the disposable administrator, not a proposed restore rebind policy. Earlier revoked-factor fixture remains revoked. Genuine signature/enrollment positive control is covered earlier in the same parent test.
+- eb58533: both exact evidence markers required by CI. New tests NOT RUN pending exact-head verification.
+
+These cases close specific local epoch isolation gaps, not the external recovery authority gap. Avoid more duplicate local cases unless they reveal an uncovered binding. Next examine passkey registration/admission/activation, then prioritize integrated stale-restore negative/positive controls against independently surviving evidence and a separately approved hold/release policy. No production runtime, migration, route, data mutation or release change. Independent review remains required before merge.
