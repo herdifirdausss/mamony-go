@@ -781,36 +781,44 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	}
 	close(start)
 	releaseActivation()
-	var finisherBlocked, readerBlocked, issuerBlocked bool
+	// PostgreSQL reports both hard and soft blockers: later waiters may
+	// be queued behind other waiting transactions, not directly behind the
+	// admin PID. Assert all three principals have an actual server-side
+	// Lock wait AND the held admin lock is a direct blocker for at least
+	// one. The gated v34 ports guarantee their SQL starts at the subject.
+	var finisherBlocked, readerBlocked, issuerBlocked, adminBlocking bool
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
-		var nf, nr, ni int
+		var nf, nr, ni, direct int
 		err := observer.QueryRow(ctx,
 			"SELECT count(*) FILTER (WHERE usename=$2), "+
 				"count(*) FILTER (WHERE usename=$3), "+
-				"count(*) FILTER (WHERE usename=$4) "+
+				"count(*) FILTER (WHERE usename=$4), "+
+				"count(*) FILTER (WHERE $1=ANY(pg_blocking_pids(pid))) "+
 				"FROM pg_stat_activity WHERE datname=current_database() "+
 				"AND wait_event_type='Lock' "+
-				"AND $1=ANY(pg_blocking_pids(pid))",
+				"AND usename IN ($2,$3,$4)",
 			blockerPID,
 			"mamony_identity_passkey_activation_finisher_runtime",
 			"mamony_identity_passkey_activation_reader_runtime",
 			"mamony_identity_passkey_activation_issuer_runtime",
-		).Scan(&nf, &nr, &ni)
+		).Scan(&nf, &nr, &ni, &direct)
 		if err != nil {
 			t.Fatalf("cannot observe PostgreSQL lock waiters: %v", err)
 		}
 		finisherBlocked = finisherBlocked || nf > 0
 		readerBlocked = readerBlocked || nr > 0
 		issuerBlocked = issuerBlocked || ni > 0
-		if finisherBlocked && readerBlocked && issuerBlocked {
+		adminBlocking = adminBlocking || direct > 0
+		if finisherBlocked && readerBlocked && issuerBlocked && adminBlocking {
 			break
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	if !finisherBlocked || !readerBlocked || !issuerBlocked {
-		t.Fatalf("not all three SQL principals waited on the SAME subject row: "+
-			"finisher=%v reader=%v issuer=%v", finisherBlocked, readerBlocked, issuerBlocked)
+	if !finisherBlocked || !readerBlocked || !issuerBlocked || !adminBlocking {
+		t.Fatalf("v34/v36 SQL roles did not all wait under the real subject lock: "+
+			"finisher=%v reader=%v issuer=%v adminBlocking=%v",
+			finisherBlocked, readerBlocked, issuerBlocked, adminBlocking)
 	}
 	if len(results) != 0 || len(readResults) != 0 || len(issueResults) != 0 {
 		t.Fatal("an actor returned before the PostgreSQL row lock was released")
