@@ -8,10 +8,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
+	"io"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -36,6 +40,107 @@ func (s syntheticPostCommitAckLoss) WithTx(ctx context.Context, work func(pgx.Tx
 		return err
 	}
 	return errors.New("synthetic lost acknowledgement after definite database commit")
+}
+
+// wireCommitAckDropConn is test-only PostgreSQL wire fault injection.
+// TLS is disabled ONLY for the guarded disposable loopback database.
+// It watches the outbound COMMIT command and then reads server-framed
+// backend messages. On observing CommandComplete("COMMIT"), it closes
+// the real TCP socket BEFORE forwarding that acknowledgment to pgx.
+// Unlike a fake store, the actual PostgreSQL server has committed.
+type wireCommitAckDropConn struct {
+	net.Conn
+	armed        atomic.Bool
+	sawCommitted atomic.Bool
+	pending      []byte
+}
+
+func (c *wireCommitAckDropConn) Write(p []byte) (int, error) {
+	if bytes.Contains(bytes.ToUpper(p), []byte("COMMIT\x00")) {
+		c.armed.Store(true)
+	}
+	return c.Conn.Write(p)
+}
+
+func (c *wireCommitAckDropConn) Read(p []byte) (int, error) {
+	if !c.armed.Load() {
+		return c.Conn.Read(p)
+	}
+	if len(c.pending) == 0 {
+		var header [5]byte
+		if _, err := io.ReadFull(c.Conn, header[:]); err != nil {
+			return 0, err
+		}
+		length := binary.BigEndian.Uint32(header[1:])
+		if length < 4 || length > 1<<20 {
+			_ = c.Conn.Close()
+			return 0, errors.New("invalid PostgreSQL commit response frame")
+		}
+		body := make([]byte, int(length)-4)
+		if _, err := io.ReadFull(c.Conn, body); err != nil {
+			return 0, err
+		}
+		if header[0] == 'C' && bytes.Equal(body, []byte("COMMIT\x00")) {
+			c.sawCommitted.Store(true)
+			_ = c.Conn.Close()
+			return 0, io.ErrUnexpectedEOF
+		}
+		c.pending = append(header[:], body...)
+	}
+	n := copy(p, c.pending)
+	c.pending = c.pending[n:]
+	return n, nil
+}
+
+// wireCommitAckDropTransactor executes the SAME real v36 SQL through the
+// production postgres repository adapter, but with a test-only net.Conn.
+// It does not change the platform pool, expose a privileged runtime, or
+// claim to simulate leader failover or a PostgreSQL crash before COMMIT.
+type wireCommitAckDropTransactor struct {
+	dsn  string
+	wire *wireCommitAckDropConn
+}
+
+func (t *wireCommitAckDropTransactor) WithTx(
+	ctx context.Context, operation func(pgx.Tx) error) error {
+	cfg, err := pgx.ParseConfig(t.dsn)
+	if err != nil {
+		return err
+	}
+	cfg.Fallbacks = nil
+	cfg.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil || (host != "localhost" && host != "127.0.0.1") {
+			return nil, errors.New("wire-fault test must use a loopback PostgreSQL endpoint")
+		}
+		raw, err := (&net.Dialer{}).DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		t.wire = &wireCommitAckDropConn{Conn: raw}
+		return t.wire, nil
+	}
+	conn, err := pgx.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(context.Background()) }()
+	var principal string
+	if err := conn.QueryRow(ctx, "SELECT current_user").Scan(&principal); err != nil {
+		return err
+	}
+	if principal != "mamony_identity_passkey_activation_finisher_runtime" {
+		return errors.New("wire-fault test did not connect as the isolated finisher")
+	}
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if err := operation(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // resolveThenGateActivationIssuer proves that the genuine v10 session
@@ -906,18 +1011,20 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		originalBS    bool
 		signedFlags   byte
 		allow         bool
-		loseCommitAck bool
+		loseCommitAck  bool
+		loseWireAck    bool
 	}{
-		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true, false},
-		{"counter_zero_to_one", 0, 1, false, false, 0x05, true, false},
-		{"counter_one_to_two", 1, 2, false, false, 0x05, true, false},
-		{"counter_two_to_two_denied", 2, 2, false, false, 0x05, false, false},
-		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false, false},
-		{"backup_false_to_true", 0, 1, true, false, 0x1d, true, false},
-		{"backup_true_to_false", 0, 1, true, true, 0x0d, true, false},
+		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true, false, false},
+		{"counter_zero_to_one", 0, 1, false, false, 0x05, true, false, false},
+		{"counter_one_to_two", 1, 2, false, false, 0x05, true, false, false},
+		{"counter_two_to_two_denied", 2, 2, false, false, 0x05, false, false, false},
+		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false, false, false},
+		{"backup_false_to_true", 0, 1, true, false, 0x1d, true, false, false},
+		{"backup_true_to_false", 0, 1, true, true, 0x0d, true, false, false},
 		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false, false},
-		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false, false},
-		{"counter_one_to_two_definite_commit_ack_lost", 1, 2, false, false, 0x05, true, true},
+		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false, false, false},
+		{"counter_one_to_two_definite_commit_ack_lost", 1, 2, false, false, 0x05, true, true, false},
+		{"counter_one_to_two_tcp_commit_ack_lost", 1, 2, false, false, 0x05, true, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			account := randomSyntheticID(t, "sub_")
@@ -1019,7 +1126,24 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 				t.Fatalf("invalid signed counter/flags were not denied: %v", verifyErr)
 			}
 			var finishErr error
-			if tc.loseCommitAck {
+			if tc.loseWireAck {
+				wire := &wireCommitAckDropTransactor{dsn: finishDSN}
+				uncertainStore, err := identitypg.NewPasskeyActivationFinishStore(wire)
+				if err != nil {
+					t.Fatal(err)
+				}
+				uncertainCommitter, err := usecase.NewPasskeyActivationCommitter(proof, uncertainStore)
+				if err != nil {
+					t.Fatal(err)
+				}
+				finishErr = uncertainCommitter.Finish(ctx, session, ch.ChallengeID(), assertion)
+				if !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitUnavailable) ||
+					wire.wire == nil || !wire.wire.sawCommitted.Load() {
+					t.Fatalf("real TCP COMMIT ack loss was not observed and sanitized: "+
+						"err=%v committed=%v", finishErr,
+						wire.wire != nil && wire.wire.sawCommitted.Load())
+				}
+			} else if tc.loseCommitAck {
 				uncertainStore, err := identitypg.NewPasskeyActivationFinishStore(
 					syntheticPostCommitAckLoss{delegate: finisherPool})
 				if err != nil {
@@ -1036,7 +1160,7 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			} else {
 				finishErr = committer.Finish(ctx, session, ch.ChallengeID(), assertion)
 			}
-			if tc.allow && !tc.loseCommitAck && finishErr != nil {
+			if tc.allow && !tc.loseCommitAck && !tc.loseWireAck && finishErr != nil {
 				t.Fatalf("valid signed counter/backup assertion did not commit: %v", finishErr)
 			}
 			if !tc.allow && !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitDenied) {
