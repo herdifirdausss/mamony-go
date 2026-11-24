@@ -271,20 +271,36 @@ func TestPostingAgainstIndependentModel(t *testing.T) {
 		accounts := []AccountSnapshot{
 			fixtureAccount(c, "a", CollectionCash, rng.Int64N(1000)),
 			fixtureAccount(c, "b", CustomerAvailable, rng.Int64N(1000)),
+			fixtureAccount(c, "c", ContributedCapital, rng.Int64N(1000)),
+			fixtureAccount(c, "d", CustomerAvailable, rng.Int64N(1000)),
 		}
 		entries := make([]Entry, 0, 64)
-		for range 1 + rng.IntN(32) {
+		for k := range 2 + rng.IntN(31) {
 			amount := 1 + rng.Int64N(100)
 			if i%17 == 0 {
 				amount = math.MaxInt64
 			}
-			entries = append(entries, fixtureEntry(t, c, "a", Debit, amount), fixtureEntry(t, c, "b", Credit, amount))
+			left, right := rng.IntN(len(accounts)), rng.IntN(len(accounts))
+			// Ensure all accounts are touched before varying repeated accounts.
+			if k < 2 {
+				left, right = k*2, k*2+1
+			}
+			entries = append(entries, fixtureEntry(t, c, accounts[left].ID, Debit, amount), fixtureEntry(t, c, accounts[right].ID, Credit, amount))
 		}
-		// Swap some balanced pairs to vary signs, still touching both accounts.
 		for k := 0; k < len(entries); k += 2 {
 			if rng.IntN(2) == 0 {
 				entries[k].Direction, entries[k+1].Direction = Credit, Debit
 			}
+		}
+		// A one-unit mutation of exactly one line must break journal equality.
+		unbalanced := slices.Clone(entries)
+		if unbalanced[0].Amount.minor == math.MaxInt64 {
+			unbalanced[0].Amount.minor--
+		} else {
+			unbalanced[0].Amount.minor++
+		}
+		if _, err := NewJournalDraft("book", c, unbalanced); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("case %d accepted unbalanced journal: %v", i, err)
 		}
 		j, err := NewJournalDraft("book", c, entries)
 		if err != nil {
@@ -301,7 +317,16 @@ func TestPostingAgainstIndependentModel(t *testing.T) {
 		}
 		accepted++
 		steps := got.Steps()
-		if steps[0].Delta != steps[1].Delta {
+		var conservation big.Int
+		for k, step := range steps {
+			delta := big.NewInt(step.Delta)
+			if accounts[k].Type == CollectionCash {
+				conservation.Add(&conservation, delta)
+			} else {
+				conservation.Sub(&conservation, delta)
+			}
+		}
+		if conservation.Sign() != 0 {
 			t.Fatal("debit-normal conservation failed")
 		}
 		permuted := slices.Clone(entries)
@@ -343,4 +368,34 @@ func TestPostingAgainstIndependentModel(t *testing.T) {
 		t.Fatal("generator did not exercise both outcomes")
 	}
 	t.Logf("independent model: %d accepted, %d refused", accepted, refused)
+}
+
+func TestPostingRejectsZeroDraftAndExtraSnapshot(t *testing.T) {
+	c := fixtureCurrency(t, "USD", 2)
+	accounts := []AccountSnapshot{
+		fixtureAccount(c, "a", CollectionCash, 0),
+		fixtureAccount(c, "b", ContributedCapital, 0),
+		fixtureAccount(c, "c", CustomerAvailable, 0),
+	}
+	if _, err := PlanPosting(JournalDraft{}, accounts); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("zero draft accepted: %v", err)
+	}
+	j, err := NewJournalDraft("book", c, []Entry{
+		fixtureEntry(t, c, "a", Debit, 1),
+		fixtureEntry(t, c, "a", Debit, 1),
+		fixtureEntry(t, c, "b", Credit, 2),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PlanPosting(j, accounts); !errors.Is(err, ErrSnapshot) {
+		t.Fatalf("unreferenced snapshot accepted: %v", err)
+	}
+	p, err := PlanPosting(j, accounts[:2])
+	if err != nil || !reflect.DeepEqual(p.Steps(), []AccountStep{
+		{Account: "a", Delta: 2, After: 2, Sequence: 1},
+		{Account: "b", Delta: 2, After: 2, Sequence: 1},
+	}) {
+		t.Fatalf("valid capital posting failed: %v", err)
+	}
 }
