@@ -1,10 +1,11 @@
 package domain
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"math"
 	"math/big"
-	"math/rand/v2"
 	"reflect"
 	"slices"
 	"strings"
@@ -265,22 +266,32 @@ func signedOracle(accounts []AccountSnapshot, entries []Entry) ([]AccountStep, b
 
 func TestPostingAgainstIndependentModel(t *testing.T) {
 	c := fixtureCurrency(t, "USD", 2)
-	rng := rand.New(rand.NewPCG(7, 19))
+	// Generate reproducible fixture data from a fixed seed and counter.
+	// No randomness or security-sensitive identifier generation is involved.
+	var counter uint64
+	next := func(n int) int {
+		var seed [16]byte
+		copy(seed[:8], "k1model1")
+		binary.BigEndian.PutUint64(seed[8:], counter)
+		counter++
+		digest := sha256.Sum256(seed[:])
+		return int(binary.BigEndian.Uint16(digest[:2])) % n
+	}
 	accepted, refused := 0, 0
 	for i := range 2000 {
 		accounts := []AccountSnapshot{
-			fixtureAccount(c, "a", CollectionCash, rng.Int64N(1000)),
-			fixtureAccount(c, "b", CustomerAvailable, rng.Int64N(1000)),
-			fixtureAccount(c, "c", ContributedCapital, rng.Int64N(1000)),
-			fixtureAccount(c, "d", CustomerAvailable, rng.Int64N(1000)),
+			fixtureAccount(c, "a", CollectionCash, int64(next(1000))),
+			fixtureAccount(c, "b", CustomerAvailable, int64(next(1000))),
+			fixtureAccount(c, "c", ContributedCapital, int64(next(1000))),
+			fixtureAccount(c, "d", CustomerAvailable, int64(next(1000))),
 		}
 		entries := make([]Entry, 0, 64)
-		for k := range 2 + rng.IntN(31) {
-			amount := 1 + rng.Int64N(100)
+		for k := range 2 + next(31) {
+			amount := 1 + int64(next(100))
 			if i%17 == 0 {
 				amount = math.MaxInt64
 			}
-			left, right := rng.IntN(len(accounts)), rng.IntN(len(accounts))
+			left, right := next(len(accounts)), next(len(accounts))
 			// Ensure all accounts are touched before varying repeated accounts.
 			if k < 2 {
 				left, right = k*2, k*2+1
@@ -288,7 +299,7 @@ func TestPostingAgainstIndependentModel(t *testing.T) {
 			entries = append(entries, fixtureEntry(t, c, accounts[left].ID, Debit, amount), fixtureEntry(t, c, accounts[right].ID, Credit, amount))
 		}
 		for k := 0; k < len(entries); k += 2 {
-			if rng.IntN(2) == 0 {
+			if next(2) == 0 {
 				entries[k].Direction, entries[k+1].Direction = Credit, Debit
 			}
 		}
