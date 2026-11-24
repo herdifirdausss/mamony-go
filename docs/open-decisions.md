@@ -349,7 +349,8 @@ factor, real delivered security notice, or production authorization.
 
 **Unverified release-sensitive scenarios** remain distinct from achieved CI checks: cross-role
 provisioning outside disposable fixtures, lost-acknowledgment after definite COMMIT,
-credential counter zero transitions and backup-state changes, genuine
+counter/backup handling on real production authenticators (synthetic real-ES256
+PostgreSQL counter/BE/BS fixtures now exist), genuine
 registration-intent/admission replacement during concurrent writes, rollback
 and recovery after a database restore, and non-synthetic production notification
 delivery. See #78 for the exact-head evidence and acceptance checklist.
