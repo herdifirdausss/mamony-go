@@ -328,3 +328,28 @@ The internal v34 challenge issuer creates a unique 3-minute (and no later than 1
 ### Signed WebAuthn passkey activation proof (v35 / Draft #77)
 
 V35 verifies a **real** ES256-signed `webauthn.get` assertion against the v34 original session-bound nonce and DB-stored COSE key with maintained go-webauthn v0.18.2; challenge/type/origin/RP hash/UP+UV, exact credential/user handle, backup flags, and explicit clone/nonprogressing-counter handling are checked. Fixture tests include real cryptography and negative cases; real PostgreSQL integration uses the same v34 EXECUTE-only reader. **The read-only result is replayable while the challenge remains unconsumed and is NOT an authorization decision.** Next review must implement independently fenced v36 atomic one-time activation, signed-evidence/counter binding, user consent/risk policy and a real security-notice sender. Credential remains `PENDING_ASSERTION`. See [ADR-0040](adr/0040-passkey-activation-signed-assertion-verifier.md).
+
+### Atomic passkey possession verification (v36; Critical issue #78)
+
+**Decision status as of 2026-11-24: NOT ACCEPTED / NOT APPROVED FOR MERGE.**
+[Proposed ADR-0041](adr/0041-passkey-atomic-activation.md) and
+[Critical proposal](proposals/identity-passkey-atomic-activation.md)
+describe the candidate; GitHub issue #78 records open G2 owner and independent
+G3 technical approval. Stacked Draft PRs #79 (design), #80 (Go handoff) and
+#81 (SQL one-use candidate) **do not constitute an approval**. Their Go/SQL
+code and synthetic CI are not a live passkey login, independent recovery
+factor, real delivered security notice, or production authorization.
+
+| Decision | Status and consequence |
+|---|---|
+| D1 — non-login possession semantics | **PENDING**: accept `PENDING_ASSERTION → POSSESSION_VERIFIED` only as cryptographic possession evidence, with no `ACTIVE` login/session/recovery entitlements; define the separate policy and future consumers before enabling any client route |
+| D2 — activation security audit/notice | **PENDING**: accept a distinct activation event and mandatory queued notice, and decide owner, delivery/retry/retention/incident policy; a `PENDING` row never means delivery |
+| D3 — privileged finisher signature-claim oracle | **PENDING**: explicitly acknowledge Profile A root-compromise/finisher-credential risks or require independent verifier/role custody; server SQL cannot reverify the authenticator's ES256 signature |
+| D4 — expiration and operations | **PENDING**: accept 3-minute v34 nonce, 10-minute staging cap, abandonment/cleanup, durable replay/restore protections, key/security-role provision, and public ingress/CSRF policy |
+
+**Unverified release-sensitive scenarios** remain distinct from achieved CI checks: cross-role
+provisioning outside disposable fixtures, lost-acknowledgment after definite COMMIT,
+credential counter zero transitions and backup-state changes, genuine
+registration-intent/admission replacement during concurrent writes, rollback
+and recovery after a database restore, and non-synthetic production notification
+delivery. See #78 for the exact-head evidence and acceptance checklist.
