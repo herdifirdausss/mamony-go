@@ -22,6 +22,22 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// syntheticPostCommitAckLoss runs the real PostgreSQL SQL transaction to
+// confirmed COMMIT, then deliberately discards the success acknowledgement
+// before the repository adapter sees it. This test-only transport boundary
+// is not a simulated network/TCP failure; it proves the durable SQL state
+// is not retried when application acknowledgement is uncertain.
+type syntheticPostCommitAckLoss struct {
+	delegate identitypg.Transactor
+}
+
+func (s syntheticPostCommitAckLoss) WithTx(ctx context.Context, work func(pgx.Tx) error) error {
+	if err := s.delegate.WithTx(ctx, work); err != nil {
+		return err
+	}
+	return errors.New("synthetic lost acknowledgement after definite database commit")
+}
+
 // TestIdentityZPasskeyAtomicPossession exercises a REAL ES256 authenticator
 // signature plus isolated PostgreSQL roles and the v36 atomic finish. This
 // is a synthetic, unmounted fixture; it does not test production login.
@@ -105,8 +121,8 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	finishStore, err := identitypg.NewPasskeyActivationFinishStore(
-		open(finishDSN, "mamony_identity_passkey_activation_finisher_runtime", 8))
+	finisherPool := open(finishDSN, "mamony_identity_passkey_activation_finisher_runtime", 8)
+	finishStore, err := identitypg.NewPasskeyActivationFinishStore(finisherPool)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -735,16 +751,18 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		originalBS    bool
 		signedFlags   byte
 		allow         bool
+		loseCommitAck bool
 	}{
-		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true},
-		{"counter_zero_to_one", 0, 1, false, false, 0x05, true},
-		{"counter_one_to_two", 1, 2, false, false, 0x05, true},
-		{"counter_two_to_two_denied", 2, 2, false, false, 0x05, false},
-		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false},
-		{"backup_false_to_true", 0, 1, true, false, 0x1d, true},
-		{"backup_true_to_false", 0, 1, true, true, 0x0d, true},
-		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false},
-		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false},
+		{"counter_zero_to_zero", 0, 0, false, false, 0x05, true, false},
+		{"counter_zero_to_one", 0, 1, false, false, 0x05, true, false},
+		{"counter_one_to_two", 1, 2, false, false, 0x05, true, false},
+		{"counter_two_to_two_denied", 2, 2, false, false, 0x05, false, false},
+		{"counter_two_to_one_denied", 2, 1, false, false, 0x05, false, false},
+		{"backup_false_to_true", 0, 1, true, false, 0x1d, true, false},
+		{"backup_true_to_false", 0, 1, true, true, 0x0d, true, false},
+		{"backup_eligibility_changed_denied", 0, 1, true, false, 0x05, false, false},
+		{"backup_state_without_eligibility_denied", 0, 1, false, false, 0x15, false, false},
+		{"counter_one_to_two_definite_commit_ack_lost", 1, 2, false, false, 0x05, true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			account := randomSyntheticID(t, "sub_")
@@ -845,8 +863,25 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 			if !tc.allow && !errors.Is(verifyErr, usecase.ErrPasskeyAssertionDenied) {
 				t.Fatalf("invalid signed counter/flags were not denied: %v", verifyErr)
 			}
-			finishErr := committer.Finish(ctx, session, ch.ChallengeID(), assertion)
-			if tc.allow && finishErr != nil {
+			var finishErr error
+			if tc.loseCommitAck {
+				uncertainStore, err := identitypg.NewPasskeyActivationFinishStore(
+					syntheticPostCommitAckLoss{delegate: finisherPool})
+				if err != nil {
+					t.Fatal(err)
+				}
+				uncertainCommitter, err := usecase.NewPasskeyActivationCommitter(proof, uncertainStore)
+				if err != nil {
+					t.Fatal(err)
+				}
+				finishErr = uncertainCommitter.Finish(ctx, session, ch.ChallengeID(), assertion)
+				if !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitUnavailable) {
+					t.Fatalf("definite SQL commit with lost acknowledgement leaked a success: %v", finishErr)
+				}
+			} else {
+				finishErr = committer.Finish(ctx, session, ch.ChallengeID(), assertion)
+			}
+			if tc.allow && !tc.loseCommitAck && finishErr != nil {
 				t.Fatalf("valid signed counter/backup assertion did not commit: %v", finishErr)
 			}
 			if !tc.allow && !errors.Is(finishErr, usecase.ErrPasskeyActivationCommitDenied) {
