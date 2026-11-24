@@ -108,3 +108,31 @@ Owner direction accepted 2026-11-24 (see decision record above). The initial dri
 Each case remains NOT RUN. No local PostgreSQL server/client or Docker was available in the review environment. A later approved test-only implementation should use disposable CI infrastructure, fail on missing/skipped required cases, report exact-head evidence and avoid changing any application runtime grant or migration. Passing IRF-F01–F06 cannot be reported as full IRF-01/02/05/06 acceptance, PKA-R02 PASS, reconciliation, production release, or Profile B currentness.
 
 Independent technical review must confirm actual source/target access fencing, principal inventory, barrier acknowledgment conditions, bounded failure behavior, and test isolation before code. Runtime rollout additionally needs a selected surviving evidence backend, explicit release authority, reconciliation policy, and tested old-credential denial. No change to the unrelated v36 D1–D3 decision status.
+
+## G3 review supplement — concrete fixture scope and hold acknowledgment
+
+**Review baseline:** `d22008f35d148d958349816e82dfd0dd61bc1c67`, 2026-11-24. This is a source inspection and a proposed test refinement, not independent G3 acceptance.
+
+### Principal inventory (static source inspection)
+
+The synthetic Identity bootstrap declares 32 LOGIN principals: 31 runtime principals (7 passkey, 13 recovery, 11 other Identity) and one Identity migrator. All 32 names occur in each of the two CI workflow definitions, local runner and integration testgate. This is a reference-presence comparison, not a live privilege or completeness test. Sources: [bootstrap](../../tools/postgrestest/testdata/identity-bootstrap.sql), [PostgreSQL CI](../../.github/workflows/postgres-integration.yml), [browser CI](../../.github/workflows/identity-real-browser-e2e.yml), [local runner](../../tools/postgrestest/run-local.sh), [testgate](../../tools/testgate/main.go).
+
+- Derive the expected role inventory from the reviewed fixture rather than a manually copied list of only passkey roles. Independently inspect the actual catalog for extra login principals, role membership and effective access, including platform/shared principals, default PUBLIC privileges and alternate paths. Unknown/unaccounted authority fails the drill. The count is an observed baseline, not a permanent hardcoded product requirement.
+- Distinguish 31 runtime roles from the privileged migrator; the migrator is not an ordinary worker, must not be a standing access exception, and may be admitted only as an explicitly scoped recovery-admin operation. Keep test administrator distinct. Do not alter the shared integration bootstrap or its database, since it contains destructive reset setup intended only for the existing synthetic test lifecycle.
+- For each source runtime principal verify a positive connection to the intended synthetic database with the actual role before fencing. Verify the corresponding denial after fencing and independently confirm the administrator can still inspect the isolated target. Missing/incorrect credentials, a dead server, a wrong endpoint or transport errors cannot establish an authorization denial. Use redacted status/counts, not DSNs.
+
+### Hold acknowledgment — gaps found and reviewer dispositions
+
+| Finding | Required evidence before acknowledging the corresponding lab barrier |
+|---|---|
+| Connection admission differs from existing sessions | Independently observe both fresh connection refusal and loss of existing usable connections. A successful signal submission is not termination evidence. Bound observation and treat a timeout as unverified. |
+| Active connection count is not a complete transaction inventory | The first slice proposes no two-phase commit. Verify `max_prepared_transactions=0` and no outstanding prepared transaction in the disposable authority. If unexpected prepared work exists, hold and investigate; do not automatically resolve it. Ordinary in-flight or ambiguous COMMIT decisions still need separate evidence. |
+| Database-only fencing does not settle work already outside SQL | The Identity contract includes bounded lease-based delivery workers. Stop and account for in-flight external requests separately; lost response is an unknown provider outcome, not delivery failure or permission to resend. Use synthetic mock provider only in later approved worker tests. |
+| Shared database / role membership can widen impact | First test only dedicated disposable instances. Catalog and connection evidence must be compared to the exact intended database and authorized administrative scope. No changes to unrelated platform/ledger connections. |
+| External release record is not yet selected | Fencing mechanism evidence alone cannot authorize release. No automatic reopening on successful restore or green CI. |
+
+Primary references checked 2026-11-24: [PostgreSQL 18 privileges](https://www.postgresql.org/docs/18/ddl-priv.html), [administration functions](https://www.postgresql.org/docs/18/functions-admin.html) (termination with zero timeout confirms signal submission only), [prepared transaction semantics](https://www.postgresql.org/docs/18/sql-prepare-transaction.html), [prepared-transaction catalog](https://www.postgresql.org/docs/18/view-pg-prepared-xacts.html). Existing [Identity contract](../contracts/identity.md) documents lease-based delivery and ambiguous provider outcomes. No claim that these conditions are already enforced in the repository runtime.
+
+### Independent reviewer handoff
+
+Review the exact proposal and fixture baseline. Before G4, a designated reviewer should record acceptance or requested changes for: (1) dedicated target and principal inventory, (2) effective admission and existing-connection barriers, (3) known/unknown transaction handling including prepared work, (4) excluded worker/provider effects and separate test obligations, (5) bounded failure and cleanup without touching shared or live infrastructure. The initial drill is not approval of the external release mechanism or reconciliation policy. Owner direction is recorded; no independent review or new lab test execution was observed. All IRF-F01–F06 remain NOT RUN.
