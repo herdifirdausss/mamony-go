@@ -4,6 +4,15 @@ The ledger is the sole writer of balances. See the [ledger and data ownership de
 
 Ledger implementation and integration evidence are pending.
 
+## K1 isolated monetary domain (synthetic experiment)
+
+The owner accepted the limited pure-domain experiment in [#90](https://github.com/herdifirdausss/mamony-go/issues/90), following [#86](https://github.com/herdifirdausss/mamony-go/issues/86). This experiment may precede completion of Foundation and Identity; it does not change capability activation order or authorize K2–K6. No runtime integration, database, public posting, or real funds.
+
+- LGR-01: validate 2–64 ordered positive int64 entries, one book and immutable currency definition, exact debit/credit equality. Currency metadata is fixture-only, not FND-02 implementation.
+- LGR-09: three initial types (cash asset/debit, capital equity/credit, customer liability/credit), all zero floor; valid snapshots with nonnegative balances and sequences, active only for new posting plans. Identifiers and definition versions are nonempty valid UTF-8 up to 128 bytes, no NUL, compared bytewise.
+- Arithmetic portion of LGR-02: exact wide intermediate net per touched account, final floor/range and sequence bounds, deterministic sorted steps, one sequence increment per account even for net zero; reject invalid/missing/duplicate/unreferenced snapshots and mismatches, no partial plan or input mutation.
+- Acceptance: actual Go unit and independent model tests; persistence, replay, authority, reversal execution, outbox, restore, FND-02 reference integration and all database tests remain outside this slice. Synthetic experiment approval does not authorize merge or release.
+
 ## Posting and replay
 
 | ID | Requirement | Go acceptance check |
