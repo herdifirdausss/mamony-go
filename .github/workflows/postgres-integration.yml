@@ -90,3 +90,5 @@ jobs:
         env:
           PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
         run: bash tools/postgrestest/check-passkey-backup-restore.sh
+      - name: Verify isolated Identity recovery fence mechanism (IRF lab)
+        run: bash tools/postgrestest/check-identity-recovery-fence.sh
