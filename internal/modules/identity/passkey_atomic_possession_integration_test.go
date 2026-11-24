@@ -270,8 +270,8 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 	const failFunction = "mamony_identity.test_reject_possession_notice"
 	if _, err := admin.Exec(ctx,
 		"CREATE FUNCTION "+failFunction+"() RETURNS trigger LANGUAGE plpgsql "+
-			"AS $ BEGIN RAISE EXCEPTION 'synthetic notice failure' "+
-			"USING ERRCODE='23514'; END; $"); err != nil {
+			"AS $noticebody$ BEGIN RAISE EXCEPTION 'synthetic notice failure' "+
+			"USING ERRCODE='23514'; END; $noticebody$"); err != nil {
 		t.Fatal(err)
 	}
 	const failTrigger = "test_passkey_notice_failure"
