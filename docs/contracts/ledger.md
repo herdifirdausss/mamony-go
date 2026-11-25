@@ -13,6 +13,10 @@ The owner accepted the limited pure-domain experiment in [#90](https://github.co
 - Arithmetic portion of LGR-02: exact wide intermediate net per touched account, final floor/range and sequence bounds, deterministic sorted steps, one sequence increment per account even for net zero; reject invalid/missing/duplicate/unreferenced snapshots and mismatches, no partial plan or input mutation.
 - Acceptance: actual Go unit and independent model tests; persistence, replay, authority, reversal execution, outbox, restore, FND-02 reference integration and all database tests remain outside this slice. Synthetic experiment approval does not authorize merge or release.
 
+## FND-02b isolated currency admission (synthetic experiment)
+
+The owner accepted [#94](https://github.com/herdifirdausss/mamony-go/issues/94) after FND-02a post-merge verification. Application composition resolves the canonical USD definition from the Platform catalog and passes its code, exponent and definition version as Ledger-owned values to the unmounted facade. Ledger owns the USD-only enablement policy (FND-02 partial and LGR-09 enabled subset only). The facade admits exactly one valid USD definition from trusted composition, retains a private domain CurrencyRef, and refuses missing, duplicate, incompatible or disabled configuration, unknown/disabled lookup and nonmatching metadata. No default exponent, coercion, mutable configuration or domain import of Platform. A matching value is not authentication or authorization; a malicious trusted in-process constructor caller could supply a structurally valid false definition. The release ID is not the definition version. Historical identity for same-exponent reassignment, effective dates and immutable history must be decided before persistence. No posting API, account creation, database, K2, startup wiring, runtime integration or real funds in this experiment.
+
 ## Posting and replay
 
 | ID | Requirement | Go acceptance check |
