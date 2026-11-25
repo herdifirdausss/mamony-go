@@ -34,6 +34,9 @@ func Load(dir string) ([]File, error) { return loadForSchema(dir, "mamony_platfo
 // LoadIdentity verifies migrations for the separately owned Identity schema.
 func LoadIdentity(dir string) ([]File, error) { return loadForSchema(dir, "mamony_identity") }
 
+// LoadLedger verifies the dedicated Ledger migration manifest.
+func LoadLedger(dir string) ([]File, error) { return loadForSchema(dir, "mamony_ledger") }
+
 func loadForSchema(dir, schema string) ([]File, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {

@@ -20,6 +20,12 @@ const identityPackage = "github.com/herdifirdausss/mamony-go/internal/modules/id
 const identityIntegrationPackage = "github.com/herdifirdausss/mamony-go/internal/modules/identity"
 
 var requiredTests = []string{
+	"TestPostgresLedgerK2aMigration",
+	"TestPostgresLedgerK2aCurrency",
+	"TestPostgresLedgerK2aStorage",
+	"TestPostgresLedgerK2aPrivileges",
+	"TestPostgresLedgerK2aRestore",
+	"TestPostgresLedgerK2aContainment",
 	"TestPostgresRoleSeparation",
 	"TestPostgresTenantIsolation",
 	"TestPostgresTenantContext",
