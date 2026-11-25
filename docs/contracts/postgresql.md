@@ -6,7 +6,7 @@
 
 Use one schema per capability. Give each schema an owner role and a limited runtime role. Restrict migration privileges to the migration role or owner. The runtime role cannot own tables, create objects in the schema, act as a superuser, or bypass row-level security.
 
-Grant access to another capability's database interface only for a named contract. Record the caller, operations, and grant. Refer to the [Ledger acceptance checks](ledger.md) for posting and recovery.
+Each capability owns its business schema and local transaction. Default integration uses authorized facades or events, not shared transaction handles, private cross-schema reads/writes, foreign keys or routine business DML. Narrow technical relay/verification grants or an exceptional cross-owner atomic boundary require a separately accepted design/ADR, named caller, exact operations and grants, threat model and actual catalog verification. Platform provides infrastructure and migration tooling, not ownership of capability financial records. Refer to the [Ledger acceptance checks](ledger.md) for posting and recovery.
 
 ## Tenant isolation
 
@@ -14,7 +14,8 @@ Classify each table in its migration. Use this classification when assigning gra
 
 | Table class | Access rules |
 |---|---|
-| Platform-owned, including core ledger tables | Limit access with schema grants and capability authorization. Merchant access uses the owning capability's authorized API. |
+| Platform-owned infrastructure and canonical reference records | Limit access with schema grants and authorized interfaces. Platform does not own Ledger financial records. |
+| Capability-owned, non-tenant-local records, including core Ledger financial records | Limit access to the owning capability's scoped roles and authorized facade. Merchant access requires resource authorization; a book is not a tenant. |
 | Tenant-owned, such as merchant account mappings | Require `tenant_id`. Enable and force RLS. Check the transaction tenant for reads and writes. Include the tenant in tenant-local unique keys. |
 
 Authorize the caller's tenant before setting it in the database. Set the tenant locally at the start of each tenant transaction. Use the same transaction for all tenant queries. Reject missing or invalid tenant context.
@@ -34,7 +35,7 @@ Use a separate named role for a job that must cross tenants. Grant only the oper
 - Run migrations on an empty database and from each supported prior schema. Record the expected locks and recovery steps.
 - Check ownership and privileges against the database catalog. Connect as the actual runtime role for integration tests.
 - On tenant tables, verify that tenant A cannot read, insert, change, or delete tenant B's data. Test missing tenant context and reuse of the same pooled connection by two tenants.
-- On platform tables, check schema grants and the permitted service interface. Test tenant-facing ledger access through the calling capability.
+- On platform and capability-owned tables, check schema grants, permitted owner operations and denied routine foreign-schema access. Test tenant-facing Ledger access through the authorized calling capability; verify any separately accepted technical grant or exception against actual catalogs.
 - Restore a backup onto a fresh database. Verify the ledger, outbox, roles, and grants. Record the observed recovery time.
 
 Keep `make check` independent of PostgreSQL. Record database test results in the [PR evidence](../../.github/pull_request_template.md).

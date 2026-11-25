@@ -2,7 +2,26 @@
 
 The ledger is the sole writer of balances. See the [ledger and data ownership decision](../adr/0002-ledger-and-data-ownership.md).
 
-Ledger implementation and integration evidence are pending.
+K1 and FND-02a–d are merged, isolated synthetic implementations. Durable Ledger posting and integration evidence are pending; see [current state](../current-state.md).
+
+## K1 isolated monetary domain (synthetic experiment)
+
+The owner accepted the limited pure-domain experiment in [#90](https://github.com/herdifirdausss/mamony-go/issues/90), following [#86](https://github.com/herdifirdausss/mamony-go/issues/86). This experiment may precede completion of Foundation and Identity; it does not change capability activation order or authorize K2–K6. No runtime integration, database, public posting, or real funds.
+
+- LGR-01: validate 2–64 ordered positive int64 entries, one book and immutable currency definition, exact debit/credit equality. K1 domain tests use structural fixture values; separate FND-02a–d slices provide the unmounted curated reference and admission boundary, not persistent or production authority.
+- LGR-09: three initial types (cash asset/debit, capital equity/credit, customer liability/credit), all zero floor; valid snapshots with nonnegative balances and sequences, active only for new posting plans. Identifiers and definition versions are nonempty valid UTF-8 up to 128 bytes, no NUL, compared bytewise.
+- Arithmetic portion of LGR-02: exact wide intermediate net per touched account, final floor/range and sequence bounds, deterministic sorted steps, one sequence increment per account even for net zero; reject invalid/missing/duplicate/unreferenced snapshots and mismatches, no partial plan or input mutation.
+- Acceptance: actual Go unit and independent model tests; persistence, replay, authority, reversal execution, outbox, restore, FND-02 reference integration and all database tests remain outside this slice. Synthetic experiment approval does not authorize merge or release.
+
+## FND-02b isolated currency admission (synthetic experiment)
+
+The owner accepted [#94](https://github.com/herdifirdausss/mamony-go/issues/94) after FND-02a post-merge verification. Application composition resolves the canonical USD definition from the Platform catalog and passes its code, exponent and definition version as Ledger-owned values to the unmounted facade. Ledger owns the USD-only enablement policy (FND-02 partial and LGR-09 enabled subset only). The facade admits exactly one valid USD definition from trusted composition, retains a private domain CurrencyRef, and refuses missing, duplicate, incompatible or disabled configuration, unknown/disabled lookup and nonmatching metadata. No default exponent, coercion, mutable configuration or domain import of Platform. A matching value is not authentication or authorization; a malicious trusted in-process constructor caller could supply a structurally valid false definition. The release ID is not the definition version. FND-02d [#100](https://github.com/herdifirdausss/mamony-go/issues/100) adds explicit allocated definition and monetary-unit IDs to the Ledger-owned DTO through the same unmounted composition. USD remains the sole enabled currency. Admission validates shape and code-aligned namespaces, not catalog authenticity; RequireCurrency compares the entire admitted tuple including unit ID. Legacy v1 and release IDs are refused. K1 uses the explicit definition ID as its structural version without changing the domain or arithmetic. The immutable baseline binds unit/exponent to that ID; effective dates, real history, correction and retirement policy still require review before persistence. No posting API, account creation, database, K2, startup wiring, runtime integration or real funds in this experiment.
+
+## Canonical ownership and bounded USD definition freeze (future design)
+
+Owner-approved documentation-only direction in [#87](https://github.com/herdifirdausss/mamony-go/pull/87): Ledger owns its local financial transaction and financial records; Platform owns the canonical reference. Future Ledger persistence would keep an immutable local admitted-definition snapshot with exact code, exponent, definition ID and monetary unit ID, sourced from trusted composition. It is evidence bound to stored amounts, not a second canonical currency authority. Dataset release and checksum are provenance, not definition identity. No cross-owner foreign key or routine shared transaction is required.
+
+Option B freezes only USD / 2 / `mamony-currency-v2:USD:1` / `mamony-unit-v1:USD:1` for any separately approved bounded synthetic K2. Refuse other enabled currencies, missing or mismatched metadata, legacy identity and currency evolution until a separately reviewed lifecycle design permits transitions. Never reinterpret existing amounts or silently replace a stored definition. Real historical provenance, retirement, correction and conversion remain out of scope; exact snapshot schema, keys, constraints, grant matrix, restore and authority design require separate acceptance. No persistence or K2 authorization follows from this direction.
 
 ## Posting and replay
 
@@ -35,7 +54,7 @@ Before implementation, record which fields are part of replay identity. Include 
 
 Use the [PostgreSQL contract](postgresql.md) for schema ownership and runtime roles. Apply its tenant-isolation tests to tenant-owned tables. Check the ledger through its database grants and its calling capability's authorization.
 
-Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). All database checks above are **NOT RUN** in the bootstrap.
+Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). All Ledger database checks above remain **NOT RUN**; isolated domain/reference test evidence does not satisfy them.
 
 ## Account lifecycle and reads
 
@@ -59,8 +78,8 @@ Money that has left the application through an external provider is not covered 
 2. Run registered posting gates for new work. A gate can refuse the request. Record the refusal reason without a ledger write.
 3. Start a local transaction. Enforce key uniqueness in PostgreSQL. Handle the concurrent-claim path even if the initial lookup found no row.
 4. Lock all affected account rows in a stable order. Read currency, status, floor, and balances under those locks. Check the final signed 64-bit balance bounds.
-5. Write the journal, entries, balance changes, and per-account sequence. Store the replay result and one event. Run registered transaction participants on the same transaction.
-6. Commit. If a participant fails, roll back its writes and all ledger writes. Return the recorded result.
+5. Write the journal, entries, balance changes, and per-account sequence. Store the replay result and one event. Any atomic participant effects must be Ledger-owned and within the same local transaction; independent capabilities record their own durable outcomes through explicit orchestration.
+6. Commit. If a Ledger-owned participant fails, roll back the whole local Ledger transaction; cross-owner progress is recovered separately, not rolled back by sharing this transaction. Return the recorded result.
 
 The posting procedure chooses its own UTC record time. The journal stores the business reference and correlation ID. Use a database constraint for caller and key uniqueness. Use a second constraint for the original journal of a reversal.
 
@@ -79,10 +98,11 @@ Test `Read Committed` with explicit locks as a candidate. A Go design must prove
 
 | Record | Key or constraint | Owner |
 |---|---|---|
+| Admitted currency snapshot (future) | Exact immutable canonical code/exponent/definition ID/unit ID; release provenance separate; initial synthetic USD freeze only. | Ledger (Platform canonical source) |
 | Accounts and account types | Stable account ID. One currency per account. Store the normal side and floor policy. Check status before posting. | Ledger |
 | Journals | Unique calling capability and journal key. Store a content fingerprint and the immutable result. Allow at most one reversal of an original. | Ledger |
 | Entries | Unique journal position. Reference the account and journal. Store a positive amount and the account order. | Ledger |
 | Account order and outbox | Transactional counters scoped to each affected account. Advance them under stable locks. A rollback leaves no account-order record for the rejected post. | Ledger producer, event relay |
 | Verifier runs | Store when the verifier ran, the results, and any differences. Keep the balance data read-only during the verification pass. | Ledger |
 
-Implement journal shape and arithmetic checks in the ledger domain package. A ledger use case owns the posting sequence. Its repository applies the atomic operation and returns the durable result. The composition root supplies approved gates and participants. Use one transaction for participant effects and do not make network calls inside it.
+Implement journal shape and arithmetic checks in the ledger domain package. A ledger use case owns the posting sequence. Its repository applies the atomic operation and returns the durable result. The composition root supplies approved gates and Ledger-owned participants. Use one Ledger-local transaction for its effects; no foreign-owner transaction handle, private schema mutation, or network call inside it. Cross-owner work uses separately accepted authorized commands and durable recovery. Exact authority and currentness remain open.

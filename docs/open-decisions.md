@@ -1,5 +1,7 @@
 # Decisions to resolve before implementation
 
+For merged implementation and active work, see [current state](current-state.md). Identity PRs #22–#77 are merged, not deployed. Historical Draft references below describe the decision at its original slice; they do not mean those PRs are currently open. Operational/production approvals and independent acceptance remain separate. The v36 stack (#79–#81) is still Draft.
+
 Use the local [architecture decision index](adr/README.md) for baseline requirements. Record each choice below when its stage starts. A candidate needs tests in Mamony Go before it becomes an implementation claim.
 
 ## Foundation and access
@@ -7,7 +9,7 @@ Use the local [architecture decision index](adr/README.md) for baseline requirem
 **DEC-01 ACCEPTED by the repository owner on 2026-11-21:** PostgreSQL 18.7, Go 1.27 (CI toolchain 1.27.4), native pgx v5, and SQL-only golang-migrate v4 with database-committed SHA-256 fingerprint verification and separate owner/migrator/runtime roles. [Research and trade-offs](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) remain available for context. Acceptance of the design is not equivalent to passing migration tests or deploying production credentials; see [migration runbook](runbooks/platform-migrations.md). The release image digest and production secret source must be pinned/verified at deployment.\n\n| ID | Choice | Decision evidence |
 |---|---|---|
 | DEC-01 | **ACCEPTED** — PostgreSQL 18.7, Go 1.27, native pgx v5, golang-migrate v4, applied-file SHA-256 verification and separate credentials. | Verify fresh/upgrade migration, dirty state, runtime grants, and restore; implementation evidence remains separately tracked. |
-| DEC-02 | Choose the Go transaction and locking design for posting. Define which metadata belongs in the replay fingerprint. | Same-key contention, floor race, close and post race, and lost response after commit. |
+| DEC-02 | Owner selected Go repository/direct parameterized SQL and Ledger-local ACID as design direction; exact isolation, lock graph, constraints, role matrix, replay/fact encoding and authority remain open. | Same-key contention, floor race, close and post race, and lost response after commit. |
 | DEC-03 | Choose Go password and factor storage, recovery, credential rotation, and revocation timing. | Threat review and tests for operator second factor, revocation, and recovery. |
 | DEC-04 | Choose a screening matcher and rule version policy. Choose list age and review limits. | Synthetic false-positive and miss fixtures. A missing or stale list always causes hold. |
 | DEC-05 | Approve a job role only when its access cannot use an existing service boundary. Define its exact grants. | Runtime catalog test, least privilege, and no access from a request handler. |
@@ -57,7 +59,7 @@ The delivery handler is intentionally not wired into a production process or pub
 
 ## DEC-ID-DELIVERY-RUNTIME (draft, production enablement not approved)
 
-A separately executed Identity Mailgun delivery worker exists as stacked PR #27. Code uses a capability facade, a PostgreSQL role with restricted updates, one-at-a-time polling, and dual live-send opt-in with private-file secrets. This is **not** authorization to deploy or send real email: the operator has not provisioned an account/domain, approved a secret manager, sender limits, egress policy, retention, bounce/complaint webhooks, or public API admission. All CI Mailgun sends are intercepted by an injected `httptest` transport. Keep the PR Draft until those decisions and end-to-end negative tests are resolved.
+A separately executed Identity Mailgun delivery worker exists as stacked PR #27. Code uses a capability facade, a PostgreSQL role with restricted updates, one-at-a-time polling, and dual live-send opt-in with private-file secrets. This is **not** authorization to deploy or send real email: the operator has not provisioned an account/domain, approved a secret manager, sender limits, egress policy, retention, bounce/complaint webhooks, or public API admission. All CI Mailgun sends are intercepted by an injected `httptest` transport. Keep live deployment disabled until those decisions and end-to-end negative tests are resolved.
 
 ## DEC-ID-EMAIL-ADMISSION (Draft, internal-only policy, external approval pending)
 
