@@ -114,3 +114,24 @@ func TestMigrationFileComparison(t *testing.T) {
 		t.Fatal("changed manifest was accepted")
 	}
 }
+
+func TestLedgerMigrationManifestTarget(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	body := "SELECT 1;\n"
+	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(body)))
+	sql := body + marker + fmt.Sprintf("INSERT INTO mamony_ledger.migration_fingerprints (version, sha256) VALUES (1, '%s');\n", digest)
+	if err := fixtureRoot(t, dir).WriteFile("000001_testing.up.sql", []byte(sql), 0600); err != nil {
+		t.Fatal(err)
+	}
+	files, err := LoadLedger(dir)
+	if err != nil || len(files) != 1 || files[0].Digest != digest {
+		t.Fatalf("Ledger manifest rejected: %v", err)
+	}
+	if _, err := Load(dir); err == nil {
+		t.Fatal("Platform accepted Ledger manifest")
+	}
+	if _, err := LoadIdentity(dir); err == nil {
+		t.Fatal("Identity accepted Ledger manifest")
+	}
+}
