@@ -3,7 +3,8 @@ package ledger
 
 import (
 	"errors"
-	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/ledger/internal/domain"
 )
@@ -23,6 +24,7 @@ type CurrencyDefinition struct {
 	Code     string
 	Exponent uint8
 	Version  string
+	UnitID   string
 }
 
 // CurrencyAdmission owns one immutable enabled definition and its private domain value.
@@ -30,6 +32,16 @@ type CurrencyDefinition struct {
 type CurrencyAdmission struct {
 	definition CurrencyDefinition
 	currency   domain.CurrencyRef
+}
+
+// validAllocatedID validates local identity syntax, not source authority.
+func validAllocatedID(value, prefix string) bool {
+	if !strings.HasPrefix(value, prefix) {
+		return false
+	}
+	revision := strings.TrimPrefix(value, prefix)
+	n, err := strconv.ParseUint(revision, 10, 64)
+	return err == nil && n != 0 && strconv.FormatUint(n, 10) == revision
 }
 
 // NewCurrencyAdmission accepts exactly the initial synthetic USD definition.
@@ -43,7 +55,8 @@ func NewCurrencyAdmission(definitions []CurrencyDefinition) (CurrencyAdmission, 
 		return CurrencyAdmission{}, ErrInvalidCurrencyConfiguration
 	}
 	currency, err := domain.NewCurrencyRef(d.Code, d.Version, d.Exponent)
-	if err != nil || d.Version != fmt.Sprintf("iso4217-minor-v1:%s:%d", d.Code, d.Exponent) {
+	if err != nil || !validAllocatedID(d.Version, "mamony-currency-v2:"+d.Code+":") ||
+		!validAllocatedID(d.UnitID, "mamony-unit-v1:"+d.Code+":") {
 		return CurrencyAdmission{}, ErrInvalidCurrencyConfiguration
 	}
 	return CurrencyAdmission{definition: d, currency: currency}, nil
@@ -65,7 +78,7 @@ func (a CurrencyAdmission) RequireCurrency(candidate CurrencyDefinition) (Curren
 		return CurrencyDefinition{}, err
 	}
 	currency, err := domain.NewCurrencyRef(candidate.Code, candidate.Version, candidate.Exponent)
-	if err != nil || currency != a.currency {
+	if err != nil || currency != a.currency || candidate != d {
 		return CurrencyDefinition{}, ErrCurrencyMismatch
 	}
 	return d, nil

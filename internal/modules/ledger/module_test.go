@@ -7,7 +7,7 @@ import (
 )
 
 func usdDefinition() CurrencyDefinition {
-	return CurrencyDefinition{Code: "USD", Exponent: 2, Version: "iso4217-minor-v1:USD:2"}
+	return CurrencyDefinition{Code: "USD", Exponent: 2, Version: "mamony-currency-v2:USD:1", UnitID: "mamony-unit-v1:USD:1"}
 }
 
 func TestCurrencyAdmissionConfiguration(t *testing.T) {
@@ -19,14 +19,19 @@ func TestCurrencyAdmissionConfiguration(t *testing.T) {
 		{"missing", nil},
 		{"zero", []CurrencyDefinition{{}}},
 		{"duplicate", []CurrencyDefinition{usd, usd}},
-		{"conflict", []CurrencyDefinition{usd, {Code: "USD", Exponent: 3, Version: "iso4217-minor-v1:USD:3"}}},
-		{"extra", []CurrencyDefinition{usd, {Code: "JPY", Version: "iso4217-minor-v1:JPY:0"}}},
-		{"disabled", []CurrencyDefinition{{Code: "JPY", Version: "iso4217-minor-v1:JPY:0"}}},
-		{"lowercase", []CurrencyDefinition{{Code: "usd", Exponent: 2, Version: "iso4217-minor-v1:usd:2"}}},
-		{"invalid exponent", []CurrencyDefinition{{Code: "USD", Exponent: 4, Version: "iso4217-minor-v1:USD:4"}}},
+		{"conflict", []CurrencyDefinition{usd, {Code: "USD", Exponent: 3, Version: "mamony-currency-v2:USD:2", UnitID: "mamony-unit-v1:USD:1"}}},
+		{"extra", []CurrencyDefinition{usd, {Code: "JPY", Version: "mamony-currency-v2:JPY:1", UnitID: "mamony-unit-v1:JPY:1"}}},
+		{"disabled", []CurrencyDefinition{{Code: "JPY", Version: "mamony-currency-v2:JPY:1", UnitID: "mamony-unit-v1:JPY:1"}}},
+		{"lowercase", []CurrencyDefinition{{Code: "usd", Exponent: 2, Version: "mamony-currency-v2:usd:1", UnitID: "mamony-unit-v1:usd:1"}}},
+		{"invalid exponent", []CurrencyDefinition{{Code: "USD", Exponent: 4, Version: "mamony-currency-v2:USD:1", UnitID: "mamony-unit-v1:USD:1"}}},
 		{"missing version", []CurrencyDefinition{{Code: "USD", Exponent: 2}}},
-		{"mismatch", []CurrencyDefinition{{Code: "USD", Exponent: 3, Version: usd.Version}}},
-		{"release not definition", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: "fnd02a-2026-11-25.1"}}},
+		{"definition code mismatch", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: "mamony-currency-v2:JPY:1", UnitID: usd.UnitID}}},
+		{"unit code mismatch", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: usd.Version, UnitID: "mamony-unit-v1:JPY:1"}}},
+		{"missing unit", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: usd.Version}}},
+		{"legacy v1", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: "iso4217-minor-v1:USD:2", UnitID: usd.UnitID}}},
+		{"malformed definition", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: "mamony-currency-v2:USD:01", UnitID: usd.UnitID}}},
+		{"malformed unit", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: usd.Version, UnitID: "mamony-unit-v1:USD:0"}}},
+		{"release not definition", []CurrencyDefinition{{Code: "USD", Exponent: 2, Version: "fnd02d-2026-11-25.1", UnitID: usd.UnitID}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a, err := NewCurrencyAdmission(tc.definitions)
@@ -59,10 +64,15 @@ func TestCurrencyAdmissionLookupAndMatch(t *testing.T) {
 		want      error
 	}{
 		{CurrencyDefinition{}, ErrCurrencyNotEnabled},
-		{CurrencyDefinition{Code: "JPY", Version: "iso4217-minor-v1:JPY:0"}, ErrCurrencyNotEnabled},
-		{CurrencyDefinition{Code: "USD", Exponent: 0, Version: usd.Version}, ErrCurrencyMismatch},
-		{CurrencyDefinition{Code: "USD", Exponent: 3, Version: "iso4217-minor-v1:USD:3"}, ErrCurrencyMismatch},
-		{CurrencyDefinition{Code: "USD", Exponent: 2, Version: "iso4217-minor-v2:USD:2"}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "JPY", Version: "mamony-currency-v2:JPY:1", UnitID: "mamony-unit-v1:JPY:1"}, ErrCurrencyNotEnabled},
+		{CurrencyDefinition{Code: "USD", Exponent: 0, Version: usd.Version, UnitID: usd.UnitID}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "USD", Exponent: 3, Version: "mamony-currency-v2:USD:2", UnitID: "mamony-unit-v1:USD:1"}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "USD", Exponent: 2, Version: "iso4217-minor-v1:USD:2", UnitID: usd.UnitID}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "USD", Exponent: 2, Version: "iso4217-minor-v2:USD:2", UnitID: usd.UnitID}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "USD", Exponent: 3, Version: usd.Version, UnitID: usd.UnitID}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "USD", Exponent: 2, Version: usd.Version, UnitID: "mamony-unit-v1:USD:2"}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "USD", Exponent: 2, Version: "mamony-currency-v2:USD:2", UnitID: usd.UnitID}, ErrCurrencyMismatch},
+		{CurrencyDefinition{Code: "USD", Exponent: 2, Version: usd.Version}, ErrCurrencyMismatch},
 		{CurrencyDefinition{Code: "USD", Exponent: 2}, ErrCurrencyMismatch},
 	} {
 		if got, err := a.RequireCurrency(tc.candidate); !errors.Is(err, tc.want) || got != (CurrencyDefinition{}) {
@@ -86,11 +96,13 @@ func TestCurrencyAdmissionImmutableConcurrentReads(t *testing.T) {
 		t.Fatal(err)
 	}
 	input[0].Exponent = 3
+	input[0].UnitID = "changed"
 	returned, err := a.LookupCurrency("USD")
 	if err != nil {
 		t.Fatal(err)
 	}
 	returned.Version = "changed"
+	returned.UnitID = "changed"
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Add(1)
@@ -106,4 +118,18 @@ func TestCurrencyAdmissionImmutableConcurrentReads(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// TestCurrencyAdmissionTrustBoundary documents that structural validation is
+// not proof of catalog membership; only the composition root supplies authority.
+func TestCurrencyAdmissionTrustBoundary(t *testing.T) {
+	d := usdDefinition()
+	d.Exponent = 3
+	a, err := NewCurrencyAdmission([]CurrencyDefinition{d})
+	if err != nil {
+		t.Fatal("shape-valid metadata should not be interpreted from identity", err)
+	}
+	if _, err := a.RequireCurrency(usdDefinition()); !errors.Is(err, ErrCurrencyMismatch) {
+		t.Fatal("mismatched tuple accepted")
+	}
 }
