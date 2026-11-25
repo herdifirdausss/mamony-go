@@ -109,3 +109,42 @@ func TestK2aRequiredEvidenceRegistration(t *testing.T) {
 		}
 	}
 }
+
+func TestIdentityMigrationRequiredSubtestEvidence(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{
+		"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade",
+		"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade/populated_data_preservation",
+		"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade/applied_manifest_verification",
+	} {
+		count := 0
+		for _, required := range requiredTests {
+			if required == name {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Fatalf("mandatory subtest %s registration count: %d", name, count)
+		}
+		for _, tc := range []struct {
+			action, pkg, test string
+			want              bool
+		}{
+			{"pass", requiredPackage, name, true},
+			{"skip", requiredPackage, name, false},
+			{"fail", requiredPackage, name, false},
+			{"pass", identityPackage, name, false},
+			{"pass", requiredPackage, name + "/other", false},
+			{"pass", requiredPackage, "TestPostgresIdentityMigration", false},
+		} {
+			event := "{\"Action\":\"" + tc.action + "\",\"Package\":\"" + tc.pkg + "\",\"Test\":\"" + tc.test + "\"}\n"
+			passed, err := summarizeEvents(strings.NewReader(event), &bytes.Buffer{})
+			if err != nil || passed[name] != tc.want {
+				t.Fatalf("incorrect evidence disposition: %s %s", name, tc.action)
+			}
+			if tc.test == name && passed["TestPostgresIdentityMigration"] {
+				t.Fatal("subtest evidence must not satisfy its parent")
+			}
+		}
+	}
+}

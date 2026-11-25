@@ -171,13 +171,29 @@ func testIdentityMigrationUpgrade(t *testing.T, dir string) {
 		t.Fatalf("provision isolated migration fixture: %v", err)
 	}
 
+	// Build once, then bound each executable invocation independently of the
+	// outer integration suite timeout. Do not emit subprocess environment or
+	// unsanitized output in failure diagnostics.
+	binary := filepath.Join(t.TempDir(), "identity-migrate")
+	buildCtx, cancelBuild := context.WithTimeout(context.Background(), 60*time.Second)
+	build := exec.CommandContext(buildCtx, "go", "build", "-o", binary, "../../cmd/mamony-identity-migrate")
+	build.Env = sanitizedPSQLEnv(os.Environ())
+	buildErr := build.Run()
+	buildTimedOut := buildCtx.Err() != nil
+	cancelBuild()
+	if buildErr != nil || buildTimedOut {
+		t.Fatalf("isolated migration executable build failed (deadline=%v)", buildTimedOut)
+	}
+
 	run := func(migrations string) {
 		t.Helper()
-		cmd := exec.Command("go", "run", "../../cmd/mamony-identity-migrate")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, binary)
 		cmd.Env = append(sanitizedPSQLEnv(os.Environ()),
 			"MAMONY_IDENTITY_MIGRATION_DSN="+migrator.String(), "MAMONY_IDENTITY_MIGRATIONS_DIR="+migrations)
 		if err := cmd.Run(); err != nil {
-			t.Fatalf("isolated identity migration failed: %v", err)
+			t.Fatalf("isolated identity migration failed (deadline=%v)", ctx.Err() != nil)
 		}
 	}
 	require := func(query, want string) {
@@ -198,15 +214,41 @@ func testIdentityMigrationUpgrade(t *testing.T, dir string) {
 	if err != nil || len(strings.Split(before, "\n")) != 34 {
 		t.Fatal("cannot record original migration fingerprints")
 	}
+	// A representative ordinary, unverified subject/contact pair is enough
+	// to exercise preservation of pre-existing business rows without creating
+	// credentials, sessions or elevated account authority.
+	const subjectID = "sub_UUUUUUUUUUUUUUUUUUUUUU"
+	const email = "migration-upgrade@example.test"
+	if _, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c",
+		"BEGIN; INSERT INTO mamony_identity.subjects (subject_id,status,created_at) VALUES ('"+subjectID+"','UNVERIFIED','2026-01-01T00:00:00Z'); "+
+			"INSERT INTO mamony_identity.email_aliases (canonical_email,subject_id,created_at) VALUES ('"+email+"','"+subjectID+"','2026-01-01T00:00:00Z'); COMMIT;"); err != nil {
+		t.Fatal("cannot insert ordinary synthetic upgrade fixture")
+	}
+	const dataQuery = "SELECT row_to_json(s)::text || ':' || row_to_json(a)::text FROM mamony_identity.subjects s JOIN mamony_identity.email_aliases a USING (subject_id) WHERE s.subject_id='"+subjectID+"'"
+	dataBefore, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c", dataQuery)
+	if err != nil || dataBefore == "" {
+		t.Fatal("cannot capture original synthetic business rows")
+	}
+	verifyData := func() {
+		t.Helper()
+		out, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c", dataQuery)
+		if err != nil || out != dataBefore {
+			t.Fatal("ordinary synthetic business rows not preserved")
+		}
+	}
 	run(dir)
 	require(versionQuery, "35:false")
 	require(countQuery, "35")
 	require(historyQuery, before)
+	verifyData()
 	run(dir)
 	require(versionQuery, "35:false")
 	require(countQuery, "35")
 	require(historyQuery, before)
 	t.Log("Identity migration upgrade v34 to v35: original fingerprints preserved; repeat clean")
+	t.Run("populated data preservation", func(t *testing.T) {
+		verifyData()
+	})
 
 	// Check the production migrator's read-only history verifier against the
 	// actual upgraded synthetic database. A mismatching manifest is test

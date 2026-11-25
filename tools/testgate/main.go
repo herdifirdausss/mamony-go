@@ -33,6 +33,9 @@ var requiredTests = []string{
 	"TestPostgresRuntimePoolIsolation",
 	"TestPostgresRuntimePoolRejectsElevatedRole",
 	"TestPostgresIdentityMigration",
+	"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade",
+	"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade/populated_data_preservation",
+	"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade/applied_manifest_verification",
 	"TestPostgresIdentityVerifierRole",
 	"TestPostgresIdentityZAuthenticatorRole",
 	"TestPostgresIdentityZSessionRole",
@@ -401,6 +404,16 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 		if ev.Output != "" {
 			if _, err := fmt.Fprint(output, ev.Output); err != nil {
 				return nil, fmt.Errorf("write integration output: %w", err)
+			}
+		}
+		// Only explicitly required subtests from the PostgreSQL integration
+		// package count. Arbitrary subtests cannot satisfy a parent test.
+		if ev.Action == "pass" && ev.Package == requiredPackage && strings.Contains(ev.Test, "/") {
+			for _, name := range requiredTests {
+				if ev.Test == name {
+					passed[name] = true
+					break
+				}
 			}
 		}
 		if ev.Action == "pass" && !strings.Contains(ev.Test, "/") {
