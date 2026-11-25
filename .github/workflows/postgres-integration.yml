@@ -102,6 +102,7 @@ jobs:
           grep -F 'RH-03c2 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
           grep -F 'RH-03a3 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
           grep -F 'RH-03a4 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03a5 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
 
       - name: Verify recovered application password and session binding
         run: |
