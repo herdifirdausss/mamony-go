@@ -1,6 +1,6 @@
 # Platform foundation
 
-The current binary reads listener addresses at startup and shuts down on cancellation. The database, event relay, and recovery procedures below are planned. The [package rules](../architecture.md), [PostgreSQL contract](postgresql.md), and [public HTTP contract](../adr/0003-public-http-contract.md) apply.
+The current binary reads listener addresses at startup and shuts down on cancellation. Synthetic PostgreSQL migrations, runtime pool, recovery lab and reference catalog are implemented in bounded slices. Full capability integration, event relay, recovery and production acceptance remain open; see [current state](../current-state.md). The [package rules](../architecture.md), [PostgreSQL contract](postgresql.md), and [public HTTP contract](../adr/0003-public-http-contract.md) apply.
 
 ## Configuration, data, and operations
 
