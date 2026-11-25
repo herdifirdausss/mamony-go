@@ -25,3 +25,11 @@ func TestRepositoryIdentityMigrationFiles(t *testing.T) {
 		t.Fatalf("committed identity SQL must pass fingerprint verification: files=%v err=%v", files, err)
 	}
 }
+
+func TestRepositoryMigrationFilesLedger(t *testing.T) {
+	t.Parallel()
+	files, err := LoadLedger(filepath.Join("..", "..", "..", "db", "migrations", "ledger"))
+	if err != nil || len(files) != 1 || files[0].Version != 1 {
+		t.Fatalf("Ledger baseline manifest invalid: files=%v err=%v", files, err)
+	}
+}

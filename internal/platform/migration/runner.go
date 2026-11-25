@@ -17,7 +17,7 @@ import (
 )
 
 // Migration targets are fixed by code, never constructed from HTTP or an
-// untrusted database value. The two roles must not own each other's schema.
+// untrusted database value. Roles must not own one another's schemas.
 type target struct {
 	schema string
 	role   string
@@ -27,6 +27,7 @@ type target struct {
 var (
 	platformTarget = target{schema: "mamony_platform", role: "mamony_platform_migrator", lockID: 731198465908223}
 	identityTarget = target{schema: "mamony_identity", role: "mamony_identity_migrator", lockID: 731198465908224}
+	ledgerTarget   = target{schema: "mamony_ledger", role: "mamony_ledger_migrator", lockID: 731198465908225}
 )
 
 // A session lock serializes manifest preflight and postflight for each target.
@@ -38,6 +39,12 @@ func Run(ctx context.Context, dsn, dir string) error {
 // RunIdentity uses a different owned schema, role and advisory lock.
 func RunIdentity(ctx context.Context, dsn, dir string) error {
 	return runTarget(ctx, dsn, dir, identityTarget)
+}
+
+// RunLedger is the fixed Ledger migration target. K2a calls it only from
+// its disposable integration lab; no application or command wiring exists.
+func RunLedger(ctx context.Context, dsn, dir string) error {
+	return runTarget(ctx, dsn, dir, ledgerTarget)
 }
 
 func runTarget(ctx context.Context, dsn, dir string, target target) error {
@@ -161,6 +168,11 @@ func Verify(ctx context.Context, conn *pgx.Conn, files []File) error {
 // VerifyIdentity checks identity migration fingerprints with the same rules.
 func VerifyIdentity(ctx context.Context, conn *pgx.Conn, files []File) error {
 	return verifyFor(ctx, conn, files, identityTarget.schema)
+}
+
+// VerifyLedger verifies Ledger migration history using its own manifest.
+func VerifyLedger(ctx context.Context, conn *pgx.Conn, files []File) error {
+	return verifyFor(ctx, conn, files, ledgerTarget.schema)
 }
 
 func verifyFor(ctx context.Context, conn *pgx.Conn, files []File, schema string) error {

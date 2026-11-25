@@ -80,3 +80,32 @@ func TestSummarizeEventsPropagatesWriterFailure(t *testing.T) {
 		t.Fatalf("expected a propagated write error, got %v", err)
 	}
 }
+
+func TestK2aRequiredEvidenceRegistration(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{
+		"TestPostgresLedgerK2aMigration",
+		"TestPostgresLedgerK2aCurrency",
+		"TestPostgresLedgerK2aStorage",
+		"TestPostgresLedgerK2aPrivileges",
+		"TestPostgresLedgerK2aRestore",
+		"TestPostgresLedgerK2aContainment",
+	} {
+		count := 0
+		for _, required := range requiredTests {
+			if required == name {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Fatalf("mandatory test %s registration count: %d", name, count)
+		}
+		for _, action := range []string{"pass", "skip", "fail"} {
+			event := "{\"Action\":\"" + action + "\",\"Package\":\"github.com/herdifirdausss/mamony-go/tools/postgrestest\",\"Test\":\"" + name + "\"}\n"
+			passed, err := summarizeEvents(strings.NewReader(event), &bytes.Buffer{})
+			if err != nil || passed[name] != (action == "pass") {
+				t.Fatalf("incorrect evidence disposition: %s %s", name, action)
+			}
+		}
+	}
+}
