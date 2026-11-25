@@ -1,9 +1,9 @@
 # Identity passkey atomic activation — Critical change proposal
 
 **Issue:** [#78](https://github.com/herdifirdausss/mamony-go/issues/78)  
-**Owner/technical reviewer:** repository owner / designated independent reviewer (**acceptance not yet recorded**)  
+**Owner/technical reviewer:** repository owner / designated independent reviewer (owner scope accepted; independent technical acceptance not accepted)  
 **Capability:** Identity / WebAuthn, following merged #75–#77  
-**Status:** **PROPOSED** — G0/G1 completed, G2/G3 owner and technical decisions pending  
+**Status:** **OWNER-ACCEPTED BOUNDED SYNTHETIC DIRECTION** — final candidate review pending  
 **Risk:** Critical: new credential trust state + SQL runtime authority + forward-only migration  
 **Evidence reviewed:** 2026-11-23  
 **Related:** [ADR-0038](../adr/0038-webauthn-atomic-provisional-registration.md), [ADR-0039](../adr/0039-passkey-activation-challenge-evidence.md), [ADR-0040](../adr/0040-passkey-activation-signed-assertion-verifier.md), [proposed ADR-0041](../adr/0041-passkey-atomic-activation.md); `IAM-08`, `IAM-10`, `IAM-11`, `IAM-13`
@@ -29,9 +29,9 @@ The user has completed a valid WebAuthn registration staging and a fresh, signed
 - **B — Immediate `ACTIVE` passkey:** shorter subsequent login path, but grants ambiguous privilege to any future consumer of `ACTIVE` and may silently elevate password-backed enrollment. **Not recommended** without independent policy/review.
 - **C — No state transition, just mark nonce consumed:** stops replay but does not provide a named durable evidence state or explicit maintenance/monitorability. Insufficient for the stated outcome.
 
-## G2 — Proposed requirements and acceptance (not accepted contract)
+## G2 — Owner-accepted bounded requirements (contract promotion pending)
 
-The source of truth for accepted requirements remains `docs/contracts/identity.md`. After approval, promote stable AC IDs there. These are **proposed IDs**.
+The source of truth for accepted requirements remains `docs/contracts/identity.md`. Promote stable agreed AC IDs there after final design reconciliation; no claim of an already updated contract.
 
 | Proposed AC | Requirement | Evidence (all NOT RUN) |
 |---|---|---|
@@ -106,21 +106,21 @@ sequenceDiagram
 - A security-notice queue row means *enqueued*, not delivered. Separate operator release gate for worker/retry/monitor/retention.
 - Future passkey login and independent recovery factors must explicitly evaluate provenance, state, assurance policy and lifecycle, not simply `state=POSSESSION_VERIFIED`.
 
-### Unresolved explicit decisions
+### D1–D4 owner decision record
 
 - **Decision D1:** adopt `POSSESSION_VERIFIED` vs `ACTIVE` and what (if anything) may consume it as a login factor. Recommendation: non-login.
 - **Decision D2:** approve distinct audit+notice table vs extending registration queue. Recommendation: separate activation event/queue.
 - **Decision D3:** accept Profile A finisher role as a privileged verifier oracle for an **unmounted** candidate, or require stronger workload separation before any activation semantics. Recommendation: internal-only with explicit residual risk.
 - **Decision D4:** approved activation timeout/abandoned staged credential retention, notification delivery and incident/recovery policy remain **release blocked**; v34 TTL reused for candidate.
 
-**G2 owner acceptance:** NOT RECORDED. **G3 independent technical acceptance:** NOT RECORDED. This proposal is NOT authorization to code or merge SQL behavior.
+Owner accepted D1–D4, bounded synthetic requirements and technical direction on 2026-11-25 ([owner decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178)). The existing three-minute challenge and ten-minute staging limit remain; no automatic cleanup or recovery release. Platform #14 owns recovery foundation; Identity #78 owns credential semantics and recovery obligations. Production delivery, recovery continuity and activation remain blocked. Under adopted main governance #89, independent technical acceptance is not accepted; it may be deferred only for an eligible, separately owner-authorized synthetic merge after candidate-specific containment, review and exact-head CI. Production readiness NOT ACCEPTED. No merge or production activation authorized.
 
 ## G4 — Implementation slice (planned, gated)
 
-1. After D1–D3 accepted, update `docs/contracts/identity.md` with stable agreed ACs.
+1. Reconcile accepted D1–D4 and update `docs/contracts/identity.md` with stable agreed ACs.
 2. New forward-only SQL `000035`, migration fingerprint + migration canary, synthetic role bootstrap, workflow DSNs and testgate required test.
 3. Go finisher usecase + restricted repository adapter, unit negatives and real PostgreSQL 16-way replay, freeze/counter/role, late event collision and rollback integration. Use existing genuine signed ES256 fixture; mocked cryptography alone is not sufficient.
-4. ADR-0041 accepted revision, runbook/contract updates, PR risk and CI record. Keep Draft until exact final SHA checks and independent reviewer signoff.
+4. ADR-0041 accepted revision, runbook/contract updates, PR risk and CI record. Keep Draft until applicable #89 review and exact-head owner authorization; independent acceptance is not accepted.
 
 ## G5–G7 — Current verification
 
@@ -129,7 +129,7 @@ sequenceDiagram
 | Existing v35 signed verifier source and existing v33/v34 DB boundaries inspected | REVIEWED |
 | W3C WebAuthn Level 3 and pinned library contract checked | RESEARCHED |
 | New SQL/Go integration test, race/role tests, migration fingerprint | **NOT RUN — not implemented** |
-| Security review, owner G2/technical G3 approval | **PENDING** |
+| Owner bounded scope / technical direction | **ACCEPTED**; final candidate review and independent technical acceptance remain outstanding |
 | Production/browser rollout and independent security-notice delivery | **NOT IMPLEMENTED** |
 
 ## G3 supplement — precise TOCTOU, SQL lock and lineage review (2026-11-23)
@@ -215,4 +215,4 @@ All cases below are **PLANNED / NOT RUN**. Run against disposable PostgreSQL wit
 - Migration file `000035` must include canonical `-- mamony:integrity:v1` trailer calculated over bytes preceding the marker; never edit applied v33/v34 SQL or manually change their fingerprints.
 - Separate human/technical review must inspect the new test assertions themselves to ensure a green test isn't obtained by relaxing the expected denial behavior.
 
-**Status:** all PKA-T cases NOT RUN; design acceptance remains pending in #78.
+**Status:** reconcile case-level results against exact #81 candidate; this design PR does not establish implementation evidence.
