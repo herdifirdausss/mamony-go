@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/ledger"
 	"github.com/herdifirdausss/mamony-go/internal/platform/migration"
@@ -118,7 +119,14 @@ func k2aSeal(t *testing.T, l *k2aLab, admin *pgx.Conn) {
 	t.Helper()
 	l.exec(t, admin, "REVOKE INSERT ON "+k2aTables+" FROM "+k2aLoader)
 	l.exec(t, admin, "REVOKE USAGE ON SCHEMA mamony_ledger FROM "+k2aLoader)
-	l.exec(t, admin, "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = $1 AND datname = current_database()", k2aLoader)
+	var stopped bool
+	if err := admin.QueryRow(l.ctx, "SELECT COALESCE(bool_and(pg_terminate_backend(pid, 1000)), true) FROM pg_stat_activity WHERE usename = $1 AND datname = current_database()", k2aLoader).Scan(&stopped); err != nil || !stopped {
+		t.Fatal("fixture loader sessions not terminated")
+	}
+	var remaining int
+	if err := admin.QueryRow(l.ctx, "SELECT count(*) FROM pg_stat_activity WHERE usename = $1 AND datname = current_database()", k2aLoader).Scan(&remaining); err != nil || remaining != 0 {
+		t.Fatal("fixture loader session remains after seal")
+	}
 }
 
 func k2aRows(t *testing.T, l *k2aLab, reader *pgx.Conn) []string {
@@ -261,6 +269,23 @@ func TestPostgresLedgerK2aStorage(t *testing.T) {
 	_ = tx.Rollback(l.ctx)
 	k2aExpectState(t, err, "23503")
 	k2aAssertRows(t, l, reader, nil)
+	for _, tc := range []struct {
+		name string
+		sql  string
+		row  []any
+	}{
+		{"book", k2aBook, []any{"BOOK-001", k2aDefinition}},
+		{"type", k2aType, []any{"COLLECTION_CASH", "ASSET", "D", int64(0)}},
+	} {
+		t.Run("required_"+tc.name, func(t *testing.T) {
+			for i := range tc.row {
+				row := slices.Clone(tc.row)
+				row[i] = nil
+				k2aReject(t, l, loader, "23502", tc.sql, row...)
+			}
+		})
+	}
+	k2aAssertRows(t, l, reader, nil)
 	k2aSeed(t, l, loader)
 	k2aReject(t, l, loader, "23505", k2aBook, "BOOK-002", k2aDefinition)
 	k2aReject(t, l, loader, "23503", k2aBook, "BOOK-002", "absent")
@@ -295,6 +320,27 @@ func TestPostgresLedgerK2aStorage(t *testing.T) {
 		row := slices.Clone(base)
 		row[tc.column] = tc.value
 		k2aReject(t, l, loader, tc.state, k2aAccount, row...)
+	}
+	// Named CHECK constraints distinguish the intended invariant from an
+	// unrelated constraint with the same SQLSTATE.
+	for _, tc := range []struct {
+		column int
+		value  any
+		name   string
+	}{
+		{0, "", "account_id_bytes"},
+		{3, "", "account_owner_bytes"},
+		{4, "CLOSED", "account_k2a_status"},
+		{5, int64(1), "account_k2a_balance"},
+		{6, int64(1), "account_k2a_sequence"},
+	} {
+		row := slices.Clone(base)
+		row[tc.column] = tc.value
+		_, err := loader.Exec(l.ctx, k2aAccount, row...)
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23514" || pgErr.ConstraintName != tc.name {
+			t.Fatalf("expected named invariant %s, got %v", tc.name, err)
+		}
 	}
 	// The server must reject malformed UTF-8 and NUL in text parameters.
 	for _, invalid := range []string{"bad\x00id", string([]byte{0xff})} {
@@ -380,6 +426,13 @@ func k2aCheckPrivileges(t *testing.T, l *k2aLab, admin *pgx.Conn) {
 			}
 		}
 	}
+	// Check the database boundary as well as object-level grants.
+	for _, role := range []string{k2aMigrator, k2aReader, k2aLoader, k2aOther} {
+		var connect, create, temporary bool
+		if err := admin.QueryRow(l.ctx, "SELECT has_database_privilege($1,current_database(),'CONNECT'), has_database_privilege($1,current_database(),'CREATE'), has_database_privilege($1,current_database(),'TEMP')", role).Scan(&connect, &create, &temporary); err != nil || !connect || create || temporary {
+			t.Fatalf("unexpected database privileges for %s", role)
+		}
+	}
 	var owned int
 	if err := admin.QueryRow(l.ctx, "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner WHERE n.nspname='mamony_ledger' AND c.relkind='r' AND r.rolname=$1", k2aMigrator).Scan(&owned); err != nil || owned != 6 {
 		t.Fatal("Ledger table ownership mismatch")
@@ -448,6 +501,35 @@ func TestPostgresLedgerK2aMigration(t *testing.T) {
 		t.Fatal("canceled migration accepted")
 	}
 	k2aHistory(t, l)
+	// Deliberately inconsistent metadata is confined to rollback-only
+	// transactions in this disposable lab. No recovery repair path is added.
+	files, err := migration.LoadLedger(k2aDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		sql  string
+	}{
+		{"missing_fingerprint", "DELETE FROM mamony_ledger.migration_fingerprints WHERE version=1"},
+		{"extra_fingerprint", "INSERT INTO mamony_ledger.migration_fingerprints(version,sha256) VALUES (2,repeat('0',64))"},
+		{"unknown_version", "UPDATE mamony_ledger.schema_migrations SET version=2"},
+		{"changed_fingerprint", "UPDATE mamony_ledger.migration_fingerprints SET sha256=repeat('0',64) WHERE version=1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			l.exec(t, migrator, "BEGIN")
+			defer func() {
+				if _, err := migrator.Exec(l.ctx, "ROLLBACK"); err != nil {
+					t.Error("negative metadata fixture rollback failed")
+				}
+			}()
+			l.exec(t, migrator, tc.sql)
+			if err := migration.VerifyLedger(l.ctx, migrator, files); err == nil {
+				t.Fatal("inconsistent migration history accepted")
+			}
+		})
+	}
+	k2aHistory(t, l)
 	dir := t.TempDir()
 	name := "000001_ledger-storage.up.sql"
 	original, err := os.ReadFile(filepath.Join(k2aDir(), name))
@@ -489,6 +571,20 @@ func TestPostgresLedgerK2aMigration(t *testing.T) {
 	if err := migration.RunLedger(l.ctx, l.dsn(k2aMigrator), dir); err == nil {
 		t.Fatal("dirty migration retried automatically")
 	}
+
+	// Model the committed-body/pre-clean window in a separate disposable
+	// lab. This is a dirty-metadata fixture, not an actual process kill.
+	committed, _ := k2aProvision(t)
+	k2aMigrate(t, committed)
+	owner := committed.connect(t, k2aMigrator)
+	committed.exec(t, owner, "UPDATE mamony_ledger.schema_migrations SET dirty=true WHERE version=1")
+	if err := migration.RunLedger(committed.ctx, committed.dsn(k2aMigrator), k2aDir()); err == nil {
+		t.Fatal("committed-body dirty fixture was automatically retried")
+	}
+	var committedBody bool
+	if err := owner.QueryRow(committed.ctx, "SELECT to_regclass('mamony_ledger.accounts') IS NOT NULL AND EXISTS(SELECT 1 FROM mamony_ledger.migration_fingerprints WHERE version=1 AND sha256=$1) AND EXISTS(SELECT 1 FROM mamony_ledger.schema_migrations WHERE version=1 AND dirty)", files[0].Digest).Scan(&committedBody); err != nil || !committedBody {
+		t.Fatal("committed-body dirty evidence was changed")
+	}
 }
 
 func k2aNormalizedSchema(data []byte) []string {
@@ -510,11 +606,17 @@ func TestPostgresLedgerK2aRestore(t *testing.T) {
 	k2aAssertRows(t, source, reader, k2aExpectedRows())
 	k2aCheckPrivileges(t, source, admin)
 	k2aHistory(t, source)
+	backupStart := time.Now().UTC()
 	dump := source.dump(t, false)
+	backupEnd := time.Now().UTC()
+	t.Logf("K2A backup sealed fixture start=%s end=%s elapsed=%s sha256=%x", backupStart.Format(time.RFC3339Nano), backupEnd.Format(time.RFC3339Nano), backupEnd.Sub(backupStart), sha256.Sum256(dump))
 	expectedSchema := k2aNormalizedSchema(source.dump(t, true))
 	target := k2aStart(t)
 	if source.id == target.id || source.port == target.port || source.database == target.database {
 		t.Fatal("restore destination is not independent")
+	}
+	if err := target.restore(t, []byte("not a PostgreSQL custom archive")); err == nil {
+		t.Fatal("invalid recovery archive accepted")
 	}
 	// Missing destination role definitions must cause a transactional
 	// restore failure, not silently drop ownership or ACLs.
@@ -527,6 +629,7 @@ func TestPostgresLedgerK2aRestore(t *testing.T) {
 		t.Fatal("failed restore left partial Ledger schema")
 	}
 	targetAdmin := target.roles(t)
+	restoreStart := time.Now().UTC()
 	if err := target.restore(t, dump); err != nil {
 		t.Fatal("K2a independent restore failed")
 	}
@@ -537,4 +640,6 @@ func TestPostgresLedgerK2aRestore(t *testing.T) {
 	k2aHistory(t, target)
 	k2aMigrate(t, target)
 	k2aHistory(t, target)
+	restoreEnd := time.Now().UTC()
+	t.Logf("K2A restore verified start=%s end=%s elapsed=%s archive_sha256=%x", restoreStart.Format(time.RFC3339Nano), restoreEnd.Format(time.RFC3339Nano), restoreEnd.Sub(restoreStart), sha256.Sum256(dump))
 }

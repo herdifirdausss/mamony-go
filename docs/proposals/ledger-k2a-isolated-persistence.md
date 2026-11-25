@@ -12,7 +12,7 @@ Tests create dedicated disposable PostgreSQL 18.7 containers on a local Docker d
 
 ## Acceptance evidence
 
-All candidate-specific execution is NOT RUN at authoring time. Six named PostgreSQL groups are mandatory in the existing testgate:
+Initial head 0475dc4534ed8eac5b15bc6c4682db82526be177 passed all seven CI checks, including all six real PostgreSQL groups ([job](https://github.com/herdifirdausss/mamony-go/actions/runs/45543291562/job/138966736942)). This follow-up strengthens evidence for null fields, named constraints, loader session sealing, database grants, inconsistent fingerprints/version, modeled committed-body dirty state, invalid recovery archive and backup/restore timestamps and digest. These new assertions are NOT RUN at authoring time; prior CI cannot be transferred to this candidate. Six named PostgreSQL groups are mandatory in the existing testgate:
 
 | AC | Candidate test | Status |
 |---|---|---|
@@ -25,7 +25,7 @@ All candidate-specific execution is NOT RUN at authoring time. Six named Postgre
 | 08 | Existing repository checks and actual named integration evidence | NOT RUN |
 | 10 | Exact-candidate review and nonclaims | Pending |
 
-No real version-to-version Ledger upgrade (first baseline only), complete crash/recovery proof, private K1 domain roundtrip, production RPO/RTO or actual authorization claim. The test-only failure migration is not a supported upgrade. The restore candidate also rejects missing role definitions before a successful independent restore. Review exact privilege matrix, remaining negative recovery cases, and actual scenario execution before accepting ACs; passing top-level tests alone is not sufficient. Any failed or missing required scenario blocks G5 completion.
+No real version-to-version Ledger upgrade (first baseline only), actual process-kill crash in the committed-body/pre-clean window, in-flight cancellation proof (existing cancellation case is pre-canceled), private K1 domain roundtrip, production RPO/RTO or actual authorization claim. The modeled dirty fixture verifies classification/refusal, not an actual crash. The test-only failure migration is not a supported upgrade. The restore candidate also rejects missing role definitions before a successful independent restore. Review exact privilege matrix, remaining negative recovery cases, and actual scenario execution before accepting ACs; passing top-level tests alone is not sufficient. Any failed or missing required scenario blocks G5 completion.
 
 ## Limits
 
