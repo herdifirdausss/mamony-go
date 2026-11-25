@@ -75,4 +75,20 @@ SELECT 'migration_fingerprints', count(*),
        encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
            ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')
 FROM mamony_identity.migration_fingerprints r;
+SELECT 'email_verification_challenges', count(*),
+       encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
+           ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')
+FROM mamony_identity.email_verification_challenges r;
+SELECT 'password_login_grants', count(*),
+       encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
+           ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')
+FROM mamony_identity.password_login_grants r;
+SELECT 'passkey_registration_intents', count(*),
+       encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
+           ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')
+FROM mamony_identity.passkey_registration_intents r;
+SELECT 'passkey_registration_admissions', count(*),
+       encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
+           ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')
+FROM mamony_identity.passkey_registration_admissions r;
 COMMIT;
