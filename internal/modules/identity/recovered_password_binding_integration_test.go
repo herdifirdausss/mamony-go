@@ -26,14 +26,15 @@ import (
 // TestIdentityRH03RecoveredPasswordBinding is invoked only by the dedicated
 // network-none disposable execution lab. Synthetic bearer values remain in
 // this test process. The existing paused native recovery target is not used
-// or activated. This case proves logical recovery enforcement, not native
-// application execution or production access-policy restoration.
+// or activated. The native-derived execution copy is separate from the
+// paused observation cluster; this is not production access-policy restoration.
 func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 	if os.Getenv("MAMONY_RH03_EXECUTION_FIXTURE") != "true" {
 		t.Skip("dedicated RH-03 execution fixture only")
 	}
 	const sourceDB = "mamony_test_rh03_exec_source"
 	const targetDB = "mamony_test_rh03_exec_target"
+	const nativeTargetDB = "mamony_test_rh03_exec_native"
 	const adminRole = "mamony_test_admin"
 	const adminPassword = "local-test-rh03-exec-admin"
 	dsn := func(db, role, password string) string {
@@ -47,7 +48,7 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		os.Getenv("TEST_DATABASE_ADMIN_URL") != dsn(sourceDB, adminRole, adminPassword) {
 		t.Fatal("unexpected disposable execution fixture")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 175*time.Second)
 	defer cancel()
 
 	connectAdmin := func(db string) *pgx.Conn {
@@ -190,6 +191,28 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 	if who, err := src.session.Resolve(ctx, old.ForTrustedTransport()); err != nil || who != subject {
 		t.Fatal("source session positive control failed")
 	}
+	// Compare complete selected durable rows, including original event IDs
+	// and notice rows; session last_seen_at may advance on a successful
+	// resolution. Do not export row contents or digest to logs.
+	snapshot := func(c *pgx.Conn, subject string) string {
+		t.Helper()
+		var digest string
+		err := c.QueryRow(ctx, `SELECT encode(sha256(convert_to(jsonb_build_array(
+			(SELECT to_jsonb(s) FROM mamony_identity.subjects s WHERE s.subject_id=$1),
+			(SELECT to_jsonb(p) FROM mamony_identity.password_verifiers p WHERE p.subject_id=$1),
+			(SELECT to_jsonb(a) FROM mamony_identity.email_aliases a WHERE a.subject_id=$1),
+			(SELECT jsonb_agg(to_jsonb(x)-'last_seen_at' ORDER BY x.token_digest) FROM mamony_identity.opaque_sessions x WHERE x.subject_id=$1),
+			(SELECT jsonb_agg(to_jsonb(g) ORDER BY g.grant_digest) FROM mamony_identity.password_login_grants g WHERE g.subject_id=$1),
+			(SELECT jsonb_agg(to_jsonb(o) ORDER BY o.event_id) FROM mamony_identity.security_outbox o WHERE o.subject_id=$1),
+			(SELECT jsonb_agg(to_jsonb(n) ORDER BY n.event_id) FROM mamony_identity.password_change_notices n WHERE n.subject_id=$1)
+		)::text,'UTF8')),'hex')`, subject).Scan(&digest)
+		if err != nil || len(digest) != 64 {
+			t.Fatal("fixture durable snapshot failed")
+		}
+		return digest
+	}
+	preBoundary := snapshot(source, subject)
+	native := newRH03NativeEvidence(t, ctx, source, adminRole, sourceDB)
 	if err := src.change.Change(ctx, old.ForTrustedTransport(), email, oldPassword, newPassword, peer); err != nil {
 		t.Fatal("source password change failed")
 	}
@@ -244,26 +267,7 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		t.Fatal("source revocation audit witness missing")
 	}
 
-	// Compare complete selected durable rows, including original event IDs
-	// and notice rows; session last_seen_at may advance on a successful
-	// resolution. Do not export row contents or digest to logs.
-	snapshot := func(c *pgx.Conn, subject string) string {
-		t.Helper()
-		var digest string
-		err := c.QueryRow(ctx, `SELECT encode(sha256(convert_to(jsonb_build_array(
-			(SELECT to_jsonb(s) FROM mamony_identity.subjects s WHERE s.subject_id=$1),
-			(SELECT to_jsonb(p) FROM mamony_identity.password_verifiers p WHERE p.subject_id=$1),
-			(SELECT to_jsonb(a) FROM mamony_identity.email_aliases a WHERE a.subject_id=$1),
-			(SELECT jsonb_agg(to_jsonb(x)-'last_seen_at' ORDER BY x.token_digest) FROM mamony_identity.opaque_sessions x WHERE x.subject_id=$1),
-			(SELECT jsonb_agg(to_jsonb(g) ORDER BY g.grant_digest) FROM mamony_identity.password_login_grants g WHERE g.subject_id=$1),
-			(SELECT jsonb_agg(to_jsonb(o) ORDER BY o.event_id) FROM mamony_identity.security_outbox o WHERE o.subject_id=$1),
-			(SELECT jsonb_agg(to_jsonb(n) ORDER BY n.event_id) FROM mamony_identity.password_change_notices n WHERE n.subject_id=$1)
-		)::text,'UTF8')),'hex')`, subject).Scan(&digest)
-		if err != nil || len(digest) != 64 {
-			t.Fatal("fixture durable snapshot failed")
-		}
-		return digest
-	}
+
 	var notices int
 	if err := source.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_change_notices n
 		JOIN mamony_identity.security_outbox o USING(event_id)
@@ -273,6 +277,20 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 	}
 	expected := snapshot(source, subject)
 	secondExpected := snapshot(source, secondSubject)
+	if expected == preBoundary {
+		t.Fatal("post-base durable transition missing")
+	}
+	// Observe a separate paused physical recovery before creating either
+	// application execution database. All authority values stay in process.
+	held := native.recover(t, ctx, source)
+	if snapshot(held, subject) != expected || snapshot(held, secondSubject) != secondExpected {
+		t.Fatal("native recovered binding or original obligations differ")
+	}
+	if snapshot(held, subject) == preBoundary {
+		t.Fatal("native recovered state matched pre-transition observation")
+	}
+	nativeDump := native.dump(t, ctx)
+	native.assertHeld(t, ctx, held)
 
 	// The native tools execute only inside the dedicated network-none
 	// container. Fixed database names; no shell, no credential artifacts
@@ -299,41 +317,62 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		t.Fatal("recovered durable binding or original obligations differ")
 	}
 
-	dst := build(targetDB)
-	// The existing admission limits are unchanged: three source admissions,
-	// then two target admissions within the same recovered budget window.
-	if who, err := dst.session.Resolve(ctx, fresh.ForTrustedTransport()); err != nil || who != subject {
-		t.Fatal("recovered current session positive control failed")
+	// Execute the same assertions against both independently restored
+	// databases. Do not run the application against the paused cluster.
+	assertApplication := func(db string, target *pgx.Conn) {
+		t.Helper()
+		dst := build(db)
+		// The existing admission limits are unchanged: three source admissions,
+		// then two target admissions within the same recovered budget window.
+		if who, err := dst.session.Resolve(ctx, fresh.ForTrustedTransport()); err != nil || who != subject {
+			t.Fatal("recovered current session positive control failed")
+		}
+		if who, err := dst.session.Resolve(ctx, old.ForTrustedTransport()); who != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
+			t.Fatal("recovered prior session not rejected by application")
+		}
+		if who, err := dst.flow.Authenticate(ctx, email, oldPassword, peer); who != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
+			t.Fatal("recovered superseded password not rejected by application")
+		}
+		if who, err := dst.flow.Authenticate(ctx, email, newPassword, peer); err != nil || who != subject {
+			t.Fatal("recovered current password positive control failed")
+		}
+		if who, err := dst.session.Resolve(ctx, current.ForTrustedTransport()); err != nil || who != secondSubject {
+			t.Fatal("recovered grant session positive control failed")
+		}
+		if who, err := dst.session.Resolve(ctx, loggedOut.ForTrustedTransport()); who != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
+			t.Fatal("recovered explicitly revoked session not rejected")
+		}
+		if session, err := dst.session.Issue(ctx, oneUse); session.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrSessionDenied) {
+			t.Fatal("recovered consumed grant not rejected")
+		}
+		var targetConsumed, targetRevocations int
+		if err := target.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.password_login_grants WHERE subject_id=$1 AND consumed_at IS NOT NULL", secondSubject).Scan(&targetConsumed); err != nil || targetConsumed != consumed {
+			t.Fatal("recovered consumed grant witness changed")
+		}
+		if err := target.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.security_outbox WHERE subject_id=$1 AND event_type='SESSION_REVOKED'", secondSubject).Scan(&targetRevocations); err != nil || targetRevocations != revocations {
+			t.Fatal("recovered revocation audit changed")
+		}
+		if snapshot(target, subject) != expected || snapshot(source, subject) != expected ||
+			snapshot(target, secondSubject) != secondExpected || snapshot(source, secondSubject) != secondExpected {
+			t.Fatal("application assertions changed durable binding or original obligations")
+		}
 	}
-	if who, err := dst.session.Resolve(ctx, old.ForTrustedTransport()); who != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
-		t.Fatal("recovered prior session not rejected by application")
+	assertApplication(targetDB, target)
+	if _, err := source.Exec(ctx, "CREATE DATABASE mamony_test_rh03_exec_native"); err != nil {
+		t.Fatal("distinct native-derived execution database creation failed")
 	}
-	if who, err := dst.flow.Authenticate(ctx, email, oldPassword, peer); who != "" || !errors.Is(err, usecase.ErrPasswordAuthenticationDenied) {
-		t.Fatal("recovered superseded password not rejected by application")
+	run("pg_restore", "--host=/var/run/postgresql", "--username="+adminRole, "--no-password",
+		"--single-transaction", "--exit-on-error", "--dbname="+nativeTargetDB, nativeDump)
+	nativeTarget := connectAdmin(nativeTargetDB)
+	if snapshot(nativeTarget, subject) != expected || snapshot(nativeTarget, secondSubject) != secondExpected {
+		t.Fatal("native-derived execution fixture provenance mismatch")
 	}
-	if who, err := dst.flow.Authenticate(ctx, email, newPassword, peer); err != nil || who != subject {
-		t.Fatal("recovered current password positive control failed")
+	assertApplication(nativeTargetDB, nativeTarget)
+	native.assertHeld(t, ctx, held)
+	if snapshot(held, subject) != expected || snapshot(held, secondSubject) != secondExpected {
+		t.Fatal("paused native state changed during application execution")
 	}
-	if who, err := dst.session.Resolve(ctx, current.ForTrustedTransport()); err != nil || who != secondSubject {
-		t.Fatal("recovered grant session positive control failed")
-	}
-	if who, err := dst.session.Resolve(ctx, loggedOut.ForTrustedTransport()); who != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
-		t.Fatal("recovered explicitly revoked session not rejected")
-	}
-	if session, err := dst.session.Issue(ctx, oneUse); session.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrSessionDenied) {
-		t.Fatal("recovered consumed grant not rejected")
-	}
-	var targetConsumed, targetRevocations int
-	if err := target.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.password_login_grants WHERE subject_id=$1 AND consumed_at IS NOT NULL", secondSubject).Scan(&targetConsumed); err != nil || targetConsumed != consumed {
-		t.Fatal("recovered consumed grant witness changed")
-	}
-	if err := target.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.security_outbox WHERE subject_id=$1 AND event_type='SESSION_REVOKED'", secondSubject).Scan(&targetRevocations); err != nil || targetRevocations != revocations {
-		t.Fatal("recovered revocation audit changed")
-	}
-	if snapshot(target, subject) != expected || snapshot(source, subject) != expected ||
-		snapshot(target, secondSubject) != secondExpected || snapshot(source, secondSubject) != secondExpected {
-		t.Fatal("application assertions changed durable binding or original obligations")
-	}
+	t.Log("RH-03b3c PASS: verified post-base native recovery boundary remains paused and read-only; separate native-derived execution fixture preserves binding and passes application authority assertions")
 	t.Log("RH-03b3b PASS: explicitly revoked session and consumed one-use grant denied after separate synthetic logical restore; current session and original durable obligations preserved")
 	t.Log("RH-03b3a PASS: separate synthetic logical recovery preserves durable binding and rejects prior session and superseded password with current positive controls")
 }
