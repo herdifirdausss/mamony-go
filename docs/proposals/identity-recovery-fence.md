@@ -469,3 +469,54 @@ The conclusion is an evidence gap, not a proof that every conceivable test-only 
 - Exact synthetic containment and independent technical review requirements, separate authorization for any implementation.
 
 Existing source review establishes the normal session contract and prior integration evidence only. Current research does not establish actual recovery-policy feasibility without new behavior. Recommend recording E2 as BLOCKED on an accepted recovery-session policy capability design, and requesting a separate owner decision whether to pursue that design as documentation-only or defer E2. If a later design requires new runtime, migrations, registry or role changes, these remain prohibited until separately approved; E1's deferred independent acceptance does not transfer. No more symbolic tests proposed solely to obtain a PASS. RF-01–07 NOT RUN; RF-08 BLOCKED; RH-03 PARTIAL; G6 NOT AUTHORIZED; production NOT ACCEPTED. No changes to #95/#81/#106 or canonical contracts/governance. All new evidence requirements NOT RUN.
+
+## E2 separate Identity recovery-session capability — architecture decision review
+
+[Owner RSP-01–05 direction](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7164005648) authorizes this documentation-only review. Prior exact candidate c3ff15f7f81c57d51aae73d76f1f17a9d3578bd4 passed five workflows. Inspected main f6b9a2d1f46413e7c87db0cc09d13acc4261c438; E1 #106 remains reviewed/unmerged and #81 unmerged. No implementation, migration, registry, runtime change, merge or production activation authorized. Architecture recommendations below are proposed, not an adopted ADR or canonical contract.
+
+### ARC-01 — Boundary and dependency decision
+
+Prefer a distinct policy responsibility within Identity over a new standalone service, reuse of normal logout/password-change semantics, or Platform-owned authorization. This is a logical capability boundary, not a deployment topology or new runtime interface. Keep normal authentication/issuance/resolution behavior under the existing Identity owner; Platform evidence informs the review but cannot grant access. Independent release and trust infrastructure are explicitly outside this slice.
+
+| Dependency or concern | Disposition | Source trace |
+|---|---|---|
+| Session lifecycle and authentication issuance | Required semantic dependency; preserve existing assurance and normal lifecycle contract | IAM-03/08; ADR-0006/0009/0010/0011 |
+| Authentication-material and durable binding currentness | Required evidence prerequisite; local consistency alone insufficient | IAM-11; ADR-0012 |
+| Login grants and session-dependent sensitive operations | Required dependency review before claiming a complete session boundary; separate proof-family acceptance | IAM-10/12; ADR-0009/0013/0024 |
+| Security events and notice obligations | Required preservation and future owning-transaction review | FND-12; OPS-02; EVT-03; ADR-0014/0024 |
+| Provenance, isolation and surviving trusted evidence | Required Platform input; not authority to release | FND-08; recovery runbook; #95 |
+| Other temporary authority, provider outcomes and v36 | Separate unresolved coverage; #81 unmerged | RF-03/06/08; P1 inventory |
+| Registry, release, independent production currentness infrastructure | Not an E2 dependency to implement; separate RH-04/05 and production trust review | RSP-05 |
+
+Source-level map only, not exhaustive call graph, ACL verification or deployed dependency attestation. No new dependencies adopted.
+
+### ARC-02 — Consistency decision
+
+Prefer subject-scoped review granularity with whole-Identity HOLD rather than equating a single large transaction with global security completeness, or permitting independently reviewed subjects to resume. Review granularity does not prescribe the transaction implementation. If a later authorized capability changes authoritative security state, OPS-02/FND-12 require the associated durable audit and applicable notice obligations to have owning-transaction consistency. Local atomicity cannot prove independently surviving history. No partial release, automatic completion from interrupted or ambiguous results, blind retry, or claim that a local event proves independent currentness. An unknown binding or cross-family obligation prevents completeness. Consistency/persistence and interruption feasibility remain unresolved at implementation level.
+
+### ARC-03 — Audit and retention decision
+
+Recommend distinct administrative recovery disposition semantics, not reuse of user logout, successful authentication, password change, or proof consumption. Preserve original logical event identity, historical disposition, and notice obligations; distinguish provider acknowledgement from receipt. Reconciliation must not manufacture a historical event, regenerate a purged record, or imply notification success. OPS-02 requires security-sensitive accepted state changes to retain their associated durable obligations, and EVT-03 preserves original source/event identity. Review evidence should be minimal, redacted, attributable and scoped to exact revision, with explicit limitations. No new event taxonomy, notice trigger, retention duration, storage, deletion rule, custody authority or policy override adopted. Determine any applicable additional notice requirements and retention bounds in a separately reviewed design; unknown evidence remains HOLD.
+
+### ARC-04 — Feasibility and sequencing decision
+
+| Alternative | Assessment |
+|---|---|
+| Existing tests only | Regression evidence; cannot demonstrate recovery-specific semantics |
+| Additional test-local substitute | Reject as evidence of actual capability; E1 already establishes selected symbolic cases |
+| Distinct Identity-owned recovery-session capability | Recommended architecture direction, conditional on a separate technical scope decision; behavioral feasibility UNPROVEN |
+| Standalone service or recovery registry | Premature and outside authorization; independent release remains separate |
+
+The current approved scope cannot close the identified capability gap by adding documentation or ordinary lifecycle tests. This is not a categorical impossibility proof. If the owner pursues actual capability development, a separate Critical proposal must establish the accepted technical design, exact affected scope, reviewed trust and consistency assumptions, audit/retention decisions, and independent-review conditions before requesting implementation authorization. A candidate may not introduce runtime, migration, access-policy, registry or other changes under the present documentation-only approval. If prerequisites cannot be resolved, defer E2 and preserve HOLD. E1 deferred independent acceptance does not transfer.
+
+### ARC-05 — Verification boundary and gate disposition
+
+| Future evidence objective (not accepted experiment AC) | Trace | Current result |
+|---|---|---|
+| Owning-capability outcome distinguished from unavailability/unknown | SP-01, RSP-03 | NOT RUN |
+| Recovery-specific session policy distinct from normal lifecycle | SP-03, RSP-01 | NOT RUN |
+| Legitimate binding and original obligations preserved | SP-02, RSP-02 | NOT RUN for E2 |
+| Independently justified conditional fresh control | SP-04, RSP-04 | BLOCKED on prerequisites |
+| Scoped dependency/coverage and containment review | SP-05/06, RSP-05 | PARTIAL source review; actual experiment unapproved |
+
+No executable test or recovery procedure, mutation algorithm, schema, SQL, role grants, APIs, new files or implementation allowlist is specified. Recommend owner review of ARC-01–05 as the architectural direction and then either authorize preparation of a separate Critical capability proposal (documentation only, not another symbolic experiment), or explicitly defer E2. The key next decision is whether to pursue the capability change, not whether to add more E1 tests. No further generic policy-refinement loop is needed to recognize the capability gap. Implementation-ready G3 and G4 remain incomplete; no E2 authorization or execution. RF-01–07 NOT RUN, RF-08 BLOCKED, RH-03 PARTIAL. Independent technical acceptance unrecorded for E2, G6 NOT AUTHORIZED, production NOT ACCEPTED. No changes to canonical contracts, governance or #95/#81/#106.
