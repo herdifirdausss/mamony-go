@@ -1,20 +1,20 @@
 # ADR-0002 — Ledger and data ownership
 
-**Status:** Contract baseline
+**Status:** Owner-accepted bounded design direction, proposed canonical alignment in Draft [#87](https://github.com/herdifirdausss/mamony-go/pull/87). Independent technical acceptance DEFERRED; production readiness NOT ACCEPTED. No K2 implementation or activation authorized.
 
 ## Ledger ownership
 
 The ledger alone writes balances. Each posting creates an immutable double-entry journal in one currency. A reversal creates a new journal. A verifier recomputes balances from entries. See the [Ledger acceptance checks](../contracts/ledger.md).
 
-The ledger does not depend on other capabilities. Other capabilities call its facade. If a workflow needs one local transaction across capabilities, it must use an explicit ledger extension point with a documented grant.
+Ledger owns its book, account, admitted currency snapshot, journal, entry, balance, replay, and Ledger outbox records and commits its own effects in one local ACID transaction. Other capabilities use its authorized facade or events. Each independent capability owns its local transaction and durable outcomes. Normal workflows do not share transactions or directly query or mutate another owner's private schema. Use typed ports, durable operation identities/progress, idempotent commands and explicit recovery across owners. Place an invariant that requires one atomic boundary within one owner. Any exceptional cross-owner ACID boundary or private database access requires a separately accepted ADR, scope, threat model, grants, extraction cost and actual verification. No exception is authorized by this alignment.
 
 Store ledger amounts as exact integer minor units. An FX trade uses two journals through conversion accounts. When FX work starts, use an integer mantissa and scale for rates. Round once to the target currency's minor unit with a named rule. The FX contract must specify bounds, intermediate arithmetic, and the applicable rounding rule.
 
 ## Database boundary
 
-Use one PostgreSQL database with one schema per capability and separate owner and runtime roles. A capability reaches another capability's data through a facade, event, or an explicitly granted database interface.
+Use one PostgreSQL database with one schema per capability and separate owner and runtime roles. Use authorized facades and events by default. Narrow technical relay or verification access requires separately reviewed named grants and catalog evidence. No routine private cross-schema joins, foreign keys, function calls, business DML, or shared transaction handles across owners. One physical database and Platform migration tooling do not imply shared business ownership.
 
-Use transaction-local row-level security (RLS) for tenant-owned tables. Keep the core ledger tables platform-owned. See the [PostgreSQL contract](../contracts/postgresql.md) for roles, isolation, and restore tests.
+Use transaction-local row-level security (RLS) for tenant-owned tables. Platform owns canonical reference data and infrastructure primitives; Ledger owns its financial records and any future immutable local admitted-definition snapshots, not a second canonical catalog. Accounting book is not tenant; enforce resource authorization and appropriate tenant isolation separately. See the [PostgreSQL contract](../contracts/postgresql.md) for roles, isolation, and restore tests.
 
 ## Event delivery
 

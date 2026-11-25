@@ -9,7 +9,7 @@ Use the local [architecture decision index](adr/README.md) for baseline requirem
 **DEC-01 ACCEPTED by the repository owner on 2026-11-21:** PostgreSQL 18.7, Go 1.27 (CI toolchain 1.27.4), native pgx v5, and SQL-only golang-migrate v4 with database-committed SHA-256 fingerprint verification and separate owner/migrator/runtime roles. [Research and trade-offs](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) remain available for context. Acceptance of the design is not equivalent to passing migration tests or deploying production credentials; see [migration runbook](runbooks/platform-migrations.md). The release image digest and production secret source must be pinned/verified at deployment.\n\n| ID | Choice | Decision evidence |
 |---|---|---|
 | DEC-01 | **ACCEPTED** — PostgreSQL 18.7, Go 1.27, native pgx v5, golang-migrate v4, applied-file SHA-256 verification and separate credentials. | Verify fresh/upgrade migration, dirty state, runtime grants, and restore; implementation evidence remains separately tracked. |
-| DEC-02 | Choose the Go transaction and locking design for posting. Define which metadata belongs in the replay fingerprint. | Same-key contention, floor race, close and post race, and lost response after commit. |
+| DEC-02 | Owner selected Go repository/direct parameterized SQL and Ledger-local ACID as design direction; exact isolation, lock graph, constraints, role matrix, replay/fact encoding and authority remain open. | Same-key contention, floor race, close and post race, and lost response after commit. |
 | DEC-03 | Choose Go password and factor storage, recovery, credential rotation, and revocation timing. | Threat review and tests for operator second factor, revocation, and recovery. |
 | DEC-04 | Choose a screening matcher and rule version policy. Choose list age and review limits. | Synthetic false-positive and miss fixtures. A missing or stale list always causes hold. |
 | DEC-05 | Approve a job role only when its access cannot use an existing service boundary. Define its exact grants. | Runtime catalog test, least privilege, and no access from a request handler. |
@@ -336,7 +336,7 @@ V35 verifies a **real** ES256-signed `webauthn.get` assertion against the v34 or
 **Decision status as of 2026-11-25: OWNER-ACCEPTED BOUNDED SYNTHETIC DIRECTION / NO MERGE AUTHORIZATION.** See [owner decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178). Independent technical acceptance and production readiness NOT ACCEPTED.
 [Proposed ADR-0041](adr/0041-passkey-atomic-activation.md) and
 [Critical proposal](proposals/identity-passkey-atomic-activation.md)
-describe the candidate; Issue #78 records bounded owner acceptance, not independent technical acceptance. Unmerged PRs #79 (design), #80 (Go handoff) and #81 (SQL one-use candidate) do not constitute merge or production approval. Their Go/SQL
+describe the candidate; Issue #78 records bounded owner acceptance, not independent technical acceptance. PRs #79 (design) and #80 (Go handoff) are merged under separate bounded synthetic authorizations; #81 (SQL one-use candidate) remains unmerged and HOLD. Neither adoption establishes production approval. Their Go/SQL
 code and synthetic CI are not a live passkey login, independent recovery
 factor, real delivered security notice, or production authorization.
 
