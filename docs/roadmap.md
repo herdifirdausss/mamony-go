@@ -1,12 +1,12 @@
 # Implementation roadmap
 
-The Go binary runs two health listeners. The contracts below describe planned behavior, prerequisites, and acceptance checks. See the [architecture](architecture.md) for the packages and routes available today.
+The Go binary runs two health listeners; internal Platform, Identity and Ledger synthetic slices also exist. See [current state](current-state.md) for merged implementation and open work, and [architecture](architecture.md) for runtime composition. The contracts specify intended behavior, prerequisites and acceptance checks, not blanket completion.
 
 Before beginning any new feature or architecture change, use the [change lifecycle](development-workflow.md) to validate research, requirements, design, risks and acceptance checks. The roadmap determines build order; it does not replace product acceptance, technical review or PR evidence.
 
 ## Security prerequisites by stage
 
-Security is integrated into the owning capability's contract rather than a separate feature milestone. Before implementing a non-health endpoint, resolve the applicable [edge](adr/0003-public-http-contract.md#input-admission-and-browser-boundary) and [security decisions](open-decisions.md#security-architecture-decisions). The current health-only process has no user authentication or payment API.
+Security is integrated into the owning capability's contract rather than a separate feature milestone. Before implementing a non-health endpoint, resolve the applicable [edge](adr/0003-public-http-contract.md#input-admission-and-browser-boundary) and [security decisions](open-decisions.md#security-architecture-decisions). The current health-only process mounts no user authentication or payment API; unmounted internal Identity implementations do not satisfy this release gate.
 
 - **Foundation gate:** enforce bounded input and trusted routing on introduced endpoints; keep build/runtime/migration permissions narrow; state the attacker model. Existing static checks do not prove future identity or ledger safety.
 - **Identity gate:** establish subject/session authority, recovery and revocation policy, resource-level authorization and negative tenant tests. Prove [PostgreSQL runtime isolation](contracts/postgresql.md) when database tables exist.
@@ -19,11 +19,11 @@ Use the [security verification matrix](engineering.md#security-verification) and
 
 | Order | Contract | Prerequisites and outcome |
 |---:|---|---|
-| 1 | [Platform foundation](contracts/platform.md) | Synthetic PostgreSQL role/RLS fixture is verified; [DEC-01 database design](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) was accepted on 2026-11-21. Real migration and platform runtime integration still require independent verification. Implement and verify real migrations, configuration, audit, and event relay before the ledger. |
-| 2 | [Identity Phase 1](contracts/identity.md) | First-party Profile A enrollment, email proof, login/session authority and explicit resource authorization. Implement in guarded slices, prove real PostgreSQL transactions and permissions, and do not enable public routes before relevant verification gates pass. The first primitive PR does not satisfy this milestone. |
-| 3 | [Ledger](contracts/ledger.md) | Use PostgreSQL to prove durable posting, replay, reversal, delivery, and restore, with independently enforced posting authorization. |
+| 1 | [Platform foundation](contracts/platform.md) | DEC-01 accepted; synthetic migration tooling, runtime pool, recovery lab and reference catalog merged. Full recovery, capability authorization integration, operational configuration, audit/event relay and production evidence remain open. |
+| 2 | [Identity Phase 1](contracts/identity.md) | Internal Profile A enrollment, login/session, recovery and passkey verification through v35 merged; v36 remains Draft. Complete resource authorization, recovery and operational gates before public activation. Phase 1 is not complete. |
+| 3 | [Ledger](contracts/ledger.md) | K1 pure domain and FND-02a/b reference admission merged as isolated synthetic slices. Historical definitions and design remain open; durable posting, replay, reversal, delivery, restore and posting authorization remain unimplemented. |
 
-Pass the ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
+The bounded synthetic K1/reference experiments may precede full Foundation/Identity acceptance; they do not change delivery or activation order, authorize K2–K6, or satisfy the ledger gate. Pass the ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
 
 ## Simulated pilot
 
