@@ -6,14 +6,16 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 var (
-	ErrInvalidCatalog   = errors.New("invalid reference catalog")
-	ErrUnknownCurrency  = errors.New("currency not in reference catalog")
-	ErrUnknownCountry   = errors.New("country not in reference catalog")
-	ErrCurrencyMismatch = errors.New("currency definition mismatch")
+	ErrInvalidCatalog    = errors.New("invalid reference catalog")
+	ErrUnknownCurrency   = errors.New("currency not in reference catalog")
+	ErrUnknownCountry    = errors.New("country not in reference catalog")
+	ErrCurrencyMismatch  = errors.New("currency definition mismatch")
+	ErrUnknownDefinition = errors.New("definition not in reference catalog")
 )
 
 type CurrencyCode string
@@ -24,18 +26,16 @@ type CountryCode string
 type CurrencyDefinition struct {
 	code     CurrencyCode
 	exponent uint8
+	version  string
+	unitID   string
 }
 
 func (d CurrencyDefinition) Code() CurrencyCode { return d.code }
 func (d CurrencyDefinition) Exponent() uint8    { return d.exponent }
+func (d CurrencyDefinition) UnitID() string     { return d.unitID }
 
-// Version identifies the code and minor-unit semantics, not the release.
-func (d CurrencyDefinition) Version() string {
-	if d.code == "" {
-		return ""
-	}
-	return fmt.Sprintf("iso4217-minor-v1:%s:%d", d.code, d.exponent)
-}
+// Version returns the allocated immutable definition ID, not the release.
+func (d CurrencyDefinition) Version() string { return d.version }
 
 // Catalog has no mutation API. A successful Load owns its private maps;
 // lookups return values, and copies of Catalog are safe for concurrent reads.
@@ -59,13 +59,24 @@ func (c Catalog) LookupCurrency(code CurrencyCode) (CurrencyDefinition, error) {
 	return CurrencyDefinition{}, ErrUnknownCurrency
 }
 
+// LookupDefinition pins an exact identity in this curated baseline only.
+// It does not provide historical coverage or effective-date selection.
+func (c Catalog) LookupDefinition(id string) (CurrencyDefinition, error) {
+	for _, d := range c.currencies {
+		if d.version == id {
+			return d, nil
+		}
+	}
+	return CurrencyDefinition{}, ErrUnknownDefinition
+}
+
 // RequireCurrency refuses metadata that does not match the selected definition.
-func (c Catalog) RequireCurrency(code CurrencyCode, exponent uint8, version string) (CurrencyDefinition, error) {
+func (c Catalog) RequireCurrency(code CurrencyCode, exponent uint8, version, unitID string) (CurrencyDefinition, error) {
 	d, err := c.LookupCurrency(code)
 	if err != nil {
 		return CurrencyDefinition{}, err
 	}
-	if d.exponent != exponent || d.Version() != version {
+	if d.exponent != exponent || d.version != version || d.unitID != unitID {
 		return CurrencyDefinition{}, ErrCurrencyMismatch
 	}
 	return d, nil
@@ -90,6 +101,16 @@ func asciiCode(value string, size int) bool {
 	return true
 }
 
+// validAllocatedID validates local identity syntax, not source authority.
+func validAllocatedID(value, prefix string) bool {
+	if !strings.HasPrefix(value, prefix) {
+		return false
+	}
+	revision := strings.TrimPrefix(value, prefix)
+	n, err := strconv.ParseUint(revision, 10, 64)
+	return err == nil && n != 0 && strconv.FormatUint(n, 10) == revision
+}
+
 // parseCatalog is deliberately private: callers cannot install a new dataset.
 // The checksum detects drift, not a malicious change to both data and checksum.
 func parseCatalog(release, data, checksum string) (Catalog, error) {
@@ -110,14 +131,16 @@ func parseCatalog(release, data, checksum string) (Catalog, error) {
 		fields := strings.Split(line, ",")
 		switch fields[0] {
 		case "C":
-			if len(fields) != 3 || !asciiCode(fields[1], 3) || len(fields[2]) != 1 || fields[2][0] < '0' || fields[2][0] > '3' {
+			if len(fields) != 5 || !asciiCode(fields[1], 3) || len(fields[2]) != 1 || fields[2][0] < '0' || fields[2][0] > '3' ||
+				!validAllocatedID(fields[3], "mamony-currency-v2:"+fields[1]+":") ||
+				!validAllocatedID(fields[4], "mamony-unit-v1:"+fields[1]+":") {
 				return Catalog{}, ErrInvalidCatalog
 			}
 			code := CurrencyCode(fields[1])
 			if _, exists := c.currencies[code]; exists {
 				return Catalog{}, ErrInvalidCatalog
 			}
-			c.currencies[code] = CurrencyDefinition{code: code, exponent: fields[2][0] - '0'}
+			c.currencies[code] = CurrencyDefinition{code: code, exponent: fields[2][0] - '0', version: fields[3], unitID: fields[4]}
 		case "N":
 			if len(fields) != 2 || !asciiCode(fields[1], 2) {
 				return Catalog{}, ErrInvalidCatalog
