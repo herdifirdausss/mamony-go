@@ -1,5 +1,7 @@
 # Documentation
 
+Start with [current state and active work](current-state.md) for the dated merged baseline and open work. Contracts and ADRs remain the sources of requirements and design decisions; GitHub issues and PRs hold live status and evidence.
+
 | What you need | Where to start |
 |---|---|
 | Start a new feature from research through requirements, PRD, design and verification | [Change lifecycle](development-workflow.md) and [proposal template](templates/feature-proposal.md) |

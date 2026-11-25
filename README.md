@@ -1,8 +1,21 @@
 # Mamony Go
 
-Mamony Go is a project for simulating cross-border payments and payouts with synthetic data. The current Go binary serves health endpoints on two HTTP listeners. The [roadmap](docs/roadmap.md) describes planned ledger and payment capabilities.
+Mamony Go is a Go modular-monolith simulator for cross-border payments and payouts using synthetic data. It is under active development, not a production payment service.
 
-Start with the [documentation index](docs/index.md) or the [roadmap](docs/roadmap.md). For new capabilities, follow the [research-to-implementation workflow](docs/development-workflow.md) before coding.
+## Current state
+
+The default HTTP process exposes **health endpoints only**. The repository also contains substantial internal, unmounted synthetic implementations.
+
+| Capability | Merged baseline |
+|---|---|
+| Platform | PostgreSQL migration tooling, restricted runtime pool, disposable recovery/PITR lab, curated reference catalog |
+| Identity | Internal enrollment, password login, sessions, recovery, security notices and WebAuthn verification through v35; not publicly mounted |
+| Ledger | Isolated K1 monetary domain and USD-only reference admission; no durable posting or money API |
+| Payments, payouts, FX and providers | Planned; no money movement or live payment provider integration |
+
+See [current state and active work](docs/current-state.md) for the dated main snapshot, open PRs/issues, evidence and remaining gates. [Documentation index](docs/index.md) · [Roadmap](docs/roadmap.md) · [Change lifecycle](docs/development-workflow.md).
+
+Synthetic verification and merge do not establish production readiness. Do not use real funds, identities or live credentials.
 
 ## Run locally
 
@@ -30,16 +43,16 @@ The [PostgreSQL foundation proposal](docs/proposals/postgresql-foundation.md) de
 make integration-local
 ```
 
-This creates an ephemeral PostgreSQL 18.7 container bound to a random **loopback-only** port, tests separate synthetic runtime/admin roles and tenant RLS, then removes the container. The equivalent CI job runs on every PR and push to `main`. Without a disposable database, `make integration` fails closed rather than reporting PASS. **No production migrations, ledger code, provider calls or real identities are exercised.**
+This creates an ephemeral PostgreSQL 18.7 container bound to a random **loopback-only** port, tests separate synthetic runtime/admin roles and tenant RLS, then removes the container. The equivalent CI job runs on every PR and push to `main`. Without a disposable database, `make integration` fails closed rather than reporting PASS. **No production database, live provider calls, real identities or durable Ledger posting are exercised.** The suite also includes synthetic Identity database tests and recovery fixtures; see [current state](docs/current-state.md).
 
 ## Platform SQL migration runner
 
 Accepted DEC-01 uses PostgreSQL 18.7, native pgx v5, and golang-migrate v4 with a **database-committed SHA-256 fingerprint per applied migration**. The executable is `cmd/mamony-migrate` and must be invoked **outside the HTTP process** with separate migration credentials. The public HTTP binary never receives migration credentials.
 
-The dedicated [platform migration runbook](docs/runbooks/platform-migrations.md) describes bootstrap grants, startup, integrity evidence, and dirty-state recovery. `make migrations-check` checks committed migration files without accessing PostgreSQL. `make integration-local` runs the disposable PostgreSQL integration suite, including negative migration tests, when Docker and `psql` are installed. Ledger, tenant runtime adapters, and restore remain future work.
+The dedicated [platform migration runbook](docs/runbooks/platform-migrations.md) describes bootstrap grants, startup, integrity evidence, and dirty-state recovery. `make migrations-check` checks committed migration files without accessing PostgreSQL. `make integration-local` runs the disposable PostgreSQL integration suite, including negative migration tests, when Docker and `psql` are installed. Separate Identity migration tooling and disposable recovery tests also exist; production migrations, deployment grant parity and full Ledger recovery are not accepted.
 
 ## Runtime PostgreSQL primitive (not yet connected to HTTP)
 
-`internal/platform/postgres` provides an optional bounded native `pgxpool` wrapper that checks the real runtime DB role, requires verified TLS outside isolated loopback test databases, and uses **transaction-local** tenant context for an already-authorized tenant ID. No application/handler is wired to this pool yet. The authority to grant access to a tenant must come from a future Identity/owning usecase, **never from a client-supplied tenant string or from RLS alone**.
+`internal/platform/postgres` provides an optional bounded native `pgxpool` wrapper that checks the real runtime DB role, requires verified TLS outside isolated loopback test databases, and uses **transaction-local** tenant context for an already-authorized tenant ID. Internal Identity uses dedicated PostgreSQL adapters; the default HTTP process does not mount those handlers or a tenant-aware capability. End-to-end authorization integration remains open under [#18](https://github.com/herdifirdausss/mamony-go/issues/18). Tenant authority must come from Identity and the owning use case, **never from a client-supplied tenant string or from RLS alone**.
 
 The disposable `make integration-local` suite now also verifies connection reuse, negative tenant reads/writes, rollback, cancellation and elevated-role refusal against PostgreSQL itself. This does not require a production database or credentials.

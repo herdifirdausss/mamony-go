@@ -12,8 +12,9 @@
 - Requirement IDs from the owning contract and relevant implementation changes:
 - AC-to-test mapping; identify negative, concurrency, migration and recovery cases:
 - Any departure from accepted scope and its explicit acceptance:
+- If solo synthetic mode applies: implementation approval, containment evidence, independent acceptance status, production blockers, separate exact-head owner merge authorization (otherwise not applicable):
 
-A PR link or checkbox is **not** evidence of product approval, independent review or successful tests. For Critical changes, record explicit owner and technical acceptance **before coding**; if a security hotfix used the expedited path, explain why and how the skipped evidence will be completed. See [change lifecycle](../docs/development-workflow.md).
+A PR link or checkbox is **not** evidence of product approval, independent review or successful tests. For Critical changes, record explicit owner and technical acceptance **before coding**, or exact owner approval and containment/ACs for a bounded synthetic experiment under the adopted lifecycle. For any proposed solo synthetic merge, record containment evidence, actual review of code and tests, exact SHA owner merge authorization, deferred independent acceptance, and outstanding production blockers. The owner performs the merge. Otherwise pending independent technical acceptance is a Critical merge blocker; production-capable Critical release requires independent acceptance and separate activation approval. If a security hotfix used the expedited path, explain why and how the skipped evidence will be completed. See [change lifecycle](../docs/development-workflow.md).
 
 ## Evidence
 

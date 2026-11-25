@@ -4,7 +4,7 @@ description: Use before implementing a Mamony Go issue when the agent needs prec
 ---
 # Mamony context pack
 
-Before an implementation context pack, verify the [change lifecycle](../../../docs/development-workflow.md): identify Routine / Feature / Critical, the intake issue, accepted contract ACs, the technical design or proposal when required, and unresolved decision gates. Critical work with no explicit owner/technical acceptance is **BLOCKED**, not ready for coding. A research draft is not an accepted requirement.
+Before an implementation context pack, verify the [change lifecycle](../../../docs/development-workflow.md): identify Routine / Feature / Critical, the intake issue, accepted contract ACs, the technical design or proposal when required, and unresolved decision gates. Critical work without explicit owner/technical acceptance is **BLOCKED**, except for the specifically owner-approved bounded synthetic experiment in the adopted lifecycle. Record exact approval, allowed experiment, containment and pending independent review; implementation approval cannot authorize merge or live changes. Synthetic-only merge requires separate exact-candidate owner acceptance under G6, and is performed by the owner. A research draft is not an accepted requirement.
 
 1. Read the issue or change brief. Use the [documentation index](../../../docs/index.md) to find local decisions and contracts.
 2. Identify the affected capability, risk to money, access, or recovery, acceptance criteria and requirement IDs. Do not invent IDs.
