@@ -116,3 +116,14 @@ jobs:
         run: bash tools/postgrestest/check-passkey-backup-restore.sh
       - name: Verify isolated Identity recovery fence mechanism (IRF lab)
         run: bash tools/postgrestest/check-identity-recovery-fence.sh
+      - name: Verify native PostgreSQL synthetic recovery boundary
+        run: |
+          bash -n tools/postgrestest/check-platform-native-pitr.sh
+          set -o pipefail
+          bash tools/postgrestest/check-platform-native-pitr.sh | tee "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-01a PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-01b PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-01c PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-02b PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-02c PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+          grep -F 'RH-02a PASS:' "$RUNNER_TEMP/platform-native-pitr.log"

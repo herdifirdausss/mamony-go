@@ -1,5 +1,7 @@
 # Decisions to resolve before implementation
 
+For merged implementation and active work, see [current state](current-state.md). Identity PRs #22–#77 are merged, not deployed. Historical Draft references below describe the decision at its original slice; they do not mean those PRs are currently open. Operational/production approvals and independent acceptance remain separate. The v36 stack (#79–#81) remains unmerged; no merge authorization.
+
 Use the local [architecture decision index](adr/README.md) for baseline requirements. Record each choice below when its stage starts. A candidate needs tests in Mamony Go before it becomes an implementation claim.
 
 ## Foundation and access
@@ -57,7 +59,7 @@ The delivery handler is intentionally not wired into a production process or pub
 
 ## DEC-ID-DELIVERY-RUNTIME (draft, production enablement not approved)
 
-A separately executed Identity Mailgun delivery worker exists as stacked PR #27. Code uses a capability facade, a PostgreSQL role with restricted updates, one-at-a-time polling, and dual live-send opt-in with private-file secrets. This is **not** authorization to deploy or send real email: the operator has not provisioned an account/domain, approved a secret manager, sender limits, egress policy, retention, bounce/complaint webhooks, or public API admission. All CI Mailgun sends are intercepted by an injected `httptest` transport. Keep the PR Draft until those decisions and end-to-end negative tests are resolved.
+A separately executed Identity Mailgun delivery worker exists as stacked PR #27. Code uses a capability facade, a PostgreSQL role with restricted updates, one-at-a-time polling, and dual live-send opt-in with private-file secrets. This is **not** authorization to deploy or send real email: the operator has not provisioned an account/domain, approved a secret manager, sender limits, egress policy, retention, bounce/complaint webhooks, or public API admission. All CI Mailgun sends are intercepted by an injected `httptest` transport. Keep live deployment disabled until those decisions and end-to-end negative tests are resolved.
 
 ## DEC-ID-EMAIL-ADMISSION (Draft, internal-only policy, external approval pending)
 
@@ -331,21 +333,19 @@ V35 verifies a **real** ES256-signed `webauthn.get` assertion against the v34 or
 
 ### Atomic passkey possession verification (v36; Critical issue #78)
 
-**Decision status as of 2026-11-24: NOT ACCEPTED / NOT APPROVED FOR MERGE.**
+**Decision status as of 2026-11-25: OWNER-ACCEPTED BOUNDED SYNTHETIC DIRECTION / NO MERGE AUTHORIZATION.** See [owner decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178). Independent technical acceptance and production readiness NOT ACCEPTED.
 [Proposed ADR-0041](adr/0041-passkey-atomic-activation.md) and
 [Critical proposal](proposals/identity-passkey-atomic-activation.md)
-describe the candidate; GitHub issue #78 records open G2 owner and independent
-G3 technical approval. Stacked Draft PRs #79 (design), #80 (Go handoff) and
-#81 (SQL one-use candidate) **do not constitute an approval**. Their Go/SQL
+describe the candidate; Issue #78 records bounded owner acceptance, not independent technical acceptance. Unmerged PRs #79 (design), #80 (Go handoff) and #81 (SQL one-use candidate) do not constitute merge or production approval. Their Go/SQL
 code and synthetic CI are not a live passkey login, independent recovery
 factor, real delivered security notice, or production authorization.
 
 | Decision | Status and consequence |
 |---|---|
-| D1 — non-login possession semantics | **PENDING**: accept `PENDING_ASSERTION → POSSESSION_VERIFIED` only as cryptographic possession evidence, with no `ACTIVE` login/session/recovery entitlements; define the separate policy and future consumers before enabling any client route |
-| D2 — activation security audit/notice | **PENDING**: accept a distinct activation event and mandatory queued notice, and decide owner, delivery/retry/retention/incident policy; a `PENDING` row never means delivery |
-| D3 — privileged finisher signature-claim oracle | **PENDING**: explicitly acknowledge Profile A root-compromise/finisher-credential risks or require independent verifier/role custody; server SQL cannot reverify the authenticator's ES256 signature |
-| D4 — expiration and operations | **PENDING**: accept 3-minute v34 nonce, 10-minute staging cap, abandonment/cleanup, durable replay/restore protections, key/security-role provision, and public ingress/CSRF policy |
+| D1 — non-login possession semantics | **ACCEPTED (bounded)**: possession evidence only; no login, session, independent recovery or authorization. |
+| D2 — activation security audit/notice | **ACCEPTED (bounded)**: mandatory atomic audit and pending notice; delivery/retry/retention/incident policy remains a release blocker. |
+| D3 — privileged finisher signature-claim oracle | **ACCEPTED (bounded)**: trusted Profile A with explicit residual risks; no independent authority claim or live credentials. |
+| D4 — expiration and operations | **ACCEPTED (bounded)**: existing three-minute challenge, ten-minute staging limit; no automatic cleanup or recovery release. Platform #14 owns recovery foundation; Identity owns semantics and obligations. Production recovery and ingress remain release blockers. |
 
 **Unverified release-sensitive scenarios** remain distinct from achieved CI checks: cross-role
 provisioning outside disposable fixtures, arbitrary network partitions during COMMIT

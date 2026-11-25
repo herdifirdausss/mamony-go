@@ -2,7 +2,20 @@
 
 The ledger is the sole writer of balances. See the [ledger and data ownership decision](../adr/0002-ledger-and-data-ownership.md).
 
-Ledger implementation and integration evidence are pending.
+K1 and FND-02b are merged, isolated synthetic implementations. Durable Ledger posting and integration evidence are pending; see [current state](../current-state.md).
+
+## K1 isolated monetary domain (synthetic experiment)
+
+The owner accepted the limited pure-domain experiment in [#90](https://github.com/herdifirdausss/mamony-go/issues/90), following [#86](https://github.com/herdifirdausss/mamony-go/issues/86). This experiment may precede completion of Foundation and Identity; it does not change capability activation order or authorize K2–K6. No runtime integration, database, public posting, or real funds.
+
+- LGR-01: validate 2–64 ordered positive int64 entries, one book and immutable currency definition, exact debit/credit equality. Currency metadata is fixture-only, not FND-02 implementation.
+- LGR-09: three initial types (cash asset/debit, capital equity/credit, customer liability/credit), all zero floor; valid snapshots with nonnegative balances and sequences, active only for new posting plans. Identifiers and definition versions are nonempty valid UTF-8 up to 128 bytes, no NUL, compared bytewise.
+- Arithmetic portion of LGR-02: exact wide intermediate net per touched account, final floor/range and sequence bounds, deterministic sorted steps, one sequence increment per account even for net zero; reject invalid/missing/duplicate/unreferenced snapshots and mismatches, no partial plan or input mutation.
+- Acceptance: actual Go unit and independent model tests; persistence, replay, authority, reversal execution, outbox, restore, FND-02 reference integration and all database tests remain outside this slice. Synthetic experiment approval does not authorize merge or release.
+
+## FND-02b isolated currency admission (synthetic experiment)
+
+The owner accepted [#94](https://github.com/herdifirdausss/mamony-go/issues/94) after FND-02a post-merge verification. Application composition resolves the canonical USD definition from the Platform catalog and passes its code, exponent and definition version as Ledger-owned values to the unmounted facade. Ledger owns the USD-only enablement policy (FND-02 partial and LGR-09 enabled subset only). The facade admits exactly one valid USD definition from trusted composition, retains a private domain CurrencyRef, and refuses missing, duplicate, incompatible or disabled configuration, unknown/disabled lookup and nonmatching metadata. No default exponent, coercion, mutable configuration or domain import of Platform. A matching value is not authentication or authorization; a malicious trusted in-process constructor caller could supply a structurally valid false definition. The release ID is not the definition version. Historical identity for same-exponent reassignment, effective dates and immutable history must be decided before persistence. No posting API, account creation, database, K2, startup wiring, runtime integration or real funds in this experiment.
 
 ## Posting and replay
 
@@ -35,7 +48,7 @@ Before implementation, record which fields are part of replay identity. Include 
 
 Use the [PostgreSQL contract](postgresql.md) for schema ownership and runtime roles. Apply its tenant-isolation tests to tenant-owned tables. Check the ledger through its database grants and its calling capability's authorization.
 
-Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). All database checks above are **NOT RUN** in the bootstrap.
+Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). All Ledger database checks above remain **NOT RUN**; isolated domain/reference test evidence does not satisfy them.
 
 ## Account lifecycle and reads
 

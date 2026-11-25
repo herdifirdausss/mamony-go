@@ -1,9 +1,9 @@
 # Identity passkey atomic activation — Critical change proposal
 
 **Issue:** [#78](https://github.com/herdifirdausss/mamony-go/issues/78)  
-**Owner/technical reviewer:** repository owner / designated independent reviewer (**acceptance not yet recorded**)  
+**Owner/technical reviewer:** repository owner / designated independent reviewer (owner scope accepted; independent technical acceptance not accepted)  
 **Capability:** Identity / WebAuthn, following merged #75–#77  
-**Status:** **PROPOSED** — G0/G1 completed, G2/G3 owner and technical decisions pending  
+**Status:** **OWNER-ACCEPTED BOUNDED SYNTHETIC DIRECTION** — final candidate review pending  
 **Risk:** Critical: new credential trust state + SQL runtime authority + forward-only migration  
 **Evidence reviewed:** 2026-11-23  
 **Related:** [ADR-0038](../adr/0038-webauthn-atomic-provisional-registration.md), [ADR-0039](../adr/0039-passkey-activation-challenge-evidence.md), [ADR-0040](../adr/0040-passkey-activation-signed-assertion-verifier.md), [proposed ADR-0041](../adr/0041-passkey-atomic-activation.md); `IAM-08`, `IAM-10`, `IAM-11`, `IAM-13`
@@ -29,9 +29,9 @@ The user has completed a valid WebAuthn registration staging and a fresh, signed
 - **B — Immediate `ACTIVE` passkey:** shorter subsequent login path, but grants ambiguous privilege to any future consumer of `ACTIVE` and may silently elevate password-backed enrollment. **Not recommended** without independent policy/review.
 - **C — No state transition, just mark nonce consumed:** stops replay but does not provide a named durable evidence state or explicit maintenance/monitorability. Insufficient for the stated outcome.
 
-## G2 — Proposed requirements and acceptance (not accepted contract)
+## G2 — Owner-accepted bounded requirements (contract promotion pending)
 
-The source of truth for accepted requirements remains `docs/contracts/identity.md`. After approval, promote stable AC IDs there. These are **proposed IDs**.
+The source of truth for accepted requirements remains `docs/contracts/identity.md`. Promote stable agreed AC IDs there after final design reconciliation; no claim of an already updated contract.
 
 | Proposed AC | Requirement | Required evidence (candidate results below) |
 |---|---|---|
@@ -106,21 +106,21 @@ sequenceDiagram
 - A security-notice queue row means *enqueued*, not delivered. Separate operator release gate for worker/retry/monitor/retention.
 - Future passkey login and independent recovery factors must explicitly evaluate provenance, state, assurance policy and lifecycle, not simply `state=POSSESSION_VERIFIED`.
 
-### Unresolved explicit decisions
+### D1–D4 owner decision record
 
 - **Decision D1:** adopt `POSSESSION_VERIFIED` vs `ACTIVE` and what (if anything) may consume it as a login factor. Recommendation: non-login.
 - **Decision D2:** approve distinct audit+notice table vs extending registration queue. Recommendation: separate activation event/queue.
 - **Decision D3:** accept Profile A finisher role as a privileged verifier oracle for an **unmounted** candidate, or require stronger workload separation before any activation semantics. Recommendation: internal-only with explicit residual risk.
 - **Decision D4:** approved activation timeout/abandoned staged credential retention, notification delivery and incident/recovery policy remain **release blocked**; v34 TTL reused for candidate.
 
-**G2 owner acceptance:** NOT RECORDED. **G3 independent technical acceptance:** NOT RECORDED. This proposal is NOT authorization to code or merge SQL behavior.
+Owner accepted D1–D4, bounded synthetic requirements and technical direction on 2026-11-25 ([owner decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178)). The existing three-minute challenge and ten-minute staging limit remain; no automatic cleanup or recovery release. Platform #14 owns recovery foundation; Identity #78 owns credential semantics and recovery obligations. Production delivery, recovery continuity and activation remain blocked. Under adopted main governance #89, independent technical acceptance is not accepted; it may be deferred only for an eligible, separately owner-authorized synthetic merge after candidate-specific containment, review and exact-head CI. Production readiness NOT ACCEPTED. No merge or production activation authorized.
 
 ## G4 — Implementation slice (planned, gated)
 
-1. After applicable D1–D4 and independent G3 accepted, update `docs/contracts/identity.md` with stable agreed ACs.
+1. Reconcile accepted D1–D4 and update `docs/contracts/identity.md` with stable agreed ACs.
 2. New forward-only SQL `000035`, migration fingerprint + migration canary, synthetic role bootstrap, workflow DSNs and testgate required test.
 3. Go finisher usecase + restricted repository adapter, unit negatives and real PostgreSQL 16-way replay, freeze/counter/role, late event collision and rollback integration. Use existing genuine signed ES256 fixture; mocked cryptography alone is not sufficient.
-4. ADR-0041 accepted revision, runbook/contract updates, PR risk and CI record. Keep Draft until exact final SHA checks and independent reviewer signoff.
+4. ADR-0041 accepted revision, runbook/contract updates, PR risk and CI record. Keep Draft until applicable #89 review and exact-head owner authorization; independent acceptance is not accepted.
 
 ## G5–G7 — Current verification
 
@@ -129,7 +129,7 @@ sequenceDiagram
 | Existing v35 signed verifier source and existing v33/v34 DB boundaries inspected | REVIEWED |
 | W3C WebAuthn Level 3 and pinned library contract checked | RESEARCHED |
 | Candidate SQL/Go, ES256 race/replay, SQL role tests, migration fingerprint | **IMPLEMENTED IN UNMERGED DRAFT #81; selected synthetic CI checks PASS, exact current SHA in Issue #78** |
-| Security review, owner G2/technical G3 approval | **PENDING** |
+| Owner bounded scope / technical direction | **ACCEPTED**; final candidate review and independent technical acceptance remain outstanding |
 | Production/browser rollout and independent security-notice delivery | **NOT IMPLEMENTED** |
 
 ## G3 supplement — precise TOCTOU, SQL lock and lineage review (2026-11-23)
@@ -219,7 +219,7 @@ These are **PROPOSED acceptance cases, not a blanket PASS**. Draft #81 implement
 
 **G4 disposable PostgreSQL crash-restart evidence (not backup/failover):** [PostgreSQL integration #45351020995](https://github.com/herdifirdausss/mamony-go/actions/runs/45351020995) passed on `92565db0` with a new step after `make integration`. The CI script `tools/postgrestest/check-passkey-crash-recovery.sh` first verifies the actual CI service identity (exact `mamony_test_ci` DSN, PostgreSQL 18.7 image, database user, container ID, `fsync=on` and `synchronous_commit=on`), then checks **9 verified credentials**, **9 linked consumed challenges**, **9 possession audit records** and **9 PENDING notices**. A stable snapshot of **all** passkey credentials, activation challenges, activation notices and possession-audit rows is taken before a Docker `SIGKILL` of the disposable PostgreSQL service container. The **same container/data volume** is started, readiness is checked, and the exact snapshot and relational counts must match. This detects loss or partial persistence of already-committed v36 evidence under this one-node crash-restart path. It does **not** test a crash during an in-flight commit, loss of the primary volume, PITR, backup restore, replication lag, failover or production recovery procedures. No additional login/recovery authority is conferred.
 
-**Acceptance remains blocked:** D1–D4 G2 decisions and independent G3 technical review are not recorded; a passing disposable crash-restart test is not a recovery/DR certification.
+**Final candidate acceptance remains blocked:** owner D1–D4 accepted; independent technical acceptance not accepted; final review and exact-head authorization pending; a passing disposable crash-restart test is not a recovery/DR certification.
 
 **G4 disposable logical backup-to-second-instance restore evidence (not PITR/failover):** [PostgreSQL integration #45373784654](https://github.com/herdifirdausss/mamony-go/actions/runs/45373784654) PASSED on code SHA `37ab47cc`, including the existing real PostgreSQL integration and SIGKILL/restart gates. After all test transactions completed, `tools/postgrestest/check-passkey-backup-restore.sh` used PostgreSQL 18 `pg_dump` to create a custom-format backup of `mamony_test_ci`. It started a **second** isolated `postgres:18.7` container with its own `mamony_test_restore` database, created NOLOGIN role identifiers needed by RLS policies, and ran `pg_restore --single-transaction --exit-on-error --no-owner --no-acl`. The same shared read-only snapshot query checked that **9 possession-verified credentials have 9 consumed challenge links, 9 possession audit events and 9 PENDING notices**, and that the complete credential/challenge/notice/possession-audit row digest matches the source. The dump is ephemeral and discarded with the test container; the source is never overwritten. The restore is intentionally **data-only authority coverage**: it does not restore/test original SQL role ownership, access grants, role passwords, independently provisioned credentials, notification delivery or production backup encryption/key custody. Critically it backs up the database **after** commit: restoring a **stale pre-commit/pre-consumption backup may resurrect consumed nonces or erase security events**. Prevention/detection of such rollback requires a separately approved external continuity/fencing and reconciliation policy. No PITR, server/volume loss, standby replication/failover or rollback-to-old-backup scenario has passed.
 
@@ -264,4 +264,4 @@ The enforcement mechanism, evidence store, recovery generation representation, o
 | PKA-R04 | Restored audit/notice prefix omits a known committed event; provider outcome ambiguous | Missing obligation detected against external evidence; stable event correlation and explicit unknown delivery, no fabricated or uncontrolled duplicate delivery. |
 | PKA-R05 | Verify fresh post-recovery enrollment, role/grant checks, old-generation workers and repeat restore | Only explicitly released scope accepts fresh proof; old workers/old grants denied, no cross-role access; measure recovery duration and data loss rather than assuming RTO/RPO. |
 
-**Gate disposition:** current v36 remains Draft/unmerged. These recommendations do not record D4 owner acceptance or independent G3 technical acceptance; no production role, restore mechanism, public route or security-notice sender is added. The exact pre-supplement head 90f9b120 has 5/5 passing CI; that evidence does not transfer to subsequent commits automatically.
+**Gate disposition:** current v36 remains unmerged. D4 owner bounded direction accepted; independent technical acceptance not accepted; no merge or production activation authorization; no production role, restore mechanism, public route or security-notice sender is added. The exact pre-supplement head 90f9b120 has 5/5 passing CI; that evidence does not transfer to subsequent commits automatically.
