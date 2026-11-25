@@ -26,5 +26,6 @@ func admitLedgerCurrency(catalog reference.Catalog) (ledger.CurrencyAdmission, e
 		Code:     string(d.Code()),
 		Exponent: d.Exponent(),
 		Version:  d.Version(),
+		UnitID:   d.UnitID(),
 	}})
 }
