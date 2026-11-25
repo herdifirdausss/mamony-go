@@ -12,6 +12,9 @@ import (
 // never the HTTP, issuer, reader, staging, session or migrator credentials.
 // SQL rechecks the exact original signed evidence under fresh row locks;
 // it does not itself verify WebAuthn signatures.
+// The adapter validates its persistence input contract independently of the
+// usecase. The database owns the authoritative state transition. Keep those
+// responsibilities separate when evolving validation.
 type PasskeyActivationFinishStore struct {
 	db Transactor
 }
@@ -23,6 +26,10 @@ func NewPasskeyActivationFinishStore(db Transactor) (*PasskeyActivationFinishSto
 	return &PasskeyActivationFinishStore{db: db}, nil
 }
 
+// Finish returns false with nil error only for a definitive database rejection.
+// Invalid internal handoff, unavailable processing and uncertain transaction
+// outcomes return a sanitized domain error, not a definitive rejection.
+// A true result with nil error means committed possession only.
 func (s *PasskeyActivationFinishStore) Finish(ctx context.Context,
 	r usecase.PasskeyActivationFinishRequest) (bool, error) {
 	e := r.Expected
