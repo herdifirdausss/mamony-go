@@ -89,6 +89,7 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		login   *usecase.SessionLogin
 		session *usecase.OpaqueSessionAuthority
 		change  *usecase.AuthenticatedPasswordChange
+		grants  *usecase.AuthenticationGrantAuthority
 	}
 	build := func(db string) authorities {
 		t.Helper()
@@ -149,31 +150,36 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		if err != nil {
 			t.Fatal("password change authority unavailable")
 		}
-		return authorities{flow: flow, login: login, session: sessions, change: changer}
+		return authorities{flow: flow, login: login, session: sessions, change: changer, grants: grants}
 	}
 
 	// Identical synthetic subject provisioning pattern to the existing
 	// authenticated password-change integration test; no production path.
-	subject := randomSyntheticID(t, "sub_")
-	email := strings.ToLower(randomSyntheticID(t, "rh03_")) + "@example.test"
+	provision := func(password string) (string, string) {
+		t.Helper()
+		subject := randomSyntheticID(t, "sub_")
+		email := strings.ToLower(randomSyntheticID(t, "rh03_")) + "@example.test"
+		verifier, err := kdf.Hash(ctx, password)
+		if err != nil {
+			t.Fatal("fixture password hash failed")
+		}
+		if _, err := source.Exec(ctx, "INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", subject); err != nil {
+			t.Fatal("fixture subject creation failed")
+		}
+		if _, err := source.Exec(ctx, "INSERT INTO mamony_identity.email_aliases(canonical_email,subject_id,verified_at,created_at) VALUES($1,$2,clock_timestamp(),clock_timestamp())", email, subject); err != nil {
+			t.Fatal("fixture contact creation failed")
+		}
+		if _, err := source.Exec(ctx, "INSERT INTO mamony_identity.password_verifiers(subject_id,kdf_version,memory_kib,iterations,parallelism,salt,digest,created_at) VALUES($1,1,65536,3,1,$2,$3,clock_timestamp())", subject, verifier.Salt, verifier.Digest); err != nil {
+			t.Fatal("fixture verifier creation failed")
+		}
+		if _, err := source.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", subject); err != nil {
+			t.Fatal("fixture subject activation failed")
+		}
+		return subject, email
+	}
 	oldPassword := "synthetic old password for rh03 fixture"
 	newPassword := "synthetic new password for rh03 fixture"
-	verifier, err := kdf.Hash(ctx, oldPassword)
-	if err != nil {
-		t.Fatal("fixture password hash failed")
-	}
-	if _, err := source.Exec(ctx, "INSERT INTO mamony_identity.subjects(subject_id,created_at) VALUES($1,clock_timestamp())", subject); err != nil {
-		t.Fatal("fixture subject creation failed")
-	}
-	if _, err := source.Exec(ctx, "INSERT INTO mamony_identity.email_aliases(canonical_email,subject_id,verified_at,created_at) VALUES($1,$2,clock_timestamp(),clock_timestamp())", email, subject); err != nil {
-		t.Fatal("fixture contact creation failed")
-	}
-	if _, err := source.Exec(ctx, "INSERT INTO mamony_identity.password_verifiers(subject_id,kdf_version,memory_kib,iterations,parallelism,salt,digest,created_at) VALUES($1,1,65536,3,1,$2,$3,clock_timestamp())", subject, verifier.Salt, verifier.Digest); err != nil {
-		t.Fatal("fixture verifier creation failed")
-	}
-	if _, err := source.Exec(ctx, "UPDATE mamony_identity.subjects SET status='ACTIVE' WHERE subject_id=$1", subject); err != nil {
-		t.Fatal("fixture subject activation failed")
-	}
+	subject, email := provision(oldPassword)
 
 	src := build(sourceDB)
 	peer := netip.MustParseAddr("198.51.100.192")
@@ -198,9 +204,49 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		t.Fatal("source prior session not invalidated")
 	}
 
+	// Independent synthetic subject keeps the existing password-change
+	// admission budget intact. Exercise explicit logout and a consumed
+	// one-use grant using the existing application interfaces only.
+	secondSubject, secondEmail := provision(newPassword)
+	loggedOut, err := src.login.Authenticate(ctx, secondEmail, newPassword, peer)
+	if err != nil {
+		t.Fatal("logout fixture positive login failed")
+	}
+	if who, err := src.session.Resolve(ctx, loggedOut.ForTrustedTransport()); err != nil || who != secondSubject {
+		t.Fatal("logout fixture positive session failed")
+	}
+	if err := src.session.Revoke(ctx, loggedOut.ForTrustedTransport()); err != nil {
+		t.Fatal("logout fixture revocation failed")
+	}
+	if who, err := src.session.Resolve(ctx, loggedOut.ForTrustedTransport()); who != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
+		t.Fatal("source logout invalidation failed")
+	}
+	candidate, err := src.flow.AuthenticateWithEpoch(ctx, secondEmail, newPassword, peer)
+	if err != nil || candidate.SubjectID != secondSubject {
+		t.Fatal("source grant authentication failed")
+	}
+	oneUse, err := src.grants.Issue(ctx, candidate.SubjectID, candidate.SessionEpoch)
+	if err != nil {
+		t.Fatal("source grant issuance failed")
+	}
+	current, err := src.session.Issue(ctx, oneUse)
+	if err != nil {
+		t.Fatal("source one-use grant positive control failed")
+	}
+	if who, err := src.session.Resolve(ctx, current.ForTrustedTransport()); err != nil || who != secondSubject {
+		t.Fatal("source current grant session failed")
+	}
+	var consumed, revocations int
+	if err := source.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.password_login_grants WHERE subject_id=$1 AND consumed_at IS NOT NULL", secondSubject).Scan(&consumed); err != nil || consumed != 2 {
+		t.Fatal("source consumed-grant witness missing")
+	}
+	if err := source.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.security_outbox WHERE subject_id=$1 AND event_type='SESSION_REVOKED'", secondSubject).Scan(&revocations); err != nil || revocations != 1 {
+		t.Fatal("source revocation audit witness missing")
+	}
+
 	// Compare complete selected durable rows, including original event IDs
 	// and notice rows; do not export their contents or digest to logs.
-	snapshot := func(c *pgx.Conn) string {
+	snapshot := func(c *pgx.Conn, subject string) string {
 		t.Helper()
 		var digest string
 		err := c.QueryRow(ctx, `SELECT encode(sha256(convert_to(jsonb_build_array(
@@ -222,7 +268,8 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		AND o.event_type='PASSWORD_CHANGED' AND n.status='PENDING'`, subject, email).Scan(&notices); err != nil || notices != 1 {
 		t.Fatal("source transition notice witness missing")
 	}
-	expected := snapshot(source)
+	expected := snapshot(source, subject)
+	secondExpected := snapshot(source, secondSubject)
 
 	// The native tools execute only inside the dedicated network-none
 	// container. Fixed database names; no shell, no credential artifacts
@@ -244,7 +291,8 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 	run("pg_restore", "--host=/var/run/postgresql", "--username="+adminRole, "--no-password",
 		"--single-transaction", "--exit-on-error", "--dbname="+targetDB, archive)
 	target := connectAdmin(targetDB)
-	if snapshot(source) != expected || snapshot(target) != expected {
+	if snapshot(source, subject) != expected || snapshot(target, subject) != expected ||
+		snapshot(source, secondSubject) != secondExpected || snapshot(target, secondSubject) != secondExpected {
 		t.Fatal("recovered durable binding or original obligations differ")
 	}
 
@@ -263,8 +311,26 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 	if who, err := dst.flow.Authenticate(ctx, email, newPassword, peer); err != nil || who != subject {
 		t.Fatal("recovered current password positive control failed")
 	}
-	if snapshot(target) != expected || snapshot(source) != expected {
+	if who, err := dst.session.Resolve(ctx, current.ForTrustedTransport()); err != nil || who != secondSubject {
+		t.Fatal("recovered grant session positive control failed")
+	}
+	if who, err := dst.session.Resolve(ctx, loggedOut.ForTrustedTransport()); who != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
+		t.Fatal("recovered explicitly revoked session not rejected")
+	}
+	if session, err := dst.session.Issue(ctx, oneUse); session.ForTrustedTransport() != "" || !errors.Is(err, usecase.ErrSessionDenied) {
+		t.Fatal("recovered consumed grant not rejected")
+	}
+	var targetConsumed, targetRevocations int
+	if err := target.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.password_login_grants WHERE subject_id=$1 AND consumed_at IS NOT NULL", secondSubject).Scan(&targetConsumed); err != nil || targetConsumed != consumed {
+		t.Fatal("recovered consumed grant witness changed")
+	}
+	if err := target.QueryRow(ctx, "SELECT count(*) FROM mamony_identity.security_outbox WHERE subject_id=$1 AND event_type='SESSION_REVOKED'", secondSubject).Scan(&targetRevocations); err != nil || targetRevocations != revocations {
+		t.Fatal("recovered revocation audit changed")
+	}
+	if snapshot(target, subject) != expected || snapshot(source, subject) != expected ||
+		snapshot(target, secondSubject) != secondExpected || snapshot(source, secondSubject) != secondExpected {
 		t.Fatal("application assertions changed durable binding or original obligations")
 	}
+	t.Log("RH-03b3b PASS: explicitly revoked session and consumed one-use grant denied after separate synthetic logical restore; current session and original durable obligations preserved")
 	t.Log("RH-03b3a PASS: separate synthetic logical recovery preserves durable binding and rejects prior session and superseded password with current positive controls")
 }
