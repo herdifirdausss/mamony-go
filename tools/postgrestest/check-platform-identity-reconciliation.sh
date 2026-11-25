@@ -59,14 +59,22 @@ validate_snapshot "$work/before" || fail "missing or invalid committed fixture"
 # application-produced transitions, not just matching table checksums.
 validate_witnesses() {
   local file=$1
-  [[ -s "$file" && "$(wc -l < "$file")" -eq 3 ]] || return 1
+  [[ -s "$file" && "$(wc -l < "$file")" -eq 5 ]] || return 1
   awk -F '|' '
     NF != 2 || $2 !~ /^[0-9]+$/ || $2+0 < 1 || seen[$1]++ {bad=1}
-    END {exit (bad || !seen["password_change"] || !seen["password_recovery"] || !seen["code_rotation"])}
+    END {exit (bad || !seen["password_change"] || !seen["password_recovery"] || !seen["code_rotation"] || !seen["factor_enrollment"] || !seen["passkey_stage"])}
   ' "$file"
 }
 source_sql < "$witness_sql" > "$work/witness-source"
 validate_witnesses "$work/witness-source" || fail "missing positive committed transition witnesses"
+# Reject absent, truncated, vacuous, duplicated or unknown aggregate evidence.
+head -n 4 "$work/witness-source" > "$work/witness-truncated"
+awk -F '|' 'BEGIN {OFS="|"} $1=="factor_enrollment" {$2=0} {print}' "$work/witness-source" > "$work/witness-zero"
+awk -F '|' 'BEGIN {OFS="|"} $1=="passkey_stage" {$1="factor_enrollment"} {print}' "$work/witness-source" > "$work/witness-duplicate"
+awk -F '|' 'BEGIN {OFS="|"} $1=="passkey_stage" {$1="unknown"} {print}' "$work/witness-source" > "$work/witness-unknown"
+for candidate in "$work/witness-absent" "$work/witness-truncated" "$work/witness-zero" "$work/witness-duplicate" "$work/witness-unknown"; do
+  if validate_witnesses "$candidate"; then fail "invalid transition witness inventory accepted"; fi
+done
 # Existing integration gate has completed before this step; no source writes.
 timeout 120 docker exec "$source_id" pg_dump -U mamony_test_admin -d mamony_test_ci --format=custom --no-owner --no-acl > "$work/source.dump"
 [[ -s "$work/source.dump" ]] || fail "empty logical dump"
@@ -288,3 +296,4 @@ cmp -s "$work/witness-source" "$work/witness-native-final" || fail "native trans
 matches_native_boundary "$work/native-final" || fail "final native snapshot differs"
 [[ "$(native_sql -c 'SHOW transaction_read_only')" == on ]] || fail "native target no longer read-only"
 echo "RH-03a3 PASS: positive password change, password recovery and recovery code rotation witnesses preserved across logical and native recovery; selected challenge and grant tables included"
+echo "RH-03a4 PASS: factor enrollment and staged passkey durable relationships preserved across held recovery; invalid aggregate witness inventories rejected"
