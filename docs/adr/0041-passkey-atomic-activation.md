@@ -29,7 +29,7 @@ Require real signed WebAuthn assertion fixture coupled with real PostgreSQL test
 
 Remain strictly unmounted; `POSSESSION_VERIFIED` must NOT authorize password-independent account recovery, login, higher assurance or financial approval. The separate notification queue has no worker and `PENDING` is not evidence of delivery. Complete browser options, authorization, ingress/proxy, key custody, role isolation, device loss, backup/restore and alerting decisions before any public release.
 
-**Decision owner approval:** ACCEPTED for bounded scope. **Independent technical acceptance:** NOT ACCEPTED. **Code/CI evidence:** candidate migration, bounded-role tests and synthetic PostgreSQL/WebAuthn tests exist in Draft #81; see the exact-SHA CI ledger in [#78](https://github.com/herdifirdausss/mamony-go/issues/78), not a production deployment claim.
+**Decision owner approval:** ACCEPTED for bounded scope. **Independent technical acceptance:** NOT ACCEPTED. **Code/CI evidence:** candidate migration, bounded-role tests and synthetic PostgreSQL/WebAuthn tests exist in unmerged PR #81; see the exact-SHA CI ledger in [#78](https://github.com/herdifirdausss/mamony-go/issues/78), not a production deployment claim.
 
 ## Concurrency and code-review findings (2026-11-23)
 
