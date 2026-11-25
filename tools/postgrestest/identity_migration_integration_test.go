@@ -3,6 +3,7 @@
 package postgrestest
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"net/url"
@@ -11,6 +12,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/herdifirdausss/mamony-go/internal/platform/migration"
+	"github.com/jackc/pgx/v5"
 )
 
 // TestPostgresIdentityMigration runs on an explicitly guarded disposable
@@ -202,6 +207,46 @@ func testIdentityMigrationUpgrade(t *testing.T, dir string) {
 	require(countQuery, "35")
 	require(historyQuery, before)
 	t.Log("Identity migration upgrade v34 to v35: original fingerprints preserved; repeat clean")
+
+	// Check the production migrator's read-only history verifier against the
+	// actual upgraded synthetic database. A mismatching manifest is test
+	// data only; no historical SQL, database row or role is changed.
+	t.Run("applied manifest verification", func(t *testing.T) {
+		files, err := migration.LoadIdentity(dir)
+		if err != nil || len(files) != 35 {
+			t.Fatal("cannot load the original identity manifest")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		conn, err := pgx.Connect(ctx, migrator.String())
+		if err != nil {
+			t.Fatal("cannot connect to the isolated migration fixture")
+		}
+		defer func() { _ = conn.Close(ctx) }()
+
+		var actualDB string
+		if err := conn.QueryRow(ctx, "SELECT current_database()").Scan(&actualDB); err != nil || actualDB != db {
+			t.Fatal("isolated history verification fixture identity mismatch")
+		}
+		if err := migration.VerifyIdentity(ctx, conn, files); err != nil {
+			t.Fatal("original applied manifest failed verification")
+		}
+		different := append([]migration.File(nil), files...)
+		different[0].Digest = strings.Repeat("0", 64)
+		if different[0].Digest == files[0].Digest {
+			t.Fatal("fixture manifest must differ from the original")
+		}
+		err = migration.VerifyIdentity(ctx, conn, different)
+		if err == nil || !strings.Contains(err.Error(), "fingerprint mismatch for applied migration") {
+			t.Fatal("applied manifest mismatch was not classified as a fingerprint mismatch")
+		}
+		if err := migration.VerifyIdentity(ctx, conn, files); err != nil {
+			t.Fatal("original applied manifest no longer verifies")
+		}
+	})
+	require(versionQuery, "35:false")
+	require(countQuery, "35")
+	require(historyQuery, before)
 }
 
 func TestPostgresIdentityVerifierRole(t *testing.T) {
