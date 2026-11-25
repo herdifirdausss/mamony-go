@@ -245,7 +245,8 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 	}
 
 	// Compare complete selected durable rows, including original event IDs
-	// and notice rows; do not export their contents or digest to logs.
+	// and notice rows; session last_seen_at may advance on a successful
+	// resolution. Do not export row contents or digest to logs.
 	snapshot := func(c *pgx.Conn, subject string) string {
 		t.Helper()
 		var digest string
@@ -253,6 +254,8 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 			(SELECT to_jsonb(s) FROM mamony_identity.subjects s WHERE s.subject_id=$1),
 			(SELECT to_jsonb(p) FROM mamony_identity.password_verifiers p WHERE p.subject_id=$1),
 			(SELECT to_jsonb(a) FROM mamony_identity.email_aliases a WHERE a.subject_id=$1),
+			(SELECT jsonb_agg(to_jsonb(x)-'last_seen_at' ORDER BY x.token_digest) FROM mamony_identity.opaque_sessions x WHERE x.subject_id=$1),
+			(SELECT jsonb_agg(to_jsonb(g) ORDER BY g.grant_digest) FROM mamony_identity.password_login_grants g WHERE g.subject_id=$1),
 			(SELECT jsonb_agg(to_jsonb(o) ORDER BY o.event_id) FROM mamony_identity.security_outbox o WHERE o.subject_id=$1),
 			(SELECT jsonb_agg(to_jsonb(n) ORDER BY n.event_id) FROM mamony_identity.password_change_notices n WHERE n.subject_id=$1)
 		)::text,'UTF8')),'hex')`, subject).Scan(&digest)
