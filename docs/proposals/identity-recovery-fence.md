@@ -311,3 +311,46 @@ After separate approval, verify exact approved base and allowlist; targeted test
 E1 implementation BLOCKED until explicit owner approval of this package at the exact reviewed proposal head and base, including confirmation of bounded synthetic environment and authorized solo experiment scope if independent technical review is deferred. Recheck main and proposal revisions before writing; changed scope/base or new security semantics requires review. A failure, unexpected behavior, missing coverage, dependency, or need to change another file is a stop condition, not permission to expand scope. E2 actual capability behavior requires its own design and approval. RF-01–07 NOT RUN, RF-08 BLOCKED on #81; independent technical acceptance unrecorded for this proposal. No merge, migration, registry, role changes, live credentials, production activation or held-target release authorization.
 
 Suggested owner decision after reviewing exact candidate: authorize ONLY E1 test-local symbolic model and evidence document within the two-file allowlist, on a separate Draft PR; confirm bounded synthetic environment and explicitly defer independent technical acceptance for this experiment under adopted solo policy if applicable. No E2, production, migration, registry, governance, #81 changes, or merge authorization. Without explicit acceptance, no files may be created for the experiment.
+
+## E2 research proposal — G1 only (2026-11-25)
+
+**Status:** research PROPOSED; implementation BLOCKED. [Owner synchronized E1 acceptance](https://github.com/herdifirdausss/mamony-go/pull/106#issuecomment-7152841045) authorizes final E1 review and this research proposal only. [Final E1 review](https://github.com/herdifirdausss/mamony-go/pull/106#issuecomment-7152847805) is COMPLETE for the enumerated symbolic model at exact HEAD 9010c5cf51748d04af2cf7fed468a0904d504111, base f6b9a2d1f46413e7c87db0cc09d13acc4261c438, with five workflows and seven required contexts SUCCESS. E1 remains Draft, no merge authorized. The E1 model is not a dependency or production policy validator. No E2 scope or technical design approved.
+
+### Research question and baseline
+
+What defensive evidence would demonstrate that a recovery policy actually preserves authorized durable bindings and denies outstanding pre-recovery temporary authority, while the original recovery target remains held? Distinguish evidence classification (E1), preserved-state behavior (#95), and recovery-specific enforcement (E2). A successful negative test due only to disconnection, timeout or role unavailability does not prove owning-capability denial. Fresh authorization is a separate conditional control, never a release decision.
+
+| Evidence source checked 2026-11-25 | Supported observation | Limitation |
+|---|---|---|
+| Main f6b9a2d1f46413e7c87db0cc09d13acc4261c438: IAM-03/08/10/11/12, FND-08/12, recovery runbook and testing strategy | Existing contracts demand session lifecycle, restricted recovery, trusted current bindings, durable obligations and actual authorization evidence | No accepted recovery-specific fence implementation established |
+| [#95 bounded lab](https://github.com/herdifirdausss/mamony-go/pull/95) | Selected recovered state and application semantics already investigated | Not global pre-recovery invalidation, external completeness or release |
+| [#106 final E1 review](https://github.com/herdifirdausss/mamony-go/pull/106#issuecomment-7152847805) | Twelve fixed symbolic cases; HOLD by construction | No actual authority, durable mutation, database concurrency or evidence authenticity claim |
+| [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html), sections 4 and 5 | Authenticator lifecycle, account recovery and session management have distinct requirements | Does not specify Mamony database restoration/fencing or establish compliance |
+| [PostgreSQL 18 PITR](https://www.postgresql.org/docs/18/continuous-archiving.html) and [transaction isolation](https://www.postgresql.org/docs/18/transaction-iso.html) | Recovery point and local transaction consistency are database properties | Neither establishes authorized currentness or independent release eligibility |
+| #81, observed unmerged head 98adecb0517a7e361d4ac1d3dd2e26c3703205aa | Related v36 possession dependency | Not adopted; do not import code or assume its status on main |
+
+### Alternatives and recommended research direction
+
+| Alternative | Evidence value | Limitation / disposition |
+|---|---|---|
+| Continue symbolic E1 extensions | Classification only | Diminishing returns; do not count as E2 |
+| Reuse existing source and #95 evidence | Regression and state-preservation baseline | Insufficient to show recovery-specific behavior |
+| Review a single Identity capability first, under the existing whole-Identity HOLD policy | Bounded semantic and evidence feasibility review | Only recommended as research; actual behavioral experiment requires a separate accepted design and containment approval |
+| All-family fence or new recovery infrastructure immediately | Broader eventual coverage | Unresolved cross-family, retention, consistency and custody decisions; reject as current scope |
+
+Recommend researching a single session-lifecycle capability first, with IAM-08 as trace, to establish whether a meaningful bounded defensive evaluation is feasible under existing approved behavior. Do not infer that existing local epoch behavior alone satisfies recovery-wide invalidation. No executable protocol, credential replay workflow, database operations, recovery command, new interfaces, implementation paths, or experiment allowlist is proposed at this research stage.
+
+### Candidate evaluation questions (not approved acceptance criteria)
+
+| Research dimension | Question / evidence needed | Status |
+|---|---|---|
+| Authority semantics | What distinguishes policy denial, infrastructure failure and unknown result under the owning capability? | OPEN |
+| Durable state | Which authorized bindings and original logical obligations must remain unchanged? | OPEN |
+| Fresh control | What independent prerequisites are required for a separate synthetic positive control, without inherited authority or target release? | OPEN |
+| Containment | Can evaluation be isolated, disposable, non-transferable and independent of live credentials/providers/routes and original held target? | OPEN |
+| Coverage | Which family-specific dependencies and operational/retention limits prevent a single-capability result from being generalized? | OPEN |
+| Failure | How will unexpected/partial outcomes and uncertain evidence be recorded without automatic retry, fabricated success or weakened assertions? | OPEN |
+
+### Next gates and stop conditions
+
+E2 G1 research review precedes G2 scope acceptance, G3 technical/threat review, exact bounded experiment and explicit owner authorization. No implementation or execution now. If feasibility requires changed runtime semantics, new migration/roles, registry, live access, release, transferable artifacts or unmerged v36 dependency, stop and request separate governance review; do not use a synthetic claim to waive the issue. Independent technical acceptance for E2 is not recorded and the E1 deferral does not transfer. Existing P1–P4 and C1–C4 requirements remain; all RF-01–07 NOT RUN, RF-08 BLOCKED, full RH-03 PARTIAL. RH-04/05 registry and release remain separate. No G6 authorization, production acceptance or activation. This is a documentation-only continuation of #102; no changes to #95/#81/#106 code or canonical contracts.
