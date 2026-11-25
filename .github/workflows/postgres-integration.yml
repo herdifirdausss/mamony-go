@@ -86,3 +86,14 @@ jobs:
           grep -F 'RH-02b PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
           grep -F 'RH-02c PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
           grep -F 'RH-02a PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+
+      - name: Verify bounded synthetic Identity reconciliation
+        env:
+          PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          bash -n tools/postgrestest/check-platform-identity-reconciliation.sh
+          set -o pipefail
+          bash tools/postgrestest/check-platform-identity-reconciliation.sh | tee "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03a1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03b1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03c1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
