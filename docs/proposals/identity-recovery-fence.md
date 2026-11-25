@@ -149,3 +149,57 @@ Atomicity principle: Identity must own the consistency boundary for each approve
 | RF-08 | Capability-specific v36 possession and notice reconciliation | #78 / #81 adoption prerequisite | BLOCKED |
 
 Labels are local review references, not canonical IAM/FND additions. RF-01–08 complement existing RH-03 ACs; none is waived or marked PASS by #95 or proposal CI. Detailed implementation context remains blocked. Proposed later work order: review policy classification, evidence prerequisites, consistency/audit semantics and containment; obtain explicit approved technical design and exact bounded experiment scope; only then plan implementation and checks. No new migration, role, API, registry, runtime or delivery implementation authorized. No changes to #95, #81, canonical contracts or governance. Independent technical acceptance remains unrecorded for this proposal, production NOT ACCEPTED, G6 NOT AUTHORIZED.
+
+## G3 refinement — consistency, audit and bounded experiment review
+
+Status: proposed for review, not implementation authorization. Owner direction D1–D5 remains accepted; detailed decisions below are not accepted. Primary references verified 2026-11-25: [PostgreSQL 18 transactions](https://www.postgresql.org/docs/18/tutorial-transactions.html), [transaction isolation](https://www.postgresql.org/docs/18/transaction-iso.html), [NIST SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html). Local atomicity and isolation cannot establish independent recovery currentness or a cross-transaction release decision. NIST authenticator lifecycle guidance informs classification but does not specify this recovery mechanism.
+
+### C1 — Consistency scope alternatives
+
+| Candidate | Advantage | Trade-off |
+|---|---|---|
+| Whole-Identity atomic operation | Single local consistency boundary | Large transaction and availability cost; not independently authenticated history |
+| Subject-scoped atomic evaluation | More bounded work and review | Partial subject coverage cannot authorize global or per-subject release |
+| Authority-family evaluation | Capability-specific reasoning | Cross-family dependencies and incomplete outcomes need separate review |
+
+Recommend evaluating subject-scoped consistency as a bounded unit of analysis under the whole-Identity HOLD invariant, not adopting a transaction or mutation algorithm. No per-subject release, no distributed transaction assumption, no exposure of partially reviewed state. Scope uncertainty means global HOLD. Transaction granularity and cross-subject obligations remain unresolved until a reviewed dependency and resource analysis establishes feasibility. No specific locking, persistence, schema, role or procedure is accepted.
+
+### C2 — Outcome and audit semantics
+
+| Evidence classification | Meaning | Required review outcome |
+|---|---|---|
+| Original committed user/security action | Existing legitimate durable event | Preserve original identity and historical disposition |
+| Recovery invalidation | Administrative safety disposition, not a successful user action | Distinguish from consumption, possession, enrollment, authentication or delivery success |
+| Reconciled unchanged | Observed equality under stated scope and provenance | No fabricated event or claim of independent completeness |
+| Not established | Missing, contradictory or ambiguous evidence | HOLD; do not infer successful completion |
+| Review complete | Bounded evidence available for separate approval | Not authorization to activate or release |
+
+Preserve logical event identities and notice obligations; no deletion, mutation, duplication or regeneration policy adopted by this document. New administrative audit taxonomy, retention and custody require separate reviewed decisions. Minimize evidence: category, outcome, scoped reference, revision, limitations and reviewer attribution; no credentials, raw proofs, private keys or recipient contents in review output. Distinguish provider acknowledgement, durable obligation and user receipt. Unknown external outcomes remain unknown; no blind resend.
+
+### C3 — Failure and completion semantics
+
+| Scenario | Required result |
+|---|---|
+| One scope reviewed, another unresolved | Overall HOLD; no partial release |
+| Interrupted evaluation or ambiguous result | Unknown until reviewed evidence establishes outcome; no blind retry or success claim |
+| Duplicate evidence or evaluation | No duplicated logical obligation or conflicting completion claim |
+| Evidence or policy revision changes | Previous review does not authorize changed candidate |
+| Missing capability coverage | BLOCKED, not silently treated as disabled or PASS |
+| Unexpected authority or audit behavior | Stop bounded evaluation, retain sanitized finding, keep original target held |
+
+Completion is an evidence classification, never permission. No recovery registry, release state machine or automated decision is introduced. The original held target must not be used for application execution.
+
+### C4 — Proposed bounded experiment acceptance boundary
+
+Only a future explicitly approved disposable synthetic evaluation could investigate RF-01–07. This proposal authorizes none of it. Suggested review scope: approved synthetic fixtures and existing owning-capability behavior; actual expected denial and independently scoped positive controls, original durable obligations, unknown/incomplete evidence and isolation. No transferable credentials, external services, real user data, production resources, new runtime, migration, registry, or access-policy changes. Use existing test containment where appropriate only after review of exact fixture scope. RF-08 is BLOCKED pending separate v36 capability adoption. No implication that v34 or coordinator-only evidence satisfies v36.
+
+Before any implementation: owner accepts precise consistency/disposition semantics, event/audit meaning and retention bounds, exact allowed files and fixture scope, coverage inventory, positive/negative checks, and stop conditions; independent technical acceptance or explicitly authorized bounded solo experiment per repository governance. A proposal CI pass is not behavioral evidence. If required behavior depends on a new runtime/migration or unresolved cross-family semantics, stop and request separate design review rather than weaken scope or tests.
+
+| Decision | Recommended direction | Status |
+|---|---|---|
+| C1 | Subject-scoped evaluation with whole-Identity HOLD, no release | PROPOSED |
+| C2 | Preserve original obligations; distinguish administrative invalidation from consumption; minimized evidence | PROPOSED |
+| C3 | Explicit unknown outcome and completeness; no partial release | PROPOSED |
+| C4 | Separate exact synthetic scope/implementation authorization; no v36 import | PROPOSED |
+
+All RF-01–07 NOT RUN; RF-08 BLOCKED. No accepted implementation procedure. Independent technical acceptance unrecorded; G6 NOT AUTHORIZED; production NOT ACCEPTED.
