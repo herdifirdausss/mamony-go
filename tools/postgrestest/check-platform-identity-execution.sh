@@ -16,7 +16,9 @@ CGO_ENABLED=0 go build -o "$work/migrate" ./cmd/mamony-identity-migrate
 CGO_ENABLED=0 go test -tags integration -c -o "$work/identity.test" ./internal/modules/identity
 id=$(timeout 90 docker run --rm -d --network none --label mamony.synthetic-rh03-exec=true \
   -e POSTGRES_DB=mamony_test_rh03_exec_source -e POSTGRES_USER=mamony_test_admin \
-  -e POSTGRES_PASSWORD=local-test-rh03-exec-admin postgres:18.7)
+  -e POSTGRES_PASSWORD=local-test-rh03-exec-admin postgres:18.7 \
+  -c archive_mode=on -c wal_level=replica \
+  -c 'archive_command=mkdir -p /tmp/mamony-rh03-exec-archive && cp %p /tmp/mamony-rh03-exec-archive/%f.tmp && mv /tmp/mamony-rh03-exec-archive/%f.tmp /tmp/mamony-rh03-exec-archive/%f')
 [[ "$id" =~ ^[a-f0-9]{64}$ ]] || exit 1
 [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}|{{.Config.Image}}|{{index .Config.Labels "mamony.synthetic-rh03-exec"}}' "$id")" == 'none|postgres:18.7|true' ]] || exit 1
 ready=false
@@ -36,7 +38,7 @@ timeout 150 docker exec -u postgres \
   -e MAMONY_IDENTITY_MIGRATION_DSN=postgres://mamony_identity_migrator:local-test-identity-migrator@127.0.0.1:5432/mamony_test_rh03_exec_source?sslmode=disable \
   -e MAMONY_IDENTITY_MIGRATIONS_DIR=/tmp/rh03-migrations \
   "$id" /tmp/rh03-migrate
-timeout 125 docker exec -u postgres \
+timeout 205 docker exec -u postgres \
   -e GITHUB_ACTIONS=true -e MAMONY_RH03_EXECUTION_FIXTURE=true \
   -e TEST_DATABASE_ADMIN_URL=postgres://mamony_test_admin:local-test-rh03-exec-admin@127.0.0.1:5432/mamony_test_rh03_exec_source?sslmode=disable \
-  "$id" /tmp/rh03-identity.test -test.run '^TestIdentityRH03RecoveredPasswordBinding$' -test.v -test.timeout=110s
+  "$id" /tmp/rh03-identity.test -test.run '^TestIdentityRH03RecoveredPasswordBinding$' -test.v -test.timeout=190s
