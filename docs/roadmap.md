@@ -21,7 +21,7 @@ Use the [security verification matrix](engineering.md#security-verification) and
 |---:|---|---|
 | 1 | [Platform foundation](contracts/platform.md) | DEC-01 accepted; synthetic migration tooling, runtime pool, recovery lab and reference catalog merged. Full recovery, capability authorization integration, operational configuration, audit/event relay and production evidence remain open. |
 | 2 | [Identity Phase 1](contracts/identity.md) | Internal Profile A enrollment, login/session, recovery and passkey verification through v35 merged; v36 remains Draft. Complete resource authorization, recovery and operational gates before public activation. Phase 1 is not complete. |
-| 3 | [Ledger](contracts/ledger.md) | K1 pure domain and FND-02a/b reference admission merged as isolated synthetic slices. Historical definitions and design remain open; durable posting, replay, reversal, delivery, restore and posting authorization remain unimplemented. |
+| 3 | [Ledger](contracts/ledger.md) | K1 pure domain and FND-02a–d reference slices merged as isolated synthetic work. Canonical ownership alignment and initial USD definition freeze are owner-accepted design direction only; K2 remains unauthorized. Real historical lifecycle and design details remain open; durable posting, replay, reversal, delivery, restore and posting authorization remain unimplemented. |
 
 The bounded synthetic K1/reference experiments may precede full Foundation/Identity acceptance; they do not change delivery or activation order, authorize K2–K6, or satisfy the ledger gate. Pass the ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
 
