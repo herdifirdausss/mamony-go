@@ -44,9 +44,7 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0038 — Atomic provisional passkey credential staging and mandatory notice](0038-webauthn-atomic-provisional-registration.md) | PROPOSED: v33 globally unique non-active PENDING_ASSERTION, one-use nonce+admission consumption, atomic audit and queued (not sent) security notice. |
 | [ADR-0039 — Isolated challenge and evidence for provisional passkey possession](0039-passkey-activation-challenge-evidence.md) | PROPOSED: v34 one-use 3-minute assertion nonce bound to originally staged pending credential and same session, separate issuer and reader; no signature verification or activation. |
 | [ADR-0040 — Signed WebAuthn assertion verification for provisional passkeys](0040-passkey-activation-signed-assertion-verifier.md) | PROPOSED: verify genuine ES256 webauthn.get signatures against v34 COSE key/challenge with pinned library; fail-closed clone/counter policy, no nonce consumption/activation. |
-
 | [ADR-0041 — Atomic staged-passkey possession verification](0041-passkey-atomic-activation.md) | **OWNER-ACCEPTED BOUNDED DIRECTION / FINAL REVIEW PENDING:** internal one-use possession, non-login `POSSESSION_VERIFIED`, atomic event/notice; independent acceptance and production readiness NOT ACCEPTED. |
-
 | [ADR-0042 — Context-aware forward-only migration executor](0042-context-aware-migration-executor.md) | **PROPOSED DEC-01 amendment; owner-accepted design candidate only:** native pgx per-version atomicity and outcome classification; current engine unchanged, implementation/cutover not authorized. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.
