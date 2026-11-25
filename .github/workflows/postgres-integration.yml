@@ -98,3 +98,5 @@ jobs:
           grep -F 'RH-03b1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
           grep -F 'RH-03c1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
           grep -F 'RH-03a2 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03b2 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03c2 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
