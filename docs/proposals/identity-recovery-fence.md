@@ -1,8 +1,9 @@
 # Identity recovery fence — proposed requirements and design boundary
 
 **Owner:** Identity (recovery semantics); Platform #14 (recovery infrastructure); coordinate with #78 (v36 capability).  
-**Status:** PROPOSED / Critical / G2–G3 NOT ACCEPTED; implementation BLOCKED.  
+**Status:** Critical / G2 requirements direction owner-accepted; detailed G2/G3 design PROPOSED; implementation BLOCKED.  
 **Decision:** [Owner-approved scope split](https://github.com/herdifirdausss/mamony-go/issues/14#issuecomment-7152224953) authorizes preparation of this proposal, not its adoption, implementation, merge or activation.  
+**Requirements-direction decision:** [Owner approval D1–D5](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7152312494). Design review only; no implementation, migration, registry, merge or activation.  
 **Evidence date:** 2026-11-25. Main inspected `f46459615189ea0657c630f589219b082aee9b71`.
 
 ## G1 — Research and problem
@@ -76,3 +77,75 @@ Decisions requiring separate owner and technical review before implementation:
 ## G5–G7 — Verification and outcome
 
 All new proposal acceptance tests NOT RUN. PR #95 CI is historical evidence for its exact candidate, not verification of this proposal. No implementation changes or adoption of contract IDs in this PR. Review of the policy and separate owner authorization required before any bounded implementation. Independent technical acceptance not recorded; production readiness NOT ACCEPTED; G6 NOT AUTHORIZED. No merge or release authorization.
+
+## G2/G3 refinement — owner-approved direction, detailed design pending (2026-11-25)
+
+### Evidence and alternatives
+
+Primary references checked 2026-11-25: [NIST SP 800-63B-4, authenticator event management and session management](https://pages.nist.gov/800-63-4/sp800-63b.html) separates authenticator binding/invalidation, account recovery and session assurance; it does not prescribe this database recovery architecture. [PostgreSQL 18 PITR](https://www.postgresql.org/docs/18/continuous-archiving.html) describes WAL continuity/timeline recovery and limits regarding configuration files; it is not proof of authorized latest Identity history or production access parity. The local IAM-03/08/10/11 and FND-08/12 contracts and recovery runbook govern Mamony; no claim of NIST compliance. PR #81 remains unmerged (observed head 8c6bb4ac8143f529824c61fcc23307560238c5c9); its design is contextual only.
+
+| Alternative | Security property | Cost / limitation | Recommendation |
+|---|---|---|---|
+| Restore then keep authority unavailable | Contains uncertainty | No fresh operation or fence verification | Mandatory default when evidence is incomplete |
+| One local generation rule alone | Potentially simplifies some local authority checks | Does not establish independently surviving currentness or coverage of all proof families | Insufficient as sole recovery policy |
+| Identity-owned family-specific disposition policy under common HOLD invariant | Separates durable binding reconciliation from temporary-authority disposition; explicit coverage and negative controls | Larger review burden; cross-family consistency and retention must be designed | Preferred design direction for bounded evaluation, not implementation approval |
+| External recovery authority plus production release | Addresses independent attempt/currentness and release governance under defined trust assumptions | New critical trust boundary, operational cost and failure modes | Separate RH-04/05 decision; not designed here |
+
+### D1 — Classification and invariants
+
+| Domain | Classification | Required disposition | Evidence limitation |
+|---|---|---|---|
+| Subject status, verified contacts, password verifier | Durable binding | Reconcile authorized state; unknown stays HOLD | Selected #95 observations only |
+| Saved code set, factor key, staged passkey credential | Durable binding with lifecycle and provenance | Preserve authorized current generation and historical obligations; never infer eligibility from presence | Rotated-out rows may be absent; staged is not verified possession |
+| Session and password-purpose grant | Temporary authority | Pre-recovery outstanding authority invalid for future release; preserve existing historical disposition | #95 preserved-state controls, not recovery fence |
+| Verification/recovery challenge and assurance | Temporary authority | Require disposition across all enabled families; preserve original outcomes | Source tests and recovered observations only |
+| Factor challenge, enrollment approval, registration intent/admission, activation challenge | Temporary authority | No implied fresh authorization from restored state | Actual recovery fence NOT RUN; v36 separate |
+| Security audit and notice | Durable obligation | Preserve original logical event identity; distinguish obligation, provider acceptance and receipt | No provider guarantee |
+| Delivery lease / proof-delivery work | Operational temporary authority | Uncertain/obsolete delivery remains suppressed pending reviewed policy | No live delivery or resend |
+
+Do not equate recovery of data with recovery of permission. No repair of uncertain durable bindings by fresh proof alone. No fabricated consumption, success event or possession history. A saved recovery code is not interchangeable with an ephemeral challenge. Precise disposition, retention and audit semantics remain design-review requirements; this document does not prescribe database mutations or grant changes.
+
+### D2 — Conceptual state and trust boundaries
+
+The following are review labels, not a runtime state machine, API, registry, permission, or executable recovery procedure.
+
+| Review label | Necessary evidence | Failure disposition |
+|---|---|---|
+| HOLD | Original candidate unavailable to application/production | Default; cannot infer release |
+| RECONCILIATION_REVIEW | Scoped source provenance, evidence completeness, compatible schema/access assumptions, authorized current bindings | HOLD on missing/contradictory evidence |
+| FENCE_EVIDENCE_REVIEW | Separately approved disposable fixture; independently reviewed family coverage, expected denials and original obligations | HOLD on unknown or partial outcomes |
+| FRESH_CONTROL_REVIEW | Actual approved fresh authorization control on separate synthetic fixture under existing policy; no inherited authority | HOLD on unexpected result |
+| BOUNDED_REVIEW_COMPLETE | Exact candidate, evidence and limitations ready for owner/technical review | Still HOLD for all real targets; no release action |
+
+Platform supplies provenance and isolation evidence; Identity owns interpretation of legitimate bindings and authorization outcomes. Neither party can infer permission to release from the other's evidence alone. Scope is whole Identity if affected scope cannot be established. A synthetic fixture can model a complete controlled boundary, but is not independent production custody. Evidence categories must identify exact attempt/candidate scope, relevant source boundary, policy/schema revision, family coverage, outcome and limitations; no registry schema or interface is adopted here.
+
+### D3 — Threat and failure review
+
+| Threat / failure | Required defensive outcome | Remaining verification |
+|---|---|---|
+| Stale or incomplete restored history | HOLD; no claim that a consistent restore is current | Independent completeness separate |
+| Uncertain credential ownership or revocation | HOLD affected scope; do not infer authorized re-binding | Durable policy review |
+| Outstanding pre-recovery temporary authority | All enabled families included in reviewed invalidation coverage; actual owner-capability denials required | Recovery-wide fence NOT RUN |
+| Partial/interrupted or ambiguous invalidation | No partial release, automatic success or blind retry; preserve evidence of uncertainty | Atomicity and outcome model review |
+| Concurrent normal activity or duplicate evaluation | No inconsistent eligibility or duplicated logical obligations | Concurrency/idempotency review and tests |
+| Incorrect or forged success evidence | Reject incomplete/contradictory scope or evidence; no invented consumption/audit | Independent custody not established |
+| Notice/provider uncertainty | Preserve event identity, suppress obsolete proof delivery, do not infer user receipt | Delivery-specific design and external outcomes NOT RUN |
+| Privileged authority compromise | Profile A does not guarantee resistance; hold and reassess independent trust | Explicit residual risk |
+| Cross-capability authority confusion | Recovery status does not confer login, money, or privileged-action authority | Existing IAM-10 and #18 boundaries remain |
+
+Atomicity principle: Identity must own the consistency boundary for each approved disposition and its audit obligations. An incomplete multi-family operation is never equivalent to completion. The choice of transaction granularity, durable outcome model, retention and retry policy is unresolved and requires further independent review; no database or runtime design adopted. Availability is subordinate to known authorized state; no production downtime or RPO/RTO target promised.
+
+### D4/D5 — Proposed acceptance evidence and dependencies
+
+| Proposal-local test label | Required result | Owner / dependency | Current status |
+|---|---|---|---|
+| RF-01 | Missing, stale, unknown or contradictory provenance and scope remain HOLD | Platform evidence + Identity interpretation | NOT RUN |
+| RF-02 | Legitimate selected bindings and original obligations preserved; uncertain bindings held | Identity; #95 observations inform but do not close | NOT RUN |
+| RF-03 | Actual negative outcomes for every enabled pre-recovery temporary authority family; no new successful user action | Identity, explicit per-family policy required | NOT RUN |
+| RF-04 | Separately authorized fresh control on disposable reconciled fixture; original held target untouched | Identity, approved containment | NOT RUN |
+| RF-05 | Interrupted/ambiguous and concurrent/duplicate evaluation never authorizes partial release or duplicates logical obligations | Identity, consistency design pending | NOT RUN |
+| RF-06 | Original event identity and notice obligations preserved; obsolete delivery not treated as current; unknown provider outcome remains unknown | Identity, delivery policy pending | NOT RUN |
+| RF-07 | No new production path, credentials, registry or activation; exact fixture scope and actual isolation evidenced | Platform + Identity, separate experiment approval | NOT RUN |
+| RF-08 | Capability-specific v36 possession and notice reconciliation | #78 / #81 adoption prerequisite | BLOCKED |
+
+Labels are local review references, not canonical IAM/FND additions. RF-01–08 complement existing RH-03 ACs; none is waived or marked PASS by #95 or proposal CI. Detailed implementation context remains blocked. Proposed later work order: review policy classification, evidence prerequisites, consistency/audit semantics and containment; obtain explicit approved technical design and exact bounded experiment scope; only then plan implementation and checks. No new migration, role, API, registry, runtime or delivery implementation authorized. No changes to #95, #81, canonical contracts or governance. Independent technical acceptance remains unrecorded for this proposal, production NOT ACCEPTED, G6 NOT AUTHORIZED.
