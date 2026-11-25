@@ -267,7 +267,6 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 		t.Fatal("source revocation audit witness missing")
 	}
 
-
 	var notices int
 	if err := source.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.password_change_notices n
 		JOIN mamony_identity.security_outbox o USING(event_id)
