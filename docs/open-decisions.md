@@ -1,5 +1,7 @@
 # Decisions to resolve before implementation
 
+For merged implementation and active work, see [current state](current-state.md). Identity PRs #22–#77 are merged, not deployed. Historical Draft references below describe the decision at its original slice; they do not mean those PRs are currently open. Operational/production approvals and independent acceptance remain separate. The v36 stack (#79–#81) is still Draft.
+
 Use the local [architecture decision index](adr/README.md) for baseline requirements. Record each choice below when its stage starts. A candidate needs tests in Mamony Go before it becomes an implementation claim.
 
 ## Foundation and access
@@ -57,7 +59,7 @@ The delivery handler is intentionally not wired into a production process or pub
 
 ## DEC-ID-DELIVERY-RUNTIME (draft, production enablement not approved)
 
-A separately executed Identity Mailgun delivery worker exists as stacked PR #27. Code uses a capability facade, a PostgreSQL role with restricted updates, one-at-a-time polling, and dual live-send opt-in with private-file secrets. This is **not** authorization to deploy or send real email: the operator has not provisioned an account/domain, approved a secret manager, sender limits, egress policy, retention, bounce/complaint webhooks, or public API admission. All CI Mailgun sends are intercepted by an injected `httptest` transport. Keep the PR Draft until those decisions and end-to-end negative tests are resolved.
+A separately executed Identity Mailgun delivery worker exists as stacked PR #27. Code uses a capability facade, a PostgreSQL role with restricted updates, one-at-a-time polling, and dual live-send opt-in with private-file secrets. This is **not** authorization to deploy or send real email: the operator has not provisioned an account/domain, approved a secret manager, sender limits, egress policy, retention, bounce/complaint webhooks, or public API admission. All CI Mailgun sends are intercepted by an injected `httptest` transport. Keep live deployment disabled until those decisions and end-to-end negative tests are resolved.
 
 ## DEC-ID-EMAIL-ADMISSION (Draft, internal-only policy, external approval pending)
 

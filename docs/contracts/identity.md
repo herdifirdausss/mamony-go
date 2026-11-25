@@ -2,9 +2,11 @@
 
 The identity module owns tenants, users, sessions, API credentials, roles, and change approvals. Capabilities own their resources. They supply the resource and tenant context for authorization.
 
-**Implementation status:** Draft internal registration/password primitives (PR #22), transactional PostgreSQL pending enrollment (PR #23), and email-proof issuance/consumption with contact-bound token digests and atomic ACTIVE transition (stacked PR #24), plus encrypted delivery queue and bounded worker ports (stacked PR #25), a mock-tested Mailgun HTTP sender (stacked PR #26), an opt-in separately launched worker runtime (stacked PR #27), an authoritative per-subject email proof resend budget (stacked PR #28), and an unmounted anonymous admission boundary with HMAC-keyed PostgreSQL budgets (stacked PR #29), and bounded one-shot retention maintenance (stacked PR #30), an unmounted strict HTTPS+Origin HTTP enrollment/resend orchestration boundary (stacked PR #31), and a bounded unscheduled missing-first-proof reconciliation primitive (stacked PR #32). **No Identity HTTP routes, configured Mailgun credentials/account, deployed worker, actual email send, login, sessions, recovery, tenant membership, financial authorization or usable end-user verification exist.** Internal tests are not a deployed authentication control.
+**Implementation status:** Internal Profile A slices through v35 are merged ([#22](https://github.com/herdifirdausss/mamony-go/pull/22)–[#77](https://github.com/herdifirdausss/mamony-go/pull/77)); enrollment and email proof, password authentication, opaque sessions, password change/recovery, security notice and WebAuthn verification candidates exist. The default HTTP process mounts health only; these capabilities are not released. The v35 verifier does not consume the challenge or activate the pending passkey. v36 remains in Draft ([#79](https://github.com/herdifirdausss/mamony-go/pull/79), [#80](https://github.com/herdifirdausss/mamony-go/pull/80), [#81](https://github.com/herdifirdausss/mamony-go/pull/81)). Full Phase 1, public routes, real delivery, passkey login and end-to-end tenant/resource and financial authorization are not accepted. See [current state](../current-state.md) and [#20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
-## Internal email-proof admission — Draft PR #28
+The sections below record successive implementation slices. Earlier statements describe the scope at that slice, not the latest cumulative capability; later sections supersede earlier limitations where explicitly demonstrated.
+
+## Internal email-proof admission — merged PR #28
 
 **All first-party proof issuance, including the initial proof and every resend, uses one durable PostgreSQL admission policy** while the existing verifier transaction holds the subject and current alias row locks. A new request may be issued only if no proof was issued during the prior **60 seconds**, fewer than **3 proofs** were issued during the prior **hour**, and fewer than **5 proofs** were issued during the prior **24 hours**. All windows use one sampled PostgreSQL clock, not client time. Revoked and expired proofs count until their windows lapse; a denied attempt **does not rotate a valid token** and does not create a challenge, encrypted delivery row or security event. These are initial hard-coded, internal-only bounds for a synthetic first-party profile, subject to product/security review.
 
@@ -13,7 +15,7 @@ The internal `Resend(ctx, subjectID)` creates a **new** proof and durable encryp
 **Not solved by this guard:** unauthenticated/nonexistent-account requests, requests from multiple forged identities, per-IP / network / device quotas, trusted proxy rules, global provider quotas, credential stuffing, automated account creation, CSRF/Origin and uniform public response timing. Those must be designed and verified at a trustworthy ingress before public registration or resend is enabled. A rate-limited subject is **not** an authenticated subject.
 
 
-## Anonymous pre-registration/resend admission — stacked Draft PR #29
+## Anonymous pre-registration/resend admission — merged PR #29
 
 **This is deliberately not wired to a public handler.** The internal Identity usecase `AnonymousAdmission.Admit` runs *before* user/account lookup or password hashing, using the same `CanonicalEmail` parsing policy as enrollment. This means even an email address not present in the Identity database must first consume the same account-independent budget. It requires an externally injected 32-byte HMAC key (no default); both client-network identity and canonical email are domain-separated HMAC-SHA256 digests before PostgreSQL persistence. Raw email and IP are **not stored in the admission bucket table**.
 
@@ -37,7 +39,7 @@ Acceptance evidence must include real database expiry, wrong-contact/version, re
 
 See the [Identity delivery runbook](../runbooks/identity-delivery.md) for operational constraints, encryption key rotation, retry semantics, and missing deployment gates.
 
-## Direct SQL session mint — identified boundary (Draft PR #45)
+## Direct SQL session mint — identified boundary (merged PR #45)
 
 The existing v10 `mamony_identity_session_runtime` role is itself a session-mint capability: direct `EXECUTE` can create a cookie-equivalent session for any known ACTIVE+verified subject even when no password-verifier row exists. The disposable-PostgreSQL threat fixture `TestIdentityZDirectSessionMintThreatFixture` demonstrates this **known weakness**, not a defense. Real Chromium browser tests (#44) do not change the SQL privilege.
 
@@ -84,11 +86,11 @@ Test self-approval, an expired approval, payload changes after approval, concurr
 
 **Authority limit:** Profile A trusts its authoritative application database. It does not withstand arbitrary mutation of that same authority. Stronger compromise containment requires [an explicit decision](../open-decisions.md#security-architecture-decisions), independent admin/key/deployment boundaries and adversarial evidence. The initial modular monolith remains the default.
 
-## Bounded retention — stacked Draft PR #30
+## Bounded retention — merged PR #30
 
 The new maintenance role has EXECUTE-only rights to two fixed, server-clock and 100-record bounded security-definer purge functions. They clear encrypted proof bearer 24 hours after proof expiry without removing attempts/audit metadata, and delete anonymous HMAC accounting 48 hours after fixed-window start. An independently approved one-shot runner is not scheduled or deployed, and no public Identity endpoints are created. Physical backups/WAL deletion and broader contact/account retention remain unresolved.
 
-## Unmounted HTTP registration and resend — stacked Draft PR #31
+## Unmounted HTTP registration and resend — merged PR #31
 
 **Not routed or deployable by default.** The candidate endpoints are `POST /v1/identity/register` with JSON `{"email":"...","password":"..."}` and `POST /v1/identity/resend-verification` with JSON `{"email":"..."}`. The running public/private routers remain **health-only**. A manually injected `NewEnrollmentHTTP` handler requires: directly verified TLS (`req.TLS`), operator-approved single HTTPS browser origin that exactly matches `Origin` and HTTP Host, no cookie/Authorization, same-origin Fetch Metadata if provided, no query parameters, `application/json` and <=2048 bytes. No custom forwarded scheme is trusted. A TLS-terminating proxy is **not supported by this candidate** until its authenticated transport identity and stripping policy are reviewed; absent `req.TLS` it denies closed.
 
@@ -100,7 +102,7 @@ A newly persisted pending subject is returned **only to the internal orchestrato
 
 Required checks: handler unit tests with invalid Origin, spoofed host/forwarded protocol, duplicate JSON, unknown keys, 2KB limit, cookies and authorization; database-backed `TestIdentityHTTPEnrollmentDB` using real PostgreSQL, HMAC admission and AES-GCM sealed proofs with synthetic hasher; public/private route inventory negative checks. No live Mailgun email is sent.
 
-## Bounded missing-first-proof reconciliation — stacked Draft PR #32
+## Bounded missing-first-proof reconciliation — merged PR #32
 
 A separately invoked, **unmounted and unscheduled** `ReconcileEnrollmentOnce` facade uses the existing restricted verifier PostgreSQL role and AES-GCM envelope keyring. A read-only, fixed-limit scan returns at most **25** server-owned subject IDs that are still `UNVERIFIED`, have an unverified current email contact, were created **2 minutes to 24 hours** ago, and have **never had any verification challenge** (including revoked/expired ones). No HTTP caller or business DB can choose those subjects. Each selected subject uses the dedicated `EmailVerification.FirstIfMissing` issuer, which **rechecks no historical challenge under the subject/contact-row locks** and enforces the existing 60s/3-per-hour/5-per-day limits; a successful issue atomically writes its digest, sealed outbox envelope and issuance event. The operation never directly calls Mailgun, issues a session, marks email verified or returns contact data.
 
@@ -108,11 +110,11 @@ The finder is an advisory scan, **not a distributed lock or exactly-once proof**
 
 The counters returned by the facade (`Candidates`, `Issued`, `Skipped`) contain no email/subject IDs. They provide an operator-observable primitive but **no deployed scheduler, backlog alarm, production secrets, global rate quota or response-latency equalization**. A future approved supervisor/alerting job is required before public activation. Real disposable PostgreSQL test `TestIdentityZEnrollmentReconciliationDB` checks crash-gap repair, encrypted outbox, repeat idempotency, stale-scan/old proof nonrotation and too-recent/too-old candidate exclusion. CI integration gate enforces the test. The historical Profile A DB-integrity assumption remains unchanged.
 
-## Operator-only first-proof backlog inspection — stacked Draft PR #33
+## Operator-only first-proof backlog inspection — merged PR #33
 
 A count-only verifier-role read reports `EligibleSampled` (0–26, saturated at 26) and `StalePresent` for UNVERIFIED subjects without *any* historical challenge. It separates repair-eligible subjects created 2 minutes–24 hours ago from older-than-24-hour subjects requiring manual policy review. It cannot mutate, choose subject IDs, issue proofs or inspect password verifiers. An unscheduled private one-shot command `mamony-identity-reconcile` supports `--inspect` and a separately approved `--repair-once`; the latter calls PR #32's bounded reconciliation once with externally provided AES-GCM key material and reports count-only before/after state. Exit 0 = no observed backlog, 2 = unresolved eligible/stale gap for an external supervisor, 1 = configuration/runtime failure. No built-in pager, scheduler, real provider send, public route, operational secret provisioning or production approval exists. See [Identity reconciliation operator runbook](../runbooks/identity-reconciliation.md). This does not close provider delivery/recovery, 202-response timing, bot quota, frontend proof consumption, KDF capacity or Profile B trusted-authority release gates.
 
-## Unmounted HTTP email proof consumption — stacked Draft PR #34
+## Unmounted HTTP email proof consumption — merged PR #34
 
 The Identity module now has a **manually constructed, unmounted** first-party `POST /v1/identity/verify-email` candidate with exactly `{"token":"<43-character base64url bearer>"}`. Its success response is **204 with no body**; invalid, expired, revoked, unknown or replayed proofs return the same generic **400** problem response. A denied peer admission attempt returns **429**, and an unavailable peer/limiter returns generic **503**. The candidate does **not** return a subject ID, contact data, email, authenticated session, or credential. The public/private running routers remain health-only.
 
@@ -122,7 +124,7 @@ A valid request passes only the token to the existing `EmailVerification.Confirm
 
 The Mailgun message already contains a URL fragment `#token=...`; this fragment is **not transmitted on an ordinary GET**. A **separate** first-party frontend must extract the fragment, remove it from browser history before analytics/third-party script load, then explicitly POST it in the JSON body to this candidate endpoint. No such frontend is implemented here. Avoid token in query parameters, Referer, analytics, redirect logs or support screenshots. This handler is **not wired into HTTP routing**, no real Mailgun mail is sent, and no session is minted. Disposable PostgreSQL test `TestIdentityZEmailConfirmationHTTPDB` checks valid/expired/unknown/replayed/concurrent proof outcomes and that the running routers still return 404; testgate requires the named test. This closes **only the candidate HTTP-to-verifier workflow**, not the go-live controls.
 
-## Independent HTTP confirmation admission — stacked Draft PR #35
+## Independent HTTP confirmation admission — merged PR #35
 
 A **distinct CONFIRM action** is now supported by the existing Identity v5 anonymous HMAC accounting table (extended in **immutable fingerprinted Identity migration v7**). It is NOT authorization, a login grant, or a valid-proof assertion. The dedicated internal `ConfirmationAdmission` usecase accepts only a trusted `netip.Addr`, an externally supplied 32-byte HMAC key and the restricted registration/admission PostgreSQL store. It never receives a proof bearer, subject ID, email address, or IP stored in plaintext. IPv4 exact addresses and IPv6 /64 prefixes receive independent CONFIRM counters, separate from REGISTER/RESEND even if the same HMAC key and network are supplied. The initial **fixed UTC** limits are **8 confirmations per client per minute and 80 per client per hour**; changing these requires a policy review and tests. Distinct HMAC domain strings separate the keys, and the v6 bounded 48-hour bucket retention also covers CONFIRM rows.
 
@@ -130,7 +132,7 @@ The existing `EmailConfirmationHTTP` required `ConfirmationAdmission` interface 
 
 Required evidence: `TestConfirmationAdmissionPrivacyAndNetworkBounds`, `TestConfirmationAdmissionDeniesInvalidInputAndRedactsStorageFailures`, real PostgreSQL `TestIdentityConfirmationAdmission` (many concurrent distributed requests, exact eight winners) and `TestIdentityZConfirmationAdmissionHTTPDB` (two handlers sharing the database, only eight calls reaching a synthetic verifier), plus v7 migration integrity/role tests. **Remaining release blockers:** external edge/global bot quotas (per-client fixed windows are insufficient alone), trusted reverse proxy and verified direct TLS, legitimate NAT/shared IPv6 behavior, secure and rotated HMAC key distribution, rate-load measurements, error-vs-invalid-proof classification, fragment-removal frontend, monitoring, and deployment approval. These defaults are a candidate for review, not a production SLO or a complete abuse solution.
 
-## Email confirmation failure classification — stacked Draft PR #36
+## Email confirmation failure classification — merged PR #36
 
 The **unmounted** email confirmation candidate now has a strict end-to-end two-class outcome for a syntactically valid bearer after anonymous admission: **400 `INVALID_OR_EXPIRED_PROOF`** only when the verifier authority reaches an explicit negative conclusion (unknown, expired, replayed/revoked proof, incompatible current contact or inactive subject); **503 `UNAVAILABLE`** for unknown errors, database access/connection failures, transaction begin/commit failures, canceled contexts, and outbox/row-update failures. Valid one-time consumption still returns 204 without a body, and failed database commits leave the proof and subject unchanged. Neither class contains the secret, subject/contact identifier, SQL statement, DSN, or driver error. A response 503 does **not** prove the token was unused; if the connection fails after a commit or a response is lost, a later retry can receive 400 because the earlier transaction already consumed it. Client UX and private operator metrics must account for that ambiguity.
 
@@ -140,7 +142,7 @@ Unit tests cover unknown SQL error redaction, context cancellation, sentinel pro
 
 **Still not production-ready:** The handler is unmounted, the browser fragment-consuming page and approved proxy/TLS deployment are absent, and operational alerting, edge/global abuse defense, secret governance, and lost-response UX need separate design and tests. Error classification alone does not establish uniform timing, sender reliability, or inbox delivery.
 
-## Safe first-party email verification page — stacked Draft PR #37 (unmounted)
+## Safe first-party email verification page — merged PR #37 (unmounted)
 
 A candidate first-party `GET /verify-email` browser landing page now matches the **existing** Mailgun verification URL contract `https://<approved-host>/verify-email#token=<32-byte-base64url>`. It is **not mounted** by `httpedge.PublicHandler` or `httpedge.PrivateHandler`. The Go page handler is an authority-free static asset renderer (no database, mail, credential, verifier or session capability), requiring direct TLS, the exact approved standard HTTPS host, GET, no query or request fragment, no cookies or Authorization, and no forwarded scheme declarations. Responses are non-cacheable and no-referrer, deny framing, and use CSP SHA-256 hashes of exactly the embedded inline JavaScript and CSS; all other script/style resources, images, fonts, frames, forms, workers, and external connections are forbidden. The only permitted outgoing browser connection is same-origin `fetch` to the existing unmounted `POST /v1/identity/verify-email` candidate.
 
@@ -150,13 +152,13 @@ User messages: 204 means verified (without login); 400 means unknown/expired/alr
 
 Tests: Go handler tests verify CSP integrity hashes, no external elements, request/TLS/Host hardening, and unmounted router inventory. A pinned Node.js 22.16.0 workflow runs dependency-free DOM/fetch VM tests of the exact embedded JavaScript, covering fragment scrub order, preview without automatic POST, malformed fragments, one-click-only delivery, same-origin transport options, 204/400/429/503/network ambiguity and scrub failure. These are **simulated browser-behavior tests, not an actual Chrome/Firefox/real Mailgun end-to-end test**. Before go-live, review browser compatibility/CSP in real headless browsers, Mailgun click-tracking configuration, trusted production hosting/TLS, scanner interaction, operator observability, account-status UX after a lost response, and all previously documented Identity release gates. A server-side 404 from the default router remains expected.
 
-## Real Chromium + actual database browser verification gate — stacked Draft PR #38
+## Real Chromium + actual database browser verification gate — merged PR #38
 
 A **test-only**, unmounted end-to-end fixture now joins the existing Identity HTTPS registration handler, PostgreSQL restricted registration/proof/delivery roles, AES-GCM challenge+envelope, delivery worker, real Mailgun adapter with a **loopback-only provider mock**, and the candidate verification page/confirmation handler from PR #37/#36. Headless Chromium executes the actual hashed-CSP first-party page and `fetch`; a narrowly scoped test bridge preserves the `app.example.test` browser origin while forwarding *only* the page and confirmation requests over ephemeral loopback HTTPS. No production DNS, browser hosting or TLS reverse-proxy configuration is added. The actual running `httpedge` routers remain health-only.
 
 The browser gate proves: a GET preview does not consume a challenge; the fragment is removed before a manual click; one explicit click confirms a valid proof and commits exactly one `ACTIVE` status and `CONTACT_VERIFIED` event; a response intentionally lost **after database commit** displays conservative ambiguous guidance with no automatic retry and replay returning 400; an expired proof returns 400 without activating an account. Database assertions use only the synthetic disposable admin fixture. Registration uses a **synthetic test hasher**, not production Argon2id performance, and all Mailgun sends go to a local HTTP mock. No bearer is uploaded in CI screenshots/traces or emitted to test logs. Chromium CSP and DOM behavior is more concrete than the previous Node VM, but **Firefox/Safari, active-click mail scanners, production TLS termination, provider delivery, real-browser accessibility and signup policy performance are not covered**. See `docs/runbooks/identity-browser-e2e.md` for commands, exact test path and remaining release gates.
 
-## Internal password authentication foundation — stacked Draft PR #39
+## Internal password authentication foundation — merged PR #39
 
 The first credential-checking primitive is **internal only and NOT a login endpoint or session authority**. `PasswordAuthentication.Authenticate(ctx, email, password)` validates canonical alias/NFC password and calls a separate **read-only authenticator role** for one credential snapshot. Any syntactically valid account-lookup miss still incurs one full Argon2id v1 check with a fixed fake verifier; this prevents missing aliases from skipping expensive KDF work. A matched password returns a server-owned **subject candidate** only if the account status is `ACTIVE` and the current alias is verified; unknown/wrong/unverified/suspended/frozen/deleted accounts all receive one generic denied sentinel and **no subject**. Database outage, cancellation or KDF integrity/capacity failure use a different sanitized unavailable sentinel; raw SQL, salt, digest, account status and password are not returned.
 
@@ -164,25 +166,25 @@ The forward-only fingerprinted Identity **migration v8** grants a newly provisio
 
 **Critical unresolved gates:** This is not a complete anti-enumeration solution (SQL timing still differs), and there is no pre-KDF global login throttling, public HTTP login response/timing contract, lock policy, MFA, session issuer/rotation/revocation, audit, live secure key management or financial authorization. Do not mount any login route or treat an internal subject candidate as an authenticated session. The status could change after the read; the future session authority must recheck account eligibility and write session state atomically. See `docs/adr/0004-password-authentication-foundation.md`.
 
-## Pre-Argon2id password login admission — stacked Draft PR #40
+## Pre-Argon2id password login admission — merged PR #40
 
 A new **unmounted** `PasswordLoginFlow` makes a login admission call mandatory **before** any password-verifier SQL lookup or 64 MiB Argon2id work. The independent `LoginAdmission` charges every validly shaped email—**including unknown aliases**—against HMAC-SHA256 keys for a global action, exact IPv4/IPv6 /64 client network and canonical email. The bounded PostgreSQL accounting transaction uses five LOGIN-only fixed windows: 80/global minute; 8/client minute; 80/client hour; 5/email hour; 20/email day. The global limit is intentionally an **unapproved conservative candidate**; an actual production capacity model must change/approve it. No plaintext email, peer address, subject, password or bearer enters the counter store. On a denied, invalid or unavailable admission, no credential read or KDF can be invoked through this flow. There are **no login HTTP routes, cookies, sessions, or authorization changes**.
 
 Migration **v9** extends only the existing admission table's CHECK constraints for `LOGIN` and `GLOBAL_MINUTE`, preserving the registration runtime's existing column-limited counter-write grants, independent REGISTER/RESEND/CONFIRM quotas, 48-hour retention and denied-transaction rollback semantics. The login admission role is the existing restricted `mamony_identity_runtime`; only the separate `mamony_identity_authenticator_runtime` may SELECT password verifiers. Unit and disposable database tests exercise concurrent independent pools, global/per-network/per-alias budgets, HMAC and IPv6 privacy, unknown-account charge, and **real Argon2id** admitted/denied paths. A denied attempt rolls back earlier increments; an attacker flooding already denied aliases can still load the DB—**perimeter load shedding/WAF is a mandatory production blocker**. Details: `docs/adr/0005-login-admission-before-argon2id.md`.
 
-## Internal opaque sessions — stacked Draft PR #41
+## Internal opaque sessions — merged PR #41
 
 An **internal-only** `SessionLogin` now composes the #40 durable pre-KDF admission/password authentication result with a **separately authorized, transactional session issuer**. A successful password check alone is insufficient: the SQL owner rechecks `ACTIVE` status and verified current contact under `FOR UPDATE` locks **before** storing the new opaque session digest and durable `SESSION_CREATED` event. The issuer creates a 256-bit CSPRNG bearer (43-character canonical base64url), transmits **only a domain-separated SHA-256 digest** to SQL, and releases the raw bearer only after definite transaction commit. Ambiguous DB commits discard the bearer; no automatic mint retry. Default session lifetime is **12 hours absolute** on the database clock, with no refresh/sliding renewal. Resolve checks expiry, revocation, current ACTIVE/verified state and `session_epoch` on every invocation. A database trigger increments the epoch on all account status transitions: **freeze then thaw cannot resurrect an old token**. Revoke is idempotent and produces one `SESSION_REVOKED` audit event for first revocation.
 
 Fingerprint-protected **Identity migration v10** creates `opaque_sessions`, the status-epoch trigger, and three narrowly scoped `SECURITY DEFINER` functions. The **new**, externally provisioned `mamony_identity_session_runtime` only has EXECUTE on these functions, no direct SELECT/INSERT/UPDATE/DELETE on Identity tables and no access to password digests, email challenges, or admission buckets. Session digest retention is bounded to 100 rows per maintenance call, after expiry +24h, with the maintenance role only. Existing registration/verifier/authenticator privileges stay unchanged. These APIs remain unmounted; `httpedge` still returns 404 for Identity login/session paths. No cookie, CSRF, MFA, refresh, recovery or tenant action authorization exists. The session role **can mint for any known eligible subject if directly compromised**, so it is a sensitive authority requiring network/credential isolation. Password change/contact reset must bump epoch in a future ADR; financial actions must revalidate authorization at action time. See `docs/adr/0006-opaque-session-authority.md`.
 
-## Session freeze/issuance concurrency and browser transport proposal — Draft PR #42
+## Session freeze/issuance concurrency and browser transport proposal — merged PR #42
 
 PostgreSQL isolation is now tested in **both real commit orders** with a deliberately held row lock, using a disposable superuser `pg_stat_activity` observation barrier instead of timing guesses. If freeze commits first, pending issuance must deny without persisting a session digest or `SESSION_CREATED` outbox event. If the issuer locks and commits first, subsequent freeze must wait, advance the account epoch after issuance, and invalidate that token; subsequent thaw must **not resurrect** it. An aborted issue transaction must roll back both the digest and event. `TestIdentityZSessionFreezeIssueInterleavings` is a mandatory testgate requirement. This is not equivalent to authorization at the point of a financial action.
 
 A **proposed only, unmounted** same-origin browser session contract lives in `docs/adr/0007-first-party-browser-session-http-contract.md`. Candidate `POST /v1/identity/login` requires direct verified HTTPS Host+Origin, bounded strict JSON, trusted client peer and the concrete pre-KDF `SessionLogin`; it would send a `__Host-mamony_sid` Secure, HttpOnly, SameSite=Strict, Path=/, no-Domain 12h cookie only after confirmed issuance. Candidate `GET /v1/identity/session` resolves the cookie without sliding expiry; candidate `POST /v1/identity/logout` revokes it under exact-Origin and session-bound CSRF validation; candidate `GET /v1/identity/csrf` could supply a separate same-origin CSRF token. Cookie, CSRF, routes and public error semantics are **not implemented** and the default routers remain health-only. Login-CSRF, server-side session binding, CSRF key rotation, trusted proxy deployment, WAF, MFA and financial action authorization are still explicit gates.
 
-## Unmounted first-party session HTTP candidate — stacked Draft PR #43
+## Unmounted first-party session HTTP candidate — merged PR #43
 
 A new manually constructed `BrowserSessionHTTP` exists **inside** Identity's handler package, implementing the candidate login/session/csrf/logout flow outlined by [ADR-0007](../adr/0007-first-party-browser-session-http-contract.md). Constructor injection requires direct HTTPS canonical origin, a no-proxy `ClientIPResolver`, the concrete `*usecase.SessionLogin` (which itself requires the pre-KDF `*PasswordLoginFlow`), the opaque session resolver/revoker, and a separate 32-byte CSRF HMAC secret. No production/default key, route registration or environment enable switch exists; both `httpedge` listeners still return **404** for all four session paths and the router tests enforce this.
 
@@ -190,31 +192,31 @@ Candidate POST login uses exact direct-TLS Host+Origin, bounded duplicate-key-re
 
 **Not ready for production**: session role direct-mint authority has not been restricted by an independently attested password proof; HTTP guards cannot solve a compromised session database role. Network isolation/role credentials, real browser acceptance tests, key rotation and multi-instance CSRF consistency, upstream rate limiting/WAF, trusted ingress proxy, login-CSRF/federation, account recovery/credential-reset epoch revocation, idle/reauth/MFA, and per-resource financial authorization remain blockers. See [ADR-0008](../adr/0008-unmounted-browser-session-http-candidate.md).
 
-## Server-enforced session inactivity — Draft PR #47 (candidate)
+## Server-enforced session inactivity — merged PR #47 (candidate)
 
 Following v11 grant-bound issuance, a new forward-only v12 migration adds DB-owned `last_seen_at` and changes only the restricted `resolve_opaque_session` function: after locking session, subject and current contact, PostgreSQL denies idle ≥ 30 minutes, absolute expiry ≥ 12 hours, revocation, changed epoch, frozen/inactive subject and unverified contact. On successful resolution, the PostgreSQL clock refreshes activity **without** changing `expires_at`; a bearer cannot reactivate itself after an idle timeout. The browser's 12-hour cookie expiry remains only an upper bound, not an authorization check. Existing session role direct table access is still forbidden. See [ADR-0010](../adr/0010-server-side-session-idle-expiry.md).
 
 The 30-minute value and write-on-resolve lock overhead are **unapproved design candidates**. Migration backfill deliberately treats issue time as last activity and may invalidate previously issued inactive cookies. Production rollout requires contention/load tests, multi-instance behavior, alerting, user-facing idle-expiry UX, actual secret and network isolation, safe reauthentication and MFA/step-up; all public session routes remain unmounted and financial authorization remains independent.
 
-## Atomic concurrent-session cap — stacked Draft PR #48
+## Atomic concurrent-session cap — merged PR #48
 
 Candidate v13 Identity authority enforces a **new issuance cap of five currently usable sessions per subject and current epoch**, counting only unrevoked records still within the fixed 12-hour absolute and 30-minute DB-clock idle windows. Once five slots are occupied, one real successful admission/Argon2id/grant login atomically revokes the oldest eligible digest and emits a `SESSION_REVOKED` outbox event while creating its new bearer and `SESSION_CREATED` event. Two concurrent distinct grants serialize behind the same subject row; session Resolve/Logout also use explicit subject-first/session-second locking to avoid lock inversion. No unrestricted SQL table privilege or caller-chosen-subject issuing API is introduced. See [ADR-0011](../adr/0011-atomic-five-session-cap.md).
 
 **Caveat:** this candidate does not retroactively bulk-revoke >5 live sessions already present before v13; in that state, further issuance is denied until old sessions expire/revoke or a separately reviewed remediation occurs. Session cap is not an authorization rule for finance. Operational throughput, production credential isolation, remote session list/revoke UX, MFA/step-up and password/contact epoch revocation remain launch blockers; all candidate browser endpoints stay unmounted.
 
-## Password/contact-change session invalidation — stacked Draft #49
+## Password/contact-change session invalidation — merged PR #49
 
 Candidate v14 triggers transactionally advance the Identity subject's `session_epoch` when password-verifier material or login contact really changes, or when the verifier/alias row is removed. Every previous session and previously staged grant is then stale and denied by the existing session/grant epoch checks. **Important TOCTOU fix:** the read-only authenticator now returns the epoch from the same credential SELECT as the Argon2id hash, before the CPU-bound comparison; the trusted `SessionLogin` must pass that epoch into the **three-argument** restricted grant-staging SQL function. A changed epoch blocks an old password result from creating a new-epoch session. The former two-argument function is removed by forward-only v14 migration. See [ADR-0012](../adr/0012-auth-material-epoch-grant-fence.md).
 
 This is infrastructure for a future reviewed password/contact change workflow, **not that workflow**: there is no public reset route, no sensitive-change reauthentication, no new mutation role, no account-change notification/audit policy, and no claims about compromised Identity Go runtime or a grant-role assertion oracle. Mutators must take subject lock first; existing Identity browser routes stay unmounted.
 
-## Internal authenticated password change — stacked Draft #50
+## Internal authenticated password change — merged PR #50
 
 Candidate v15 adds `AuthenticatedPasswordChange.Change`, which requires a currently usable opaque session **and** fresh old-password verification through mandatory distributed pre-KDF login admission + Argon2id, bound to the same subject and epoch. The new secret is NFC-normalized, checked against the required configured password blocklist, denied if equal to the old normalized secret, and rehashed with a new 128-bit salt. A purpose-bound one-use `PASSWORD_CHANGE` grant (30s) cannot be consumed by the login session issuer. A new EXECUTE-only `mamony_identity_password_change_runtime` can rotate the verifier only with both session and change proof; mutation, v14 `session_epoch` increment and identifier-only `PASSWORD_CHANGED` security event commit atomically. No replacement bearer is issued. See [ADR-0013](../adr/0013-authenticated-password-change.md).
 
 No change-password public endpoint, session cookie/CSRF mutation handler, notification delivery or approved production blocklist is included. The grant stager remains a privileged assertion oracle under Profile A. Owner/security/UX approvals, MFA/step-up, trusted client network and workload secret isolation remain blockers.
 
-## Password-change notification obligation — stacked Draft #51
+## Password-change notification obligation — merged PR #51
 
 The v15 trusted `PASSWORD_CHANGED` security outbox event now causes a **v16 same-transaction enqueue** in `password_change_notices`; a failed enqueue rolls back the password change. The identifier-only security outbox remains free of email addresses. Only events written under the original `mamony_identity_password_change_runtime` PostgreSQL login can trigger a notice; earlier verifier role outbox INSERT privileges cannot forge an alert. The separate queue captures the currently verified email at the time of mutation; it contains only event ID, subject, recipient and delivery metadata, never a bearer/password/reset URL.
 
@@ -222,13 +224,13 @@ The isolated `mamony_identity_security_notice_runtime` may EXECUTE only claim/fi
 
 No live sender/worker command is activated and no public password-change route exists. Sender is a mockable interface only in this candidate; no user notification can yet be claimed. Remaining policy includes operational delivery monitoring, a trusted provider sender, bounce handling and escalation when stale notices are suppressed.
 
-## Password-change Mailgun security notice sender — stacked Draft #52
+## Password-change Mailgun security notice sender — merged PR #52
 
 The internal `SecurityNoticeSender` abstraction from Draft #51 now has a real Mailgun Messages API implementation limited to the configured US/EU/AU region and verified sending domain. It submits a **fixed text-only password-changed warning**, not a verification token, session, grant, reset URL or user-selected text. No links or dynamic metadata; open/click tracking disabled and Mailgun recipient TLS required. HTTP response/error bodies are never exposed; a successful bounded 200 JSON response means **accepted by provider**, not delivered or read. HTTP 429/420/408/5xx and uncertain outcomes retry under the v16 PostgreSQL bounded lease/backoff; duplicates remain possible after an ambiguous acceptance.
 
 A new dedicated `RunSecurityNoticeDelivery` facade and standalone `cmd/mamony-identity-security-notice-worker` use **only** the `mamony_identity_security_notice_runtime` role; they do not reuse the verification email sender, token envelope keyring or worker DSN. Real email sending needs both `--send-live-security-mailgun` and the exact operator approval, external owner-only secret files, non-CI runtime and verified-full PostgreSQL TLS. **The command is not scheduled/deployed, no real credentials have been connected and no live email has been sent by this implementation.** See [ADR-0015](../adr/0015-mailgun-password-change-notice-worker.md).
 
-## Signed Mailgun notice callbacks and operator counts — stacked Draft #53
+## Signed Mailgun notice callbacks and operator counts — merged PR #53
 
 Identity v17 extends the password-change notification queue with **SHA-256 of the normalized Mailgun Message-ID** returned only after a successful Mailgun send response. The sender no longer calls an uncorrelated three-argument SQL finalizer: the worker role may only execute the new four-argument `finalize_password_change_notice_v2`. `ACCEPTED` means submitted to provider; independent `provider_state` tracks `SUBMITTED`, `TEMPORARY_FAILURE`, `DELIVERED` (recipient SMTP server only), `PERMANENT_FAILURE`, `COMPLAINED`, and `UNSUBSCRIBED`.
 
@@ -236,13 +238,13 @@ The **unmounted** HMAC-verifying Mailgun webhook candidate accepts only signed J
 
 A signed callback cannot be treated as full-body cryptographic attestation: Mailgun signs `timestamp+token`, not the entire JSON. Transport/TLS, domain binding, role isolation and real provider-key ownership must be reviewed before enabling a live endpoint. **No route is registered, no webhook receiver is deployed, no real Mailgun callback is processed and no on-call alert is configured.** Prior uncorrelated ACCEPTED notices cannot be automatically backfilled; ambiguous sender timeouts may produce unmatched provider receipts and duplicate messages. See [ADR-0016](../adr/0016-mailgun-security-notice-webhook-reconciliation.md).
 
-## Read-only Mailgun notice health probe — stacked Draft #54
+## Read-only Mailgun notice health probe — merged PR #54
 
 Identity v18 introduces the isolated `mamony_identity_notice_monitor_runtime` PostgreSQL LOGIN role, with **only** schema USAGE and EXECUTE on the count-only `security_notice_health()` function. It has no retention purge, mail delivery, webhook receipt, contacts, session, password or table permissions. `ReadSecurityNoticeHealthAsMonitor` exclusively accepts this role; the earlier maintenance-only facade remains backwards-compatible.
 
 The unmounted, one-shot `mamony-identity-notice-health` command requires a private DSN file, strict full TLS verification, `--check-security-notices`, five mandatory numeric thresholds, and a non-CI operator environment. It writes only count-only JSON and exits 0 OK, 2 ALERT (configured threshold exceeded), or 1 ERROR (misconfiguration/DB unavailable). No default production thresholds, on-call routing, scheduler or public HTTP health endpoint exist. Counts can report suspected problems, not verify human inbox receipt. See [ADR-0017](../adr/0017-read-only-notice-health-probe.md).
 
-## Unmounted browser password-change boundary — stacked Draft #55
+## Unmounted browser password-change boundary — merged PR #55
 
 The candidate `BrowserPasswordChangeHTTP` provides a separately constructed but **unmounted** `POST /v1/identity/change-password`. It reuses the existing concrete browser-session handler's exact HTTPS Origin/Host, direct-TLS, no-forwarded-identity, trusted peer, host-only cookie and 15-minute session-bound CSRF requirements. Bounded, duplicate-key-rejecting JSON has exactly `email`, `currentPassword`, `nextPassword`; the email must be canonical, but is **not** trusted as the account authority. A concrete `AuthenticatedPasswordChange` usecase independently verifies the old secret against the session's subject and epoch before the SQL atomic rotation.
 
@@ -250,25 +252,25 @@ On certain success, the response is 204 with the old cookie cleared; v14 SQL epo
 
 This is **not an enabled public or private route**: application routers and `main` remain unchanged, and no real-browser + PostgreSQL test of this new operation has yet passed. MFA/step-up, production password blocklist, live email sender/webhook, trusted ingress, account recovery, user-facing UX and finance authorization remain open. See [ADR-0018](../adr/0018-first-party-password-change-http-candidate.md).
 
-## Actual Chromium password-change proof — stacked Draft #56
+## Actual Chromium password-change proof — merged PR #56
 
 The previously unmounted `BrowserPasswordChangeHTTP` candidate is now exercised with real Chromium cookie handling, actual Argon2id, isolated PostgreSQL runtime roles and v15–v18 transactional state in `TestIdentityZBrowserPasswordChangeE2E` (tags `integration,browser_e2e`). Two independent browser sessions on the same account prove a successful password change invalidates both, while the initiator's host-only cookie is cleared and only the new credential can create a fresh session. Denied CSRF, oversized/duplicate JSON, sibling/cross-site requests, and a different account's valid password do not authorize the rotation.
 
 A second scenario deliberately drops the HTTP response **after** PostgreSQL commit: Chromium retains the old cookie but server-side session resolution rejects it; a fresh login needs the new password. The test also proves one epoch increment and exactly one `PASSWORD_CHANGED` event plus pending notice per account. It does not retry ambiguous credential changes or send email. The test-only TLS bridge does not establish deployed ingress or CORS proof. The actual production application routers still return 404 on `POST /v1/identity/change-password`; public deployment, real browser UX and MFA/recovery approvals are open. See [ADR-0019](../adr/0019-browser-password-change-postgres-e2e.md).
 
-## Candidate one-shot browser password-change experience — stacked Draft #57
+## Candidate one-shot browser password-change experience — merged PR #57
 
 An explicitly unmounted `PasswordChangePage` now renders static first-party `GET /account/change-password` using the **same** direct-TLS origin and browser session boundary as `BrowserPasswordChangeHTTP`. Its script/style are embedded with exact CSP hashes, no third-party resources or persistent storage. A real active session and session-bound CSRF must be fetched before the form becomes visible; the confirmation password remains client-only. A single deliberate click or keyboard form submit sends the existing strict `email`/`currentPassword`/`nextPassword` JSON request, clears all password input elements and locks the UI against automatic resend.
 
 The page distinguishes confirmed `204` (successful; all sessions invalidated, sign in again), generic `401` (denied, reason undisclosed), and **any uncertain response or network exception** (might have committed; do not repeat the password change; use established trusted sign-in or recovery). No new login/recovery URL is invented or exposed. Real Chromium + PostgreSQL tests cover signed-out state, matching confirmation, certain commit, denial, and HTTP response lost **after** commit. Default production listeners still return 404 for both the candidate page and mutation. See [ADR-0020](../adr/0020-unmounted-password-change-recovery-page.md).
 
-## Password recovery proof foundation — stacked Draft #58
+## Password recovery proof foundation — merged PR #58
 
 Forgot-password recovery is **not** the already implemented authenticated password-change operation. A caller without a valid session and old-password proof must never be granted the existing v15 `PASSWORD_CHANGE` capability. A new isolated `PasswordRecoveryProof` primitive generates 32 CSPRNG bytes (43-character canonical base64url) and a purpose-specific SHA-256 digest with domain `mamony:identity:password-recovery-proof:v1\0`. Strict parsing rejects malformed, padded and noncanonical values; regular formatting and serialization conceal or reject proof material. A proof digest alone never authenticates, identifies an account, or permits a password reset.
 
 **Nothing issues or consumes this proof in production.** No recovery request handler, token email, recovery database role/table/SQL function, reset UI, update-password operation, or application route has been added. The future protocol needs independent distributed admission, generic anti-enumeration responses, current verified-contact epoch checks, durable encrypted outbox delivery, expiry/attempt limits, single-use transactional redemption, all-session epoch invalidation, a separately provenance-checked `PASSWORD_RECOVERED` event/notice and MFA/assurance policy. The existing v16 `PASSWORD_CHANGED` trigger must not be bypassed. See [ADR-0021](../adr/0021-password-recovery-authority-foundation.md).
 
-## Internal password recovery issuance — stacked Draft #59 / Identity v19
+## Internal password recovery issuance — merged PR #59 / Identity v19
 
 The `RECOVERY` admission action uses purpose-isolated HMAC buckets (global 60/min; client 5/min and 40/hour; email 2/hour and 4/day), charged in PostgreSQL before proof generation or account lookup. For **every admitted canonical email, including unknown aliases**, `RecoveryRequest` generates a fresh 256-bit purpose-separated bearer and invokes a trusted *injected* recovery envelope sealer. The unmounted usecase never returns a subject, challenge ID, eligibility flag or token to an external caller. No application HTTP listener exposes recovery endpoints.
 
@@ -276,7 +278,7 @@ The dedicated `mamony_identity_recovery_issuer_runtime` credential has only EXEC
 
 The ciphertext queue deliberately has **no delivery worker, decrypt role, Mailgun adapter or live secret** yet. Test envelopes are mock bytes; actual production AEAD recovery-purpose AAD and key isolation remain unimplemented. Challenge redemption, Argon2id rotation, sessions invalidation, new `PASSWORD_RECOVERED` event and notification, MFA/assurance and anonymous uniform HTTP status/timing are future work. See [ADR-0022](../adr/0022-password-recovery-issuance-outbox.md).
 
-## Recovery-purpose AEAD delivery — stacked Draft #60 / Identity v20
+## Recovery-purpose AEAD delivery — merged PR #60 / Identity v20
 
 Recovery issuance from Identity v19 now has an explicitly constructed, **unlaunched** recovery delivery path. `RecoveryKeyring` supports a distinct active recovery key plus bounded read-old keys, sealing the canonical alias, `rcv_` challenge and purpose in AES-256-GCM AAD; it is not the EMAIL_VERIFY envelope. `RecoveryMailSender` accepts a pinned HTTPS `/account/recover-password` destination and sends only a text multipart message containing the recovery bearer in a URL fragment; disabled tracking, no redirects, no Host-derived reset URL, and sanitized provider errors. The reset page path is not mounted: this candidate **cannot be used for live emails or user recovery** yet.
 
@@ -284,7 +286,7 @@ Identity v20's `mamony_identity_recovery_delivery_runtime` holds only EXECUTE on
 
 See [ADR-0023](../adr/0023-password-recovery-delivery-worker.md). **Unresolved:** account recovery assurance/MFA, production encryption secrets, a safe reset page and atomic one-use redemption, session revocation, token-free `PASSWORD_RECOVERED` alert, provider operations, contact-change race after claim, PII retention, and public anti-enumeration. Do not merge or activate.
 
-## Atomic account-recovery redemption — stacked Draft #61 / Identity v21
+## Atomic account-recovery redemption — merged PR #61 / Identity v21
 
 `PasswordRecoveryRedemption` accepts only a strict canonical purpose-specific 256-bit bearer, a canonical email for both contextual new-password policy and SQL **equality binding**, and a new password approved by the injected breach/common-password rejector; it hashes using the bounded Argon2id v1 adapter. No subject ID is caller-selected and no public handler, login or new session exists. Unknown/used/revoked/stale/expired challenge or assurance failure yields internal denial, not an explanation of account existence. A missing or failed KDF and uncertain COMMIT yield generic unavailable, never automatic retry.
 
@@ -292,7 +294,7 @@ Identity v21 introduces independent `mamony_identity_recovery_redeemer_runtime` 
 
 **There is no trusted production writer for the assurance grant**, which is inserted **only by disposable test admin fixtures**. There is no functional forgot-password flow, recovery event notice worker, provider activation, reset UI, token redemption HTTP endpoint, production MFA approval or anti-enumeration envelope. CI tests use disposable PostgreSQL and locally generated Argon2id; green test evidence does not authorize activating recovery. See [ADR-0024](../adr/0024-atomic-password-recovery-redemption.md).
 
-## PASSWORD_RECOVERED security alert — stacked Draft #62 / Identity v22
+## PASSWORD_RECOVERED security alert — merged PR #62 / Identity v22
 
 The v21 atomic password recovery transaction enqueues a distinct `password_recovery_notices` row. Identity v22 adds independent `RecoverySecurityNoticeWorker`, a fixed text-only `SendPasswordRecovered` Mailgun adapter, and strictly scoped SQL role `mamony_identity_recovery_notice_runtime`. The sender can only EXECUTE the claim/finalize functions (45-second lease, verified recipient recheck, 24-hour event freshness, max 5 attempts with 1/2/4/8-minute backoff). Every notice is **token-free and link-free**, tracking is disabled, and Mailgun acceptance stores only a SHA-256 provider message-ID digest. The password-change and recovery-proof sender roles remain separate. Only the original v21 `session_user` of the recovery redeemer can create a `PASSWORD_RECOVERED` notification through the audited trigger.
 
@@ -300,7 +302,7 @@ The v21 atomic password recovery transaction enqueues a distinct `password_recov
 
 **No public activation**: this PR provides only an explicitly constructed, unlaunched Go worker; the recovery assurance approval issuer is intentionally unavailable in production. Mailgun accepted means provider submission, NOT inbox delivery. Signed recovery-specific delivery callbacks, operational suppression/bounce monitoring, human-approved assurance policy and reset UI remain separate release gates. See [ADR-0025](../adr/0025-password-recovery-security-notice-worker.md).
 
-## Signed PASSWORD_RECOVERED Mailgun receipt reconciliation — stacked Draft #63 / Identity v23
+## Signed PASSWORD_RECOVERED Mailgun receipt reconciliation — merged PR #63 / Identity v23
 
 `MailgunRecoveryNoticeWebhook` is an explicit **unmounted** handler that reuses the HMAC-SHA256 authentication, configured-domain check, strict timestamp limits, bounded JSON parsing and delivery-state normalization of the previous Mailgun notice verifier, but calls a **different** `RecoveryNoticeWebhookStore` backed only by `mamony_identity_recovery_notice_webhook_runtime`. This role has EXECUTE solely on `record_mailgun_recovery_notice_receipt`, with an original-session-user fence. The old `PASSWORD_CHANGED` webhook cannot use that function, and the recovery webhook cannot use the old function, read an address, or write a verifier. Only SHA-256 digests of signed token, provider event and canonical Message-ID plus a bounded state/timestamp are committed; event body and PII are never stored.
 
@@ -308,7 +310,7 @@ Receipt replay is deduplicated, including concurrent copies. The v23 revision to
 
 The count-only monitor retains its original five-field function but corrects submitted-unconfirmed to exclude confirmed or failed states. A second function adds delivered, provider-failures and unmatched-receipts counts without exposing addresses or event identifiers. Maintenance-only cleanup removes at most 100 receipt digests older than seven days per call and preserves identifier-only audit. No webhook route, real Mailgun account, recovery approval authority or public forgot-password endpoint is enabled. See [ADR-0026](../adr/0026-signed-recovery-notice-webhook.md).
 
-## Saved offline recovery codes and challenge-bound grant — Draft #64 / Identity v24
+## Saved offline recovery codes and challenge-bound grant — merged PR #64 / Identity v24
 
 A saved recovery code is 256 random bits, generated via OS CSPRNG and encoded as exactly 43 base64url characters, with only a domain-separated SHA-256 digest stored. It must have been saved *before* an email recovery challenge was issued, under a separately reviewed authenticated enrollment ceremony. **No real enrollment ceremony or enrollment runtime role exists yet**; only disposable privileged fixture tests write offline code digests. The Go primitive redacts formatting, JSON and logging. An emailed token is **not** the offline code.
 
@@ -318,7 +320,7 @@ The v21 password-recovery redemption function retains its existing arguments but
 
 No production code generation/enrollment, MFA ceremony, reissuance UX, strong-authenticated code rotation, public recovery route, risk-based AAL decision, HTTP rate/admission envelope, production notification delivery or independently protected DB owner exists. **Do not interpret this as AAL2/AAL3 compliance or permission to activate forgot-password.** See [ADR-0027](../adr/0027-offline-recovery-code-assurance.md).
 
-## Saved recovery-code enrollment and rotation — stacked Draft #65 / Identity v25
+## Saved recovery-code enrollment and rotation — merged PR #65 / Identity v25
 
 Identity v25 adds **unmounted** `AuthenticatedRecoveryCodeManager` and a five-code (`5 × 256-bit`) generator. Before staging any grant, it checks an active opaque session and runs the existing admission-limited Argon2id reauthentication for the exact same current subject and epoch. The restricted `mamony_identity_auth_grant_runtime` stages a distinct **30-second one-use `RECOVERY_CODE_ROTATION`** grant, which neither creates sessions nor changes password verifiers. The isolated `mamony_identity_recovery_code_manager_runtime` has only EXECUTE on one owner-controlled code-set replacement transaction, no direct table privileges. Raw recovery codes are never persisted or logged; returned `RecoveryCodeSet` prevents accidental serialization and is exposed only through explicit trusted display following known commit.
 
@@ -326,7 +328,7 @@ Identity v25 adds **unmounted** `AuthenticatedRecoveryCodeManager` and a five-co
 
 A dedicated `password_recovery_code_notices` outbox stores a **token-free** alert obligation for the current verified email in the same transaction, but **has no live worker or provider sender**. This is NOT proof of delivered account-security notice. An ambiguous commit withholds raw codes; there is no automatic retry or public enrollment/reset route. The policy for strong factor enrollment, lost-all-codes users, authenticated recovery-code reissue, secure one-time display and notice delivery still requires explicit owner approval. See [ADR-0028](../adr/0028-recovery-code-enrollment-rotation.md).
 
-## Isolated offline recovery-code security notice worker — Draft #66 / Identity v26
+## Isolated offline recovery-code security notice worker — merged PR #66 / Identity v26
 
 Recovery-code enrollment and rotation produce immutable `RECOVERY_CODES_ENROLLED` and `RECOVERY_CODES_ROTATED` events under the v25 recovery-code manager transaction, plus a separate `password_recovery_code_notices` obligation. Identity v26 provides a **separately credentialed**, explicitly unmounted `RecoveryCodeSecurityNoticeWorker` that selects only those two provenance-checked event types; neither v17 `PASSWORD_CHANGED` nor v22 `PASSWORD_RECOVERED` notification worker can claim it. Its `mamony_identity_recovery_code_notice_runtime` has schema USAGE and EXECUTE only on `claim_recovery_code_security_notice` and `finalize_recovery_code_security_notice`, with `session_user` original-login check, **no direct SELECT/UPDATE on subject, account, code, session or notification tables**. A distinct `mamony_identity_recovery_code_notice_monitor_runtime` reads only `recovery_code_security_notice_health()` (five aggregate counts).
 
@@ -334,7 +336,7 @@ Claim rechecks current verified address, event provenance and a 24-hour freshnes
 
 The independent monitor exposes only `pending_due`, `dead`, `submitted_unconfirmed`, `retrying` and `expired_pending`. Maintenance-only cleanup removes up to 100 notices older than seven days per call, erasing recipients while preserving identifier-only audit. This worker **does not start automatically** and has no live provider, public endpoint, approval issuer, factor enrollment ceremony or delivery webhook. See [ADR-0029](../adr/0029-recovery-code-security-notice-worker.md).
 
-## Signed recovery-code security notice webhook and provider reconciliation — stacked Draft #67 / Identity v27
+## Signed recovery-code security notice webhook and provider reconciliation — merged PR #67 / Identity v27
 
 Identity v27 adds a separate **unmounted** `MailgunRecoveryCodeNoticeWebhook` built on the previously reviewed bounded HMAC-SHA256, timestamp, domain and event-kind validator. It handles **only recovery-code ENROLLED/ROTATED notification provider receipts**, not password-change, `PASSWORD_RECOVERED`, password reset, initial enrollment approval or authentication. A distinct `mamony_identity_recovery_code_notice_webhook_runtime` SQL role has only EXECUTE on `record_mailgun_recovery_code_notice_receipt` and does **not** read or update any table directly. The original `session_user` check rejects SET ROLE origin confusion; the worker's send role and count-only monitor cannot invoke this recorder. No webhook is mounted to ingress, and no live signing keys or provider configuration are activated.
 
@@ -342,61 +344,61 @@ Signed events are reduced to SHA-256 **token/event/Message-ID digests**, normali
 
 The v26 five-field `recovery_code_security_notice_health()` ABI remains unchanged; submitted_unconfirmed excludes fully reconciled notices. Separate `recovery_code_security_notice_delivery_health()` yields **delivered/provider_failures/unmatched_events** as aggregates only. Maintenance alone can purge up to 100 digest-only receipts older than seven days while preserving immutable security events. This feature is not launched and has no independent AAL/MFA issuer, safe user-facing backup code enrollment, delivery process/ingress wiring, suppression operations or production risk signoff. See [ADR-0030](../adr/0030-recovery-code-notice-signed-webhook.md).
 
-## Independently pre-provisioned cryptographic factor — stacked Draft #68 / Identity v28
+## Independently pre-provisioned cryptographic factor — merged PR #68 / Identity v28
 
 Identity v28 creates an **unmounted**, purpose-bound **Ed25519 signed challenge** whose only function is authorizing the **first** enrollment of five saved offline recovery codes. Unlike v25's synthetic admin-approved fixture, the v28 normal path can create a five-minute, one-use independent approval **only after proof of possession of a separately pre-provisioned Ed25519 private key**, together with an active subject-bound session, a fresh admission-limited Argon2id password verification and a dedicated v25 `RECOVERY_CODE_ROTATION` one-use grant. The isolated `mamony_identity_recovery_factor_issuer_runtime` consumes the grant under DB locks and creates a random 256-bit nonce challenge (three minutes). The separate `mamony_identity_recovery_factor_verifier_runtime` reads only current challenge+key through an owner-controlled function, checks Ed25519 signature **in trusted Go**, charges invalid attempts (five max), then commits a one-use approval digest and identifier-only `RECOVERY_FACTOR_APPROVED` audit atomically. v25 still independently rechecks session, password, subject, verified contact and epoch before consuming the approval to generate exactly five recovery codes. Standard formatting and JSON cannot reveal raw approval proofs.
 
 **The independent public key MUST already be bound by a separate trusted process.** No production role can INSERT or change `recovery_code_factor_keys`; no key-binding ceremony, passkey/WebAuthn RP ID/origin, real hardware/user-verification assurance, external device management, browser or live endpoint is implemented. This means recovery-code first enrollment **still defaults to DENY for ordinary unprovisioned accounts**. Current tests use an intentionally privileged disposable ADMIN to provision a synthetic Ed25519 test key; this is **not** a user production registration authority or certified MFA/AAL2/AAL3 claim. The verifier credential itself is a sensitive trust root capable of approving an issued challenge if compromised; SQL grants do not substitute for isolating trusted Go signature verification. Signature payload binds purpose, challenge ID, subject ID, epoch and nonce, and cannot authorize other actions. Replay, expired and epoch-stale challenges fail. See [ADR-0031](../adr/0031-independent-factor-signed-enrollment.md).
 
-## Initial recovery-code factor revocation fence — stacked Draft #69 / Identity v29
+## Initial recovery-code factor revocation fence — merged PR #69 / Identity v29
 
 The one-use Ed25519 v28 approval is **not enough** at the later v25 recovery-code bootstrap commit: a key may have been revoked or rebound after signing. Identity v29 records the verified public key in the pending approval (never a private key/signature), and the existing v25 transactional code manager locks and verifies the **currently active, unrevoked, same subject/epoch/contact public key** before consuming the approval. Historical approvals without this binding fail closed; no password-only repair. The existing offline-code rotation path is unchanged. See [ADR-0032](../adr/0032-recovery-factor-revocation-fence.md). A signed approval must not be treated as a perpetual authenticator grant.
 
 No production authenticator registration/revocation ceremony, key custody, WebAuthn RP/origin/user verification, HTTP path, approval-device UX or operational incident policy exists. Revocation **after** committed code enrollment does not automatically invalidate saved codes. All work is Draft/unmerged and default-deny for ordinary unprovisioned users.
 
-## WebAuthn RP configuration candidate — stacked Draft #70 / ADR-0033
+## WebAuthn RP configuration candidate — merged PR #70 / ADR-0033
 
 A new immutable internal `PasskeyRelyingParty` candidate rejects all RP/origin configurations except a canonical lower-case ASCII DNS name and its **exact** `https://<rp-id>` origin. This conservative first-party profile does not support broader parent RP scope, subdomains, related origins, HTTP, IP/localhost, arbitrary ports or dynamic origin selection. `httpedge` regression tests ensure hypothetical registration/login endpoints remain 404 on both listeners. See [ADR-0033](../adr/0033-webauthn-relying-party-pre-enrollment.md).
 
 This is **only configuration validation**: there is NO WebAuthn library verifier, attestation/assertion, challenge store, credential owner/UV state, trusted prior-key enrollment, HTTP endpoint, runtime enrollment permission, passkey authentication, notification, AAL or phishing-resistance claim. In particular, v28's custom Ed25519 signature is not WebAuthn and is not automatically a trusted passkey registration source. A session/password/email-only registration, even if chosen for ordinary AAL1 use later, must never be silently promoted to the independent factor required by saved recovery-code bootstrap. Ordinary factor loss and suspected full-account compromise need distinct recovery-code incident policies.
 
-## Passkey registration Begin-only candidate — Identity v30 / stacked Draft #71
+## Passkey registration Begin-only candidate — Identity v30 / merged PR #71
 
 Identity v30 adds **durable** `passkey_registration_intents` (one current challenge per subject; random 32-byte nonce, exact digest-only session binding, epoch/contact, immutable RP ID/origin, fixed config generation/purpose, DB-clock three-minute TTL). The role `mamony_identity_passkey_registration_issuer_runtime` can only invoke a narrowly fenced challenge issuer; it cannot read the table, approve/consume a challenge, create passkey credentials, prebind recovery factor keys or bypass a preexisting authentic independent factor. Current HTTP routes stay unmounted. See [ADR-0034](../adr/0034-webauthn-registration-intent.md).
 
 **SECURITY:** Begin only establishes public ceremony material; possession of a valid login session can request a challenge but **cannot register a passkey** in this PR. There is **no** WebAuthn library verifier, attestation, credential table, trusted independent binding, registered/passkey login, mandatory registration notice or NIST assurance claim. SQL does not treat the caller's RP ID as an ownership proof; future finish must revalidate trusted runtime origin/RP/policy. Enrollment of offline recovery-code independent factors remains blocked without previously trusted provisioning.
 
-## WebAuthn registration evidence reader — Identity v31 / stacked Draft #72
+## WebAuthn registration evidence reader — Identity v31 / merged PR #72
 
 Identity v31 permits a **distinct internal EXECUTE-only reader role** to retrieve server-expected registration challenge and RP policy generation only when the same original live session, subject epoch, verified contact, purpose and unexpired/nonconsumed pending intent still match. The Go reader independently checks session identity and the **current exact** configured RP ID/origin; a stale policy or mismatched RP denies. See [ADR-0035](../adr/0035-webauthn-registration-evidence-reader.md).
 
 This is **expected context, not proof**. Read does not verify clientDataJSON, authenticator data, signature, UV, attestation or credential uniqueness, consume the challenge, create a credential or authorize trusted independent recovery enrollment. The candidate go-webauthn v0.18.2 library has been evaluated, **not imported**. A separately controlled transaction must consume+bind only after full maintained-library protocol verification and independent binding policy approval. All public routes remain 404; migration/role remains stacked Draft/unmerged.
 
-## WebAuthn protocol verification candidate — stacked Draft #73
+## WebAuthn protocol verification candidate — merged PR #73
 
 The Identity protocol adapter `internal/modules/identity/internal/repository/webauthn` uses **pinned go-webauthn v0.18.2** to parse a bounded registration response (max 128 KiB) and verify the original **server-owned v31 expected challenge**, exact RP ID/origin, `webauthn.create` ceremony, user presence + **required user verification**, attested credential ID and supported COSE algorithms. The usecase `PasskeyRegistrationProofVerifier.VerifyOnly` first resolves the original live session/intent/subject via v31, then delegates to this adapter. Synthetic ES256/`fmt:none` tests reject wrong nonce, wrong origin/RP hash, cross-origin, wrong ceremony, missing UP/UV, mismatched ID and malformed/oversized payload. See [ADR-0036](../adr/0036-webauthn-registration-protocol-verifier.md).
 
 **IMPORTANT: successful protocol validation is not registration authorization.** The adapter exposes only an in-memory candidate and has **no** DB credential-writing capability, finish/consume function, audit, role privilege or HTTP route. An attestation format `none` provides no proof of trusted device provenance or independent account-binding permission; session/password-only registration MUST NOT become a trusted offline recovery factor. The future Begin options must match the verifier's explicit ES256/EdDSA/RS256, UV and extension-free session contract (or persist full library SessionData). A separate atomic finish must recheck challenge/epoch/RP policy under locks and write credential + mandatory notices only after independently approved binding admission. CI success is not a production enrollment claim.
 
-## Passkey registration password admission — Identity v32 / stacked Draft #74
+## Passkey registration password admission — Identity v32 / merged PR #74
 
 A **separate, unmounted, EXECUTE-only admission role** may mark one v30 passkey registration intent as password-reauthenticated only after Go rechecks the live bearer subject against a **fresh, pre-KDF-budgeted Argon2id current-password verification**. A 30-second, single-purpose `PASSKEY_REGISTRATION_REAUTH` grant is staged by the existing trusted auth-grant role and consumed in one PostgreSQL function under subject/alias/session/intent row locks and the DB clock. The resulting record binds the exact intent ID, session digest, subject epoch, verified contact, expiry (no later than the original three-minute nonce), and fixed **`PASSWORD_REAUTH_ONLY` provenance**. A different session of the same subject, wrong password, cross-purpose login/change grant, replay, expired challenge, stale epoch or already approved intent is denied. See [ADR-0037](../adr/0037-passkey-registration-password-reauth-admission.md).
 
 **No passkey has been registered.** V32 does not consume the WebAuthn challenge, create any credential, passkey login, independent recovery-factor approval, MFA guarantee, security notice or public endpoint. Reauth admission is not sufficient for a financial high-assurance enrollment or a recovery-factor bootstrap. A separately reviewed and transactionally fenced `finish` must recheck both v30/v31 nonce and v32 admission alongside WebAuthn protocol evidence, global credential ID uniqueness and atomic security audit/mandatory notice before any account binding. All four PRs remain stacked Draft/unmerged.
 
-## Atomic passkey registration staging — Identity v33 / stacked Draft #75
+## Atomic passkey registration staging — Identity v33 / merged PR #75
 
 The internal **unmounted** `PasskeyRegistrationStager` receives exact v31 evidence and a complete verified go-webauthn registration response in the same call. A dedicated EXECUTE-only v33 role then transactionally rechecks the original nonce, session/epoch, exact RP origin, and a valid **PASSWORD_REAUTH_ONLY** v32 admission under subject/alias → session → intent → admission locks. A successful commit consumes both challenge and admission, stores a globally unique credential ID and COSE public key with fixed **PENDING_ASSERTION** status, writes an identifier-only `PASSKEY_REGISTRATION_STAGED` audit event, and enqueues **one PENDING security notice** through an origin-gated trigger. Collision or notice failure rolls back the entire commit. See [ADR-0038](../adr/0038-webauthn-atomic-provisional-registration.md).
 
 **No usable passkey exists.** A `fmt:none` registration response does not independently prove ownership of the private key or high-assurance device provenance. V33 exposes no credential activation, login assertion, registration HTTP route, independent recovery factor, or security email sender. `PENDING` is a durable notification obligation, **not a delivered notice**. Before production, a second authenticator assertion must establish possession and appropriate admission, Begin creation-options congruence must be implemented, and a separate notice worker and browser/operations controls require review. All stacked PRs remain Draft/unmerged.
 
-## Passkey activation challenge and expected evidence — Identity v34 / stacked Draft #76
+## Passkey activation challenge and expected evidence — Identity v34 / merged PR #76
 
 V34 introduces an **unmounted, EXECUTE-only, one-challenge-per-subject** `PASSKEY_ACTIVATION_ASSERTION` nonce issuer and a **separate EXECUTE-only reader** for its expected authenticator assertion context. The nonce is unique, tied to the exact original live session, subject epoch, contact version, v33 `PENDING_ASSERTION` credential, its previously consumed v30 registration intent and v32 `PASSWORD_REAUTH_ONLY` admission, and its queued notice/audit event. It expires within **3 minutes** and at most **10 minutes after staging**. While unexpired, a second issue cannot silently supersede it. The reader exposes only matching server-owned nonce, credential ID, public COSE key, AAGUID, counter and backup flags with pinned RP ID/origin. A newer v30 registration intent invalidates the older pending credential's activation eligibility instead of reusing stale approval. See [ADR-0039](../adr/0039-passkey-activation-challenge-evidence.md).
 
 **No assertion signature has been verified and no passkey is activated.** The new issuer/reader cannot consume this challenge or change the v33 state `PENDING_ASSERTION`; there is no public route or login/recovery entitlement. A separate maintained WebAuthn assertion verifier and separately reviewed atomic activation transaction are required, with browser options, rechecked session/state/nonce, mandatory notice and independently controlled trust policy. `PENDING` security notices remain queued, not delivered.
 
-## Signed passkey activation assertion verifier — Identity v35 / stacked Draft #77
+## Signed passkey activation assertion verifier — Identity v35 / merged PR #77
 
 The internal **unmounted** `PasskeyActivationAssertionVerifier` retrieves the still-live v34 expected challenge and pending credential via the already isolated EXECUTE-only reader; it validates a bounded `webauthn.get` response using the pinned **go-webauthn v0.18.2** library `ParseCredentialRequestResponseBytes` and `ValidateLogin`. It reconstructs the exact expected DB challenge, RP ID/origin, subject/user handle and only allowed credential ID with the original COSE public key. Verification checks real P-256/ES256 signature (and other library-supported keys), UP, **required UV**, challenge/type/origin/RP hash, credential ID/user handle, BE/BS consistency, and explicit counter clone-warning denial. Zero/zero counters remain permissible but offer no clone detection. The verified result is a defensive copy, not a credential or authentication grant. See [ADR-0040](../adr/0040-passkey-activation-signed-assertion-verifier.md).
 

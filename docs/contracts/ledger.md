@@ -2,7 +2,7 @@
 
 The ledger is the sole writer of balances. See the [ledger and data ownership decision](../adr/0002-ledger-and-data-ownership.md).
 
-Ledger implementation and integration evidence are pending.
+K1 and FND-02b are merged, isolated synthetic implementations. Durable Ledger posting and integration evidence are pending; see [current state](../current-state.md).
 
 ## K1 isolated monetary domain (synthetic experiment)
 
@@ -48,7 +48,7 @@ Before implementation, record which fields are part of replay identity. Include 
 
 Use the [PostgreSQL contract](postgresql.md) for schema ownership and runtime roles. Apply its tenant-isolation tests to tenant-owned tables. Check the ledger through its database grants and its calling capability's authorization.
 
-Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). All database checks above are **NOT RUN** in the bootstrap.
+Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). All Ledger database checks above remain **NOT RUN**; isolated domain/reference test evidence does not satisfy them.
 
 ## Account lifecycle and reads
 
