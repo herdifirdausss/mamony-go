@@ -38,6 +38,8 @@ vendors:
 components:
   ledger_domain:
     in: modules/ledger/internal/domain/**
+  ledger_facade:
+    in: modules/ledger
   identity_facade:
     in: modules/identity
   app:
@@ -65,6 +67,9 @@ deps:
   ledger_domain:
     mayDependOn:
       - ledger_domain
+  ledger_facade:
+    mayDependOn:
+      - ledger_domain
   identity_facade:
     mayDependOn:
       - identity_handler
@@ -81,6 +86,7 @@ deps:
   app:
     mayDependOn:
       - platform
+      - ledger_facade
   # The current config schema requires at least one explicit reference;
   # self-component references do not grant cross-layer imports.
   platform:
