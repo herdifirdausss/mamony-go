@@ -28,7 +28,8 @@ cleanup() {
 }
 trap cleanup EXIT
 snapshot_sql="$(dirname "$0")/identity-reconciliation-snapshot.sql"
-[[ -s "$snapshot_sql" ]] || fail "missing snapshot query"
+witness_sql="$(dirname "$0")/identity-reconciliation-witnesses.sql"
+[[ -s "$snapshot_sql" && -s "$witness_sql" ]] || fail "missing reconciliation query"
 
 source_sql() {
   timeout 90 docker exec -i "$source_id" psql -U mamony_test_admin -d mamony_test_ci -XqAt -F '|' -v ON_ERROR_STOP=1 "$@"
@@ -43,19 +44,36 @@ source_sql < "$snapshot_sql" > "$work/before"
 validate_snapshot() {
   local file=$1
   [[ -s "$file" ]] || return 1
-  [[ "$(wc -l < "$file")" -eq 18 ]] || return 1
+  [[ "$(wc -l < "$file")" -eq 22 ]] || return 1
   awk -F '|' 'NF != 3 || $1 !~ /^[a-z_]+$/ || $2 !~ /^[0-9]+$/ || length($3) != 64 || $3 !~ /^[0-9a-f]+$/ || seen[$1]++ {bad=1} END {exit bad}' "$file" || return 1
   local table
+  for table in subjects email_aliases password_verifiers recovery_code_factor_keys password_recovery_offline_codes passkey_credentials security_outbox password_change_notices password_recovery_notices password_recovery_code_notices passkey_registration_notices opaque_sessions password_recovery_challenges password_recovery_assurance_grants password_recovery_code_enrollment_approvals recovery_code_factor_challenges passkey_activation_challenges migration_fingerprints email_verification_challenges password_login_grants passkey_registration_intents passkey_registration_admissions; do
+    awk -F '|' -v t="$table" '$1==t {found=1} END {exit !found}' "$file" || return 1
+  done
   for table in subjects email_aliases password_verifiers recovery_code_factor_keys password_recovery_offline_codes passkey_credentials security_outbox password_change_notices password_recovery_notices password_recovery_code_notices passkey_registration_notices opaque_sessions migration_fingerprints; do
     awk -F '|' -v t="$table" '$1==t && $2>0 {found=1} END {exit !found}' "$file" || return 1
   done
 }
 validate_snapshot "$work/before" || fail "missing or invalid committed fixture"
+# Independently require nonvacuous relational witnesses for existing
+# application-produced transitions, not just matching table checksums.
+validate_witnesses() {
+  local file=$1
+  [[ -s "$file" && "$(wc -l < "$file")" -eq 3 ]] || return 1
+  awk -F '|' '
+    NF != 2 || $2 !~ /^[0-9]+$/ || $2+0 < 1 || seen[$1]++ {bad=1}
+    END {exit (bad || !seen["password_change"] || !seen["password_recovery"] || !seen["code_rotation"])}
+  ' "$file"
+}
+source_sql < "$witness_sql" > "$work/witness-source"
+validate_witnesses "$work/witness-source" || fail "missing positive committed transition witnesses"
 # Existing integration gate has completed before this step; no source writes.
 timeout 120 docker exec "$source_id" pg_dump -U mamony_test_admin -d mamony_test_ci --format=custom --no-owner --no-acl > "$work/source.dump"
 [[ -s "$work/source.dump" ]] || fail "empty logical dump"
 source_sql < "$snapshot_sql" > "$work/after-dump"
 cmp -s "$work/before" "$work/after-dump" || fail "source changed during observation"
+source_sql < "$witness_sql" > "$work/witness-after-dump"
+cmp -s "$work/witness-source" "$work/witness-after-dump" || fail "source transition witnesses changed during observation"
 # Recreate only role identifiers, without credentials or login permission.
 role_filter="left(rolname,7)='mamony_' AND rolname <> 'mamony_test_admin'"
 source_sql -c "SELECT rolname FROM pg_roles WHERE $role_filter ORDER BY rolname" > "$work/role-names"
@@ -92,6 +110,8 @@ matches_observation() {
   validate_snapshot "$1" && cmp -s "$work/before" "$1"
 }
 matches_observation "$work/restored" || fail "restored rows differ"
+target_sql < "$witness_sql" > "$work/witness-logical"
+cmp -s "$work/witness-source" "$work/witness-logical" || fail "logical transition witnesses differ"
 echo "RH-03a1 PASS: selected committed Identity binding, audit and notice rows match logical restore"
 target_sql -c "SELECT rolname FROM pg_roles WHERE $role_filter ORDER BY rolname" > "$work/target-roles"
 cmp -s "$work/role-names" "$work/target-roles" || fail "target role inventory mismatch"
@@ -150,6 +170,8 @@ SQL
 [[ "$changes" == $'1\n1' ]] || fail "controlled fixture transitions missing"
 target_sql < "$snapshot_sql" > "$work/native-boundary"
 validate_snapshot "$work/native-boundary" || fail "invalid native boundary observation"
+target_sql < "$witness_sql" > "$work/witness-native-boundary"
+cmp -s "$work/witness-source" "$work/witness-native-boundary" || fail "native boundary transition witnesses changed"
 for table in opaque_sessions password_recovery_offline_codes; do
   [[ "$(grep -F "$table|" "$work/restored")" != "$(grep -F "$table|" "$work/native-boundary")" ]] || fail "fixture transition not reflected"
 done
@@ -258,3 +280,11 @@ native_sql < "$snapshot_sql" > "$work/native-final"
 matches_native_boundary "$work/native-final" || fail "native observations changed"
 [[ "$(native_sql -c 'SHOW transaction_read_only')" == on ]] || fail "native target no longer read-only"
 echo "RH-03c2 PASS: stale and contradictory valid snapshots rejected against controlled native boundary; final observations unchanged"
+# RH-03a3: preserve nonvacuous relational observations from the committed
+# source integration tests through the logical and native recovery targets.
+native_sql < "$witness_sql" > "$work/witness-native-final"
+validate_witnesses "$work/witness-native-final" || fail "missing recovered transition witnesses"
+cmp -s "$work/witness-source" "$work/witness-native-final" || fail "native transition witnesses differ"
+matches_native_boundary "$work/native-final" || fail "final native snapshot differs"
+[[ "$(native_sql -c 'SHOW transaction_read_only')" == on ]] || fail "native target no longer read-only"
+echo "RH-03a3 PASS: positive password change, password recovery and recovery code rotation witnesses preserved across logical and native recovery; selected challenge and grant tables included"
