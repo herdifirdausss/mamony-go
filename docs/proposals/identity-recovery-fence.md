@@ -203,3 +203,54 @@ Before any implementation: owner accepts precise consistency/disposition semanti
 | C4 | Separate exact synthetic scope/implementation authorization; no v36 import | PROPOSED |
 
 All RF-01–07 NOT RUN; RF-08 BLOCKED. No accepted implementation procedure. Independent technical acceptance unrecorded; G6 NOT AUTHORIZED; production NOT ACCEPTED.
+
+## Final G3 policy review — proposed decision package (2026-11-25)
+
+[Owner C1–C4 direction acceptance](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7152424857) authorizes this review, inventory, retention requirements and bounded experiment proposal only. Prior exact documentation HEAD 6cedb8a23aacf9c0ff3bfd4993c1e062ffa50ea6 passed all five workflows. Main inspected f46459615189ea0657c630f589219b082aee9b71. #81 remains unmerged (observed head 8c6bb4ac8143f529824c61fcc23307560238c5c9); no v36 import. This package is a proposed policy baseline, not accepted implementation design.
+
+### P1 — Coverage inventory (source-level, not catalog/ACL attestation)
+
+The main tree contains Identity migration versions 1–34. Review of table creation definitions in the relevant migrations identified 28 table names grouped below. Twenty-two are selected in #95's snapshot; six additional names are not in that selected inventory. This is a source-level inventory of identified tables, not exhaustive function/role/dependency or deployed-catalog parity. Classifications are proposed; an omitted or unknown authority family blocks any completeness claim.
+
+| Group | Main creation sources (Identity migration version) | Identified table names | Required recovery review | Evidence |
+|---|---|---|---|---|
+| Durable binding | 1, 24, 28, 33 | subjects, email_aliases, password_verifiers, password_recovery_offline_codes, recovery_code_factor_keys, passkey_credentials | Authorized generation, binding and disposition; staged passkey not activated | #95 selected state; complete history NOT RUN |
+| Temporary proof / session | 2, 10, 11, 19, 21, 25, 28, 30, 32, 34 | email_verification_challenges, opaque_sessions, password_login_grants, password_recovery_challenges, password_recovery_assurance_grants, password_recovery_code_enrollment_approvals, recovery_code_factor_challenges, passkey_registration_intents, passkey_registration_admissions, passkey_activation_challenges | Outstanding pre-recovery authority invalid before any separately authorized release; preserve historical outcomes | #95 selected observations and preserved-state controls; full fence NOT RUN |
+| Durable security obligation | 1, 16, 21, 25, 33 | security_outbox, password_change_notices, password_recovery_notices, password_recovery_code_notices, passkey_registration_notices | Original event identity, disposition and notice obligation; not proof of delivery | #95 selected evidence; full obligation continuity NOT RUN |
+| Schema evidence | 1 | migration_fingerprints | Exact compatible version and provenance; no upgrade or migration in proposal | #95 selected evidence; deployed parity NOT RUN |
+| Operational state outside #95 selection | 3, 5, 19 | email_proof_deliveries, anonymous_admission_buckets, password_recovery_deliveries | Review obsolete proof work, delivery uncertainty and admission continuity without relaxing existing policy | NOT RUN |
+| Provider evidence outside #95 selection | 17, 23, 27 | security_notice_mailgun_receipts, password_recovery_notice_mailgun_receipts, recovery_code_notice_mailgun_receipts | Distinguish provider evidence from user receipt; no automatic resend or live provider action | NOT RUN |
+
+The six outside #95 selection are not asserted defects in its owner-approved bounded scope. They remain in the broader Identity recovery review. Admission counters are operational protection, not permission or durable authenticator binding; do not infer that recovery permits resetting budgets. Table-level inventory is insufficient to establish all functions, active runtime roles, external state, retention dependencies or sensitive-action approval coverage. Financial authorization remains under IAM-12/#18 and its owning transaction, not granted by Identity recovery. V36 possession and related notice are explicitly blocked by #81. For later implementation review, require confirmed enabled/disabled family list, owning capability, dependency and retention map; unknown classifications block coverage.
+
+### P2 — Retention and evidence requirements
+
+Observed existing policy (source and contract, not new recovery retention): v6 retention maintenance clears expired email proof envelopes after expiry +24h and anonymous accounting after window start +48h; v10/v11 creation migrations include session/grant cleanup after expiry +24h. Existing notice policy v16/v22/v26 has seven-day recipient-bearing notice cleanup, with provider receipt retention described in Identity contract for v17/v23/v27. These are existing local maintenance boundaries, not permission to change retention, suspend privacy obligations, purge physical backups/WAL, or reconstruct records that legitimately expired. The current source does not establish a complete recovery history retention schedule.
+
+| Evidence class | Proposed requirement | Decision still needed |
+|---|---|---|
+| Credential/proof material | Never include raw passwords, bearer values, recovery codes, private keys, encrypted payloads or recipient contents in review output; no transferable artifact | Existing policy and privacy review |
+| Historical security events and disposition | Preserve legitimate original event identity and distinguish invalidation from successful user action | Audit taxonomy, access and retention duration |
+| Notice and provider evidence | Preserve original logical obligation and classify unknown outcomes; do not assume a missing purged row proves loss or delivery | Reconciliation with approved retention and surviving evidence |
+| Admission and temporary operational state | Respect existing protective controls and retention; unknown state stays unresolved | Continuity and resource policy review |
+| Synthetic evidence artifacts | Aggregate/redacted evidence only; disposable fixture material removed with fixture; record cleanup limits | CI artifact lifetime and authorized access before experiment |
+| Backup/WAL and external history | Separate Platform retention/custody policy; logical deletion not proof of physical deletion | Independent history availability and legal/privacy review |
+
+No new numeric retention period, legal hold, retention bypass, deletion policy, event schema or storage authority is approved here. If currentness cannot be established with legitimately retained evidence, HOLD remains the outcome; do not extend retention ad hoc or fabricate history. Owner and independent privacy/security review must settle a minimum necessary evidence window, access/custody, disposal and lawful exception policy before production. These are production blockers, not waived by a synthetic review.
+
+### P3 — Proposed bounded experiment (design gate only)
+
+Goal: evaluate whether a separately approved disposable synthetic fixture can support meaningful evidence of the selected recovery-policy requirements under the common HOLD invariant, without any release or production behavior. This document authorizes no execution or implementation. Preferred first slice is inventory/coverage validation and reviewed evidence classification, before any behavioral implementation. Do not expand a passing subset into all-family acceptance.
+
+| Proposed stage | Evidence objective | Exit / stop rule |
+|---|---|---|
+| E0 — Inventory review | Confirm exact main revision, enabled authority families, source-level ownership, retention and evidence assumptions | Unknown coverage or incompatible policy stays BLOCKED |
+| E1 — Bounded policy evaluation | Verify that the proposed review classifications distinguish complete, missing, contradictory, unknown and partial evidence; preserve HOLD | No actual authorization behavior claim from classification alone |
+| E2 — Separate behavioral evidence review | After separate technical and experiment approval, assess actual owning-capability denial of pre-recovery temporary authority and fresh independently scoped positive controls in disposable fixtures; preserve original obligations | Stop on unexpected outcome or need for new runtime/migration/role/registry semantics; do not treat E1 as E2 |
+| E3 — Review consolidation | Record exact candidate, actual results, limitations, containment and coverage | RF-01–07 remain NOT RUN until their own actual evidence; RF-08 remains BLOCKED; no release |
+
+Allowed future scope, subject to separate exact approval: existing synthetic test infrastructure, integration-only test and redacted review artifacts; no production code, routes, role changes, live credentials/providers, deployment, migration, registry, release or unmerged #81 import. Exact allowed paths, fixture boundaries, resource/retention limits, independent review conditions and test ownership must be agreed before any coding. The original held recovery target remains untouched and unavailable; no transferable credential or operational recovery procedure. Use only controlled synthetic data. Failure or inability to safely evaluate a family is recorded as NOT RUN/BLOCKED, not converted to PASS. No change to #95 or #81.
+
+### P4 — G3 gate recommendation
+
+Recommend owner review of the policy baseline P1–P4: accept the source-level inventory as a starting point (not parity), retention principles without new durations, staged experiment *proposal only*, and explicit blockers. Require a further bounded scope decision before E1 implementation, and a separate reviewed technical design before E2. No automatic authorization from accepting this document, direction approval or CI. Independent technical acceptance unrecorded, production NOT ACCEPTED, G6 NOT AUTHORIZED. Full RH-03 PARTIAL; no change to canonical contracts/governance, no merge or activation.
