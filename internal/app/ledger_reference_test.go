@@ -21,8 +21,8 @@ func TestLedgerReferenceComposition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := ledger.CurrencyDefinition{Code: string(canonical.Code()), Exponent: canonical.Exponent(), Version: canonical.Version()}
-	if got, err := a.LookupCurrency("USD"); err != nil || got != want || got.Exponent != 2 || got.Version != "iso4217-minor-v1:USD:2" {
+	want := ledger.CurrencyDefinition{Code: string(canonical.Code()), Exponent: canonical.Exponent(), Version: canonical.Version(), UnitID: canonical.UnitID()}
+	if got, err := a.LookupCurrency("USD"); err != nil || got != want || got.Exponent != 2 || got.Version != "mamony-currency-v2:USD:1" || got.UnitID != "mamony-unit-v1:USD:1" {
 		t.Fatalf("composition did not use canonical USD: %+v, %v", got, err)
 	}
 	if got, err := a.RequireCurrency(want); err != nil || got != want {
@@ -33,7 +33,7 @@ func TestLedgerReferenceComposition(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected known reference %s: %v", code, err)
 		}
-		if got, err := a.RequireCurrency(ledger.CurrencyDefinition{Code: string(d.Code()), Exponent: d.Exponent(), Version: d.Version()}); !errors.Is(err, ledger.ErrCurrencyNotEnabled) || got != (ledger.CurrencyDefinition{}) {
+		if got, err := a.RequireCurrency(ledger.CurrencyDefinition{Code: string(d.Code()), Exponent: d.Exponent(), Version: d.Version(), UnitID: d.UnitID()}); !errors.Is(err, ledger.ErrCurrencyNotEnabled) || got != (ledger.CurrencyDefinition{}) {
 			t.Fatalf("known but disabled currency admitted: %s, %v", code, err)
 		}
 	}
@@ -44,6 +44,20 @@ func TestLedgerReferenceComposition(t *testing.T) {
 		if _, err := a.LookupCurrency(code); !errors.Is(err, ledger.ErrCurrencyNotEnabled) {
 			t.Fatalf("unexpected admission: %q, %v", code, err)
 		}
+	}
+	pinned, err := catalog.LookupDefinition(want.Version)
+	if err != nil || pinned != canonical {
+		t.Fatal("pinned canonical USD differs from current definition")
+	}
+	wrong := want
+	wrong.UnitID = "mamony-unit-v1:USD:2"
+	if _, err := a.RequireCurrency(wrong); !errors.Is(err, ledger.ErrCurrencyMismatch) {
+		t.Fatal("same-exponent different unit accepted")
+	}
+	wrong = want
+	wrong.Version = "iso4217-minor-v1:USD:2"
+	if _, err := a.RequireCurrency(wrong); !errors.Is(err, ledger.ErrCurrencyMismatch) {
+		t.Fatal("legacy identity accepted")
 	}
 	// The admitted identity is a definition version, not the release ID.
 	want.Version = catalog.ReleaseID()
