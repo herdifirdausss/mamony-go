@@ -382,3 +382,48 @@ Session lifecycle is a reasonable first research scope because the existing owni
 ### Research disposition
 
 Recommend accepting session-lifecycle feasibility as a G2 discussion direction only. The technical policy and evidence prerequisites, consistency/retention dependencies, actual safe experimental feasibility, and independent review remain open. If the required behavior is not already supported under approved semantics, record the gap and seek separate design review rather than substitute a toy model, add unapproved authority, or relax expected outcomes. Do not specify recovery commands or operational credential replay workflows. No E2 test or full RF acceptance is marked PASS. RF-01–07 NOT RUN, RF-08 BLOCKED by unmerged #81; full RH-03 PARTIAL. No E2 implementation, migration, registry, runtime changes, merge or activation.
+
+## E2 G2/G3 policy and threat review — session family (2026-11-25)
+
+[Owner S1–S5 direction acceptance](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7152939885) authorizes policy and threat review only. Main inspected f6b9a2d1f46413e7c87db0cc09d13acc4261c438; E1 remains reviewed and Draft #106. No E2 implementation, experiment execution, migration, registry, runtime changes, merge or activation authorized. Detailed decisions below are PROPOSED, not adopted contracts.
+
+### Material design finding
+
+IAM-03/08, ADR-0006/0010/0011/0012 and existing normal lifecycle evidence support local session expiry, revocation, activity and credential/status change handling. The selected #95 preserved-state controls include a previously issued session accepted on a disposable execution copy. This is a valid state-preservation result, but it is not proof of a recovery-specific fence. Restoring a locally consistent state does not itself establish current authorized bindings or a distinct recovery policy. Neither ordinary account lifecycle transitions nor infrastructure unavailability substitutes for recovery-specific evidence. A fresh authorization control is conditional on independently established binding currentness, existing applicable assurance, and separate approved fixture scope; it must never confer recovery release or financial authorization.
+
+### Proposed policy outcomes (S1–S5 refinement)
+
+| Policy reference | Required outcome for later design | Evidence now |
+|---|---|---|
+| SP-01 / S1 | Explicit owner-capability negative conclusion distinguished from unavailable, interrupted or ambiguous outcome; neither unavailable nor unknown counts as verified denial | Existing lifecycle contracts; E2 NOT RUN |
+| SP-02 / S2 | Legitimate durable Identity binding and original logical audit/notice obligations remain intact; unknown provenance remains HOLD | Selected #95 evidence only |
+| SP-03 / S3 | Outstanding pre-recovery session authority is not accepted under the proposed recovery policy even when ordinary lifecycle eligibility alone would be insufficient to distinguish it | Recovery-specific policy implementation not established; NOT RUN |
+| SP-04 / S3 | Independently justified fresh authorization is a separate positive-control requirement; no authority inherited from the held target and no claim of release | Prerequisites and feasibility unresolved; NOT RUN |
+| SP-05 / S4 | Session-family evidence is not proof for outstanding authentication grants, recovery proofs, factor approvals, passkeys, admission/delivery or financial authorization | Coverage explicitly partial |
+| SP-06 / S5 | Exact containment, no live access or transferable artifacts, no production wiring; no mutation or release of original held target | Separate approval required |
+
+SP labels are proposal-local review references, not new canonical acceptance IDs. Evidence interpretation must preserve historical outcomes and distinguish recovery administration from user logout, authentication, credential replacement or successful proof consumption. No new event, data-retention duration, state transition, SQL, API or role is adopted.
+
+### G3 threat review
+
+| Threat/failure | Required defensive property | Residual uncertainty |
+|---|---|---|
+| Stale but internally consistent restoration | Independently established currentness or HOLD | Independent completeness unresolved |
+| Session valid under normal lifecycle but outside proposed recovery policy | Separate recovery-specific policy evidence required | No established recovery-specific behavior |
+| Unavailable capability or ambiguous result mistaken for denial | Classify outcome as unresolved, no success claim | Actual recovery failure semantics NOT RUN |
+| Normal expiry or revocation mistaken for recovery coverage | Attribute observed evidence only to its actual policy boundary | Existing source tests insufficient |
+| Partial family coverage or concurrent/interrupted recovery | Whole-Identity HOLD; no inference of partial release | Consistency and completion semantics unresolved |
+| Durable credential/event/notice loss or false audit event | Preserve legitimate binding and original obligations; no fabricated user action | Retention and independently surviving evidence unresolved |
+| Fresh control interpreted as permission | Separate conditional control only; no production target release or financial permission | Fresh prerequisites and containment unapproved |
+| Privileged authority compromise or external evidence loss | Profile A residual risk; fail closed where trust cannot be established | No claim of production compromise resistance |
+
+### Alternatives and design disposition
+
+A: Keep HOLD and retain existing lifecycle evidence as regression baseline. Safest default, does not close E2.
+B: Reuse existing lifecycle behavior as if recovery-specific. Reject: semantics and evidence do not match.
+C: Define and independently review a distinct recovery-session disposition policy with explicit dependency, consistency, audit and containment decisions. Recommended research/design direction, not implementation approval. Its feasibility under the currently allowed test-only scope is not established.
+D: Introduce registry or release infrastructure. Out of scope; RH-04/05 remain separate.
+
+**G3 blocker:** no evidence currently establishes the required recovery-specific behavior using only existing approved semantics. Do not build another toy model, count an outage as enforcement, or modify existing runtime state merely to obtain a passing test. A new behavioral experiment needs an accepted technical design and a separately reviewed scope; if it requires new runtime, migration, access policy or registry, stop under current authorization. No implementation-ready recovery procedure is proposed. Independent technical acceptance for E2 is unrecorded; E1 deferral is not transferable.
+
+Recommendation: accept SP-01–06 as policy requirements direction for further design feasibility review or explicitly defer E2 until a separate Identity policy change can be considered. No claim that G3 technical design is complete. RF-01–07 NOT RUN; RF-08 BLOCKED by #81; full RH-03 PARTIAL. No new tests executed, no contract/governance/#95/#81/#106 code changes, no merge or activation.
