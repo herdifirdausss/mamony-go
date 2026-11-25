@@ -354,3 +354,31 @@ Recommend researching a single session-lifecycle capability first, with IAM-08 a
 ### Next gates and stop conditions
 
 E2 G1 research review precedes G2 scope acceptance, G3 technical/threat review, exact bounded experiment and explicit owner authorization. No implementation or execution now. If feasibility requires changed runtime semantics, new migration/roles, registry, live access, release, transferable artifacts or unmerged v36 dependency, stop and request separate governance review; do not use a synthetic claim to waive the issue. Independent technical acceptance for E2 is not recorded and the E1 deferral does not transfer. Existing P1–P4 and C1–C4 requirements remain; all RF-01–07 NOT RUN, RF-08 BLOCKED, full RH-03 PARTIAL. RH-04/05 registry and release remain separate. No G6 authorization, production acceptance or activation. This is a documentation-only continuation of #102; no changes to #95/#81/#106 code or canonical contracts.
+
+## E2 G1 feasibility findings — session lifecycle (2026-11-25)
+
+Research only under [owner direction](https://github.com/herdifirdausss/mamony-go/pull/106#issuecomment-7152841045). Inspected main f6b9a2d1f46413e7c87db0cc09d13acc4261c438; prior research HEAD f96426b0fe14f004680d78c3e9e969a9de0f1941 has five successful workflows. No new behavioral experiment run or authorized.
+
+| Source on inspected main | Established contract or observed evidence | Boundary |
+|---|---|---|
+| Identity IAM-03/08 and ADR-0006, 0010, 0011 | Server-owned session lifetime, revocation, inactivity, bounded concurrent sessions | Normal lifecycle; not recovery-specific invalidation |
+| ADR-0009 and 0012, Identity IAM-10/11 | Separate authentication and issuance authority, binding to current local security state, no financial permission inflation | Local authority assumptions; not independent restore currentness |
+| Recovery runbook, compromised identity section; FND-08/12 | Surviving trusted evidence and negative authorization tests are required before resuming; unknown evidence is HOLD | No independent production completeness or release evidence |
+| [Actual PostgreSQL job 138978496689](https://github.com/herdifirdausss/mamony-go/actions/runs/45546872289/job/138978496689) | TestIdentityOpaqueSessions, TestIdentityZSessionIdleExpiry, TestIdentityZMaxActiveSessions, TestIdentityZSessionFreezeIssueInterleavings, TestIdentityZAuthMaterialEpochFence, TestIdentityZAuthenticatedPasswordChange and TestIdentityZPasswordRecoveryRedemption PASS | Normal source integration cases, not E2 or recovered application behavior |
+| #95 and #106 | Selected preserved-state controls and symbolic review semantics respectively | Neither demonstrates recovery-wide temporary authority invalidation |
+
+### Feasibility assessment
+
+Session lifecycle is a reasonable first research scope because the existing owning capability, negative outcomes and source integration baseline are documented. Feasibility of a *new behavioral experiment* remains conditional, not demonstrated. Source tests can be referenced without adding further duplicate cases. Recovery-specific semantics are not established by successful normal lifecycle transitions, expired state, or isolation alone. A review cannot equate local state consistency with legitimate currentness. No implementation or operational recovery design is proposed.
+
+### Proposed G2 requirements for later review (not accepted)
+
+- S1 — Evidence quality: distinguish expected capability denial from infrastructure unavailability and unknown outcome. An unexpected result blocks the review.
+- S2 — Scope and preservation: establish reviewed authorized binding and original event/notice continuity within the selected scope; uncertainty remains HOLD.
+- S3 — Session policy: assess whether the approved recovery-specific session disposition can be evidenced separately from normal expiry/revocation. A future fresh control requires separately accepted prerequisites and containment. The original held target remains unavailable.
+- S4 — Coverage and claims: limit conclusions to the session family actually evaluated; authentication grants, other proof families, v36, delivery and financial authorization remain separately unresolved.
+- S5 — Containment and governance: no production state, transferable credential artifacts, live access, registry, migration, new runtime or release. Separate reviewed technical design and exact owner experiment authorization before any implementation. E1 independent-review deferral does not transfer.
+
+### Research disposition
+
+Recommend accepting session-lifecycle feasibility as a G2 discussion direction only. The technical policy and evidence prerequisites, consistency/retention dependencies, actual safe experimental feasibility, and independent review remain open. If the required behavior is not already supported under approved semantics, record the gap and seek separate design review rather than substitute a toy model, add unapproved authority, or relax expected outcomes. Do not specify recovery commands or operational credential replay workflows. No E2 test or full RF acceptance is marked PASS. RF-01–07 NOT RUN, RF-08 BLOCKED by unmerged #81; full RH-03 PARTIAL. No E2 implementation, migration, registry, runtime changes, merge or activation.
