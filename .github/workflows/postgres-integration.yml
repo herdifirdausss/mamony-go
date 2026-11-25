@@ -109,3 +109,4 @@ jobs:
           bash tools/postgrestest/check-platform-identity-execution.sh | tee "$RUNNER_TEMP/platform-identity-execution.log"
           grep -F 'RH-03b3a PASS:' "$RUNNER_TEMP/platform-identity-execution.log"
           grep -F 'RH-03b3b PASS:' "$RUNNER_TEMP/platform-identity-execution.log"
+          grep -F 'RH-03b3c PASS:' "$RUNNER_TEMP/platform-identity-execution.log"
