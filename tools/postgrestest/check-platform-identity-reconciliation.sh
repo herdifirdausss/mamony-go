@@ -29,7 +29,8 @@ cleanup() {
 trap cleanup EXIT
 snapshot_sql="$(dirname "$0")/identity-reconciliation-snapshot.sql"
 witness_sql="$(dirname "$0")/identity-reconciliation-witnesses.sql"
-[[ -s "$snapshot_sql" && -s "$witness_sql" ]] || fail "missing reconciliation query"
+lifecycle_sql="$(dirname "$0")/identity-reconciliation-lifecycle.sql"
+[[ -s "$snapshot_sql" && -s "$witness_sql" && -s "$lifecycle_sql" ]] || fail "missing reconciliation query"
 
 source_sql() {
   timeout 90 docker exec -i "$source_id" psql -U mamony_test_admin -d mamony_test_ci -XqAt -F '|' -v ON_ERROR_STOP=1 "$@"
@@ -65,6 +66,26 @@ validate_witnesses() {
     END {exit (bad || !seen["password_change"] || !seen["password_recovery"] || !seen["code_rotation"] || !seen["factor_enrollment"] || !seen["passkey_stage"])}
   ' "$file"
 }
+# Observe actual committed lifecycle categories separately from the
+# relational witnesses. Never infer authority eligibility from a count.
+validate_lifecycle() {
+  local file=$1
+  [[ -s "$file" && "$(wc -l < "$file")" -eq 8 ]] || return 1
+  awk -F '|' '
+    NF != 2 || $2 !~ /^[0-9]+$/ || seen[$1]++ {bad=1}
+    $1!="code_unconsumed" && $2+0 < 1 {bad=1}
+    END {exit (bad || !seen["code_consumed"] || !seen["code_unconsumed"] ||
+      !seen["recovery_challenge_consumed"] || !seen["recovery_challenge_revoked"] ||
+      !seen["recovery_assurance_consumed"] || !seen["factor_revoked"] ||
+      !seen["factor_approval_consumed"] || !seen["factor_challenge_consumed"])}
+  ' "$file"
+}
+source_sql < "$lifecycle_sql" > "$work/lifecycle-source"
+validate_lifecycle "$work/lifecycle-source" || fail "missing recovery lifecycle observation"
+# The existing isolated native fixture consumes one previously unconsumed
+# code; its expected lifecycle delta is explicit, not a new authority action.
+awk -F '|' 'BEGIN {OFS="|"} $1=="code_consumed" {$2++} $1=="code_unconsumed" {if ($2<1) bad=1; $2--} {print} END {exit bad}' "$work/lifecycle-source" > "$work/lifecycle-expected" || fail "no unconsumed code fixture"
+validate_lifecycle "$work/lifecycle-expected" || fail "invalid expected lifecycle delta"
 source_sql < "$witness_sql" > "$work/witness-source"
 validate_witnesses "$work/witness-source" || fail "missing positive committed transition witnesses"
 # Reject absent, truncated, vacuous, duplicated or unknown aggregate evidence.
@@ -82,6 +103,8 @@ source_sql < "$snapshot_sql" > "$work/after-dump"
 cmp -s "$work/before" "$work/after-dump" || fail "source changed during observation"
 source_sql < "$witness_sql" > "$work/witness-after-dump"
 cmp -s "$work/witness-source" "$work/witness-after-dump" || fail "source transition witnesses changed during observation"
+source_sql < "$lifecycle_sql" > "$work/lifecycle-after-dump"
+cmp -s "$work/lifecycle-source" "$work/lifecycle-after-dump" || fail "source lifecycle observation changed"
 # Recreate only role identifiers, without credentials or login permission.
 role_filter="left(rolname,7)='mamony_' AND rolname <> 'mamony_test_admin'"
 source_sql -c "SELECT rolname FROM pg_roles WHERE $role_filter ORDER BY rolname" > "$work/role-names"
@@ -120,6 +143,8 @@ matches_observation() {
 matches_observation "$work/restored" || fail "restored rows differ"
 target_sql < "$witness_sql" > "$work/witness-logical"
 cmp -s "$work/witness-source" "$work/witness-logical" || fail "logical transition witnesses differ"
+target_sql < "$lifecycle_sql" > "$work/lifecycle-logical"
+cmp -s "$work/lifecycle-source" "$work/lifecycle-logical" || fail "logical lifecycle observation differs"
 echo "RH-03a1 PASS: selected committed Identity binding, audit and notice rows match logical restore"
 target_sql -c "SELECT rolname FROM pg_roles WHERE $role_filter ORDER BY rolname" > "$work/target-roles"
 cmp -s "$work/role-names" "$work/target-roles" || fail "target role inventory mismatch"
@@ -180,6 +205,8 @@ target_sql < "$snapshot_sql" > "$work/native-boundary"
 validate_snapshot "$work/native-boundary" || fail "invalid native boundary observation"
 target_sql < "$witness_sql" > "$work/witness-native-boundary"
 cmp -s "$work/witness-source" "$work/witness-native-boundary" || fail "native boundary transition witnesses changed"
+target_sql < "$lifecycle_sql" > "$work/lifecycle-native-boundary"
+cmp -s "$work/lifecycle-expected" "$work/lifecycle-native-boundary" || fail "native boundary lifecycle delta differs"
 for table in opaque_sessions password_recovery_offline_codes; do
   [[ "$(grep -F "$table|" "$work/restored")" != "$(grep -F "$table|" "$work/native-boundary")" ]] || fail "fixture transition not reflected"
 done
@@ -297,3 +324,11 @@ matches_native_boundary "$work/native-final" || fail "final native snapshot diff
 [[ "$(native_sql -c 'SHOW transaction_read_only')" == on ]] || fail "native target no longer read-only"
 echo "RH-03a3 PASS: positive password change, password recovery and recovery code rotation witnesses preserved across logical and native recovery; selected challenge and grant tables included"
 echo "RH-03a4 PASS: factor enrollment and staged passkey durable relationships preserved across held recovery; invalid aggregate witness inventories rejected"
+# Verify preserved lifecycle counts at the actual held boundary and reject
+# the older, otherwise structurally valid aggregate observation.
+native_sql < "$lifecycle_sql" > "$work/lifecycle-native-final"
+validate_lifecycle "$work/lifecycle-native-final" || fail "invalid native lifecycle observation"
+cmp -s "$work/lifecycle-expected" "$work/lifecycle-native-final" || fail "native lifecycle observation differs"
+if cmp -s "$work/lifecycle-source" "$work/lifecycle-native-final"; then fail "older lifecycle observation matched"; fi
+[[ "$(native_sql -c 'SHOW transaction_read_only')" == on ]] || fail "native lifecycle target no longer held"
+echo "RH-03a5 PASS: recovery lifecycle observations preserved with exact controlled code consumption delta; prior observation differs; target held"
