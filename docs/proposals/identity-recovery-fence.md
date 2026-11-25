@@ -427,3 +427,45 @@ D: Introduce registry or release infrastructure. Out of scope; RH-04/05 remain s
 **G3 blocker:** no evidence currently establishes the required recovery-specific behavior using only existing approved semantics. Do not build another toy model, count an outage as enforcement, or modify existing runtime state merely to obtain a passing test. A new behavioral experiment needs an accepted technical design and a separately reviewed scope; if it requires new runtime, migration, access policy or registry, stop under current authorization. No implementation-ready recovery procedure is proposed. Independent technical acceptance for E2 is unrecorded; E1 deferral is not transferable.
 
 Recommendation: accept SP-01–06 as policy requirements direction for further design feasibility review or explicitly defer E2 until a separate Identity policy change can be considered. No claim that G3 technical design is complete. RF-01–07 NOT RUN; RF-08 BLOCKED by #81; full RH-03 PARTIAL. No new tests executed, no contract/governance/#95/#81/#106 code changes, no merge or activation.
+
+## E2 separate recovery-session policy — design feasibility disposition (2026-11-25)
+
+[Owner Option C and SP-01–06 direction](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7163844931) authorizes policy design review and feasibility assessment only. Previous exact proposal HEAD 5adfee311e8d04c0dbe2dca23d42a996f9132db9 passed all five workflows. Main inspected f6b9a2d1f46413e7c87db0cc09d13acc4261c438. E1 remains a reviewed but unmerged symbolic experiment; #95 is bounded preserved-state evidence, and #81 remains unmerged (observed head 06addb211df06f08c96997e8d40ba9141785420b). No E2 implementation, migration, runtime, registry, merge or activation authorized.
+
+### Distinct policy responsibility
+
+Recovery-session disposition is a security policy, not a synonym for ordinary logout, credential change, account suspension, normal expiry, or restored-row equality. Identity owns authorization and its audit meaning. Platform owns recovery provenance and isolation; a Platform observation or successful backup alone does not confer Identity authority. A subject-scoped review may collect evidence, but whole-Identity HOLD remains the default until a separately approved release policy establishes all relevant scope. The current research does not create release eligibility. Independent evidence is a prerequisite to claiming authorized binding currentness; Profile A authority compromise remains outside demonstrated resistance. Sources: IAM-03/08/10/11/12, FND-08/12, ADR-0006/0009/0010/0011/0012, recovery runbook and #95/#106 reviews already cited.
+
+### RSP-01–05 — proposed semantic design decisions
+
+| Reference | Proposed policy decision | Open issue |
+|---|---|---|
+| RSP-01 | Explicitly distinguish ordinary lifecycle disposition from recovery disposition; all in-scope outstanding pre-recovery sessions must be ineligible under an accepted recovery policy, with uncertain evidence held | Authoritative policy and its proof not implemented or accepted |
+| RSP-02 | Keep durable credential/contact bindings and original audit/notice obligations distinct from temporary session authority; do not manufacture logout, authentication or credential-change history | Administrative audit meaning, retention and cross-family obligations need review |
+| RSP-03 | Maintain HOLD on incomplete, contradictory or unknown results; distinguish expected denial from unavailable or interrupted evaluation | Consistency boundary and durable outcome evidence not established |
+| RSP-04 | Fresh authorization may be considered only as a separate conditional control under existing applicable assurance and independently established currentness, not proof of release or financial eligibility | Safe fixture feasibility and scope require separate review |
+| RSP-05 | Identity owns session semantics; Platform owns provenance and containment; grants, other temporary families and recovery release remain separate requirements | Dependency and ownership inventory not complete |
+
+These are proposal-local semantic decisions, not implementation interfaces, state machine, event taxonomy, canonical ACs or new storage policy. No specific database operation or production control is adopted.
+
+### Feasibility by option
+
+| Candidate direction | Feasibility within current authorization | Evidence value / gap |
+|---|---|---|
+| Retain HOLD and review existing evidence | Feasible as documentation-only | No new recovery behavior |
+| Additional normal lifecycle tests or symbolic classification | Feasible only after separate test approval; not recommended as E2 | Cannot demonstrate recovery-specific semantics |
+| Test-only behavioral evaluation of a distinct recovery policy | Not demonstrated | Existing approved behavior and evidence do not establish this policy; a test cannot create the missing production semantics |
+| Separate Identity policy capability design | Feasible as research/design only, recommended prerequisite | Potential changes to authority semantics, consistency, audit and dependency boundaries require new scope and review |
+| Registry/release or independent production trust infrastructure | Outside E2 scope | RH-04/05 and broader trust decisions |
+
+The conclusion is an evidence gap, not a proof that every conceivable test-only alternative is impossible. Do not claim a successful normal lifecycle test is recovery-specific enforcement or create a test-local substitute for an actual owning capability. No executable recovery procedure, operational credential workflow, database mutation design, authority API, registry or release mechanism is supplied.
+
+### Required prerequisites before any further experimental proposal
+
+- Accepted Identity recovery-session semantics and responsibility boundaries, including whether a distinct capability change is needed.
+- Reviewed authorized binding evidence, retention/custody and original logical obligation requirements.
+- Reviewed consistency and interruption/unknown-outcome semantics; no partial authorization.
+- Explicit dependencies and scoped acceptance limits; #81 v36 remains separate, other temporary authority families not waived.
+- Exact synthetic containment and independent technical review requirements, separate authorization for any implementation.
+
+Existing source review establishes the normal session contract and prior integration evidence only. Current research does not establish actual recovery-policy feasibility without new behavior. Recommend recording E2 as BLOCKED on an accepted recovery-session policy capability design, and requesting a separate owner decision whether to pursue that design as documentation-only or defer E2. If a later design requires new runtime, migrations, registry or role changes, these remain prohibited until separately approved; E1's deferred independent acceptance does not transfer. No more symbolic tests proposed solely to obtain a PASS. RF-01–07 NOT RUN; RF-08 BLOCKED; RH-03 PARTIAL; G6 NOT AUTHORIZED; production NOT ACCEPTED. No changes to #95/#81/#106 or canonical contracts/governance. All new evidence requirements NOT RUN.
