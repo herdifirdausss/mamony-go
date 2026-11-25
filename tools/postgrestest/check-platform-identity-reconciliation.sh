@@ -222,3 +222,39 @@ if cmp -s "$work/restored" "$work/native-restored"; then fail "pre-boundary stat
 native_sql -c "SELECT rolname FROM pg_roles WHERE $role_filter ORDER BY rolname" > "$work/native-roles"
 cmp -s "$work/role-names" "$work/native-roles" || fail "native role inventory mismatch"
 echo "RH-03a2 PASS: native named-boundary recovery of held Identity fixture; post-backup session revocation and code consumption preserved; original selected binding, audit and notice rows unchanged"
+
+# RH-03b2: observe the held target's actual login denials without enabling
+# any fixture role, creating credentials, or exercising a live application.
+[[ "$(native_sql -c 'SHOW transaction_read_only')" == on ]] || fail "native target not read-only"
+[[ "$(native_sql -c 'SELECT current_user')" == mamony_test_admin ]] || fail "native observation control unavailable"
+checked=0
+while IFS= read -r role; do
+  [[ "$role" =~ ^mamony_[a-z0-9_]+$ && "$role" != mamony_test_admin ]] || fail "unexpected fixture role identifier"
+  status=0
+  timeout 10 docker exec -u postgres "$physical_id" psql -h "$root/socket" -U "$role" -d mamony_test_rh03 -XqAt -w -v ON_ERROR_STOP=1 -c 'SELECT 1' > "$work/held-login.log" 2>&1 || status=$?
+  [[ "$status" == 2 ]] || fail "unexpected held login result"
+  grep -F "role \"$role\" is not permitted to log in" "$work/held-login.log" >/dev/null || fail "held login denial reason not established"
+  checked=$((checked+1))
+done < "$work/native-roles"
+[[ "$checked" -gt 0 && "$checked" -eq "$(wc -l < "$work/native-roles")" ]] || fail "incomplete held role exercise"
+[[ "$(native_sql -c 'SELECT pg_is_in_recovery() AND pg_get_wal_replay_pause_state() = '"'"'paused'"'"'')" == t ]] || fail "native target no longer held"
+[[ "$(native_sql -c 'SELECT current_user')" == mamony_test_admin ]] || fail "native observation control lost"
+echo "RH-03b2 PASS: all observed held fixture roles denied login; native target remains paused and read-only"
+
+# RH-03c2: a structurally valid but old observation must not match the
+# newer controlled recovery boundary. No review or release token is created.
+matches_native_boundary() {
+  validate_snapshot "$1" && cmp -s "$work/native-boundary" "$1"
+}
+matches_native_boundary "$work/native-restored" || fail "native positive observation mismatch"
+validate_snapshot "$work/restored" || fail "old observation not a valid snapshot"
+if matches_native_boundary "$work/restored"; then fail "old observation matched native boundary"; fi
+awk -F '|' 'BEGIN {OFS="|"} $1=="opaque_sessions" {$3=substr($3,1,63) (substr($3,64,1)=="0"?"1":"0")} {print}' "$work/native-boundary" > "$work/native-contradictory"
+validate_snapshot "$work/native-contradictory" || fail "contradictory observation not structurally valid"
+for candidate in "$work/absent" "$work/truncated" "$work/native-contradictory"; do
+  if matches_native_boundary "$candidate"; then fail "invalid native evidence matched boundary"; fi
+done
+native_sql < "$snapshot_sql" > "$work/native-final"
+matches_native_boundary "$work/native-final" || fail "native observations changed"
+[[ "$(native_sql -c 'SHOW transaction_read_only')" == on ]] || fail "native target no longer read-only"
+echo "RH-03c2 PASS: stale and contradictory valid snapshots rejected against controlled native boundary; final observations unchanged"
