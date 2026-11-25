@@ -1,7 +1,7 @@
 # Identity recovery fence — proposed requirements and design boundary
 
 **Owner:** Identity (recovery semantics); Platform #14 (recovery infrastructure); coordinate with #78 (v36 capability).  
-**Status:** Critical / G2 requirements direction owner-accepted; detailed G2/G3 design PROPOSED; implementation BLOCKED.  
+**Status:** Critical / G2 requirements and P1–P4 policy baseline owner-accepted; exact E1 experiment package PROPOSED; implementation BLOCKED.  
 **Decision:** [Owner-approved scope split](https://github.com/herdifirdausss/mamony-go/issues/14#issuecomment-7152224953) authorizes preparation of this proposal, not its adoption, implementation, merge or activation.  
 **Requirements-direction decision:** [Owner approval D1–D5](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7152312494). Design review only; no implementation, migration, registry, merge or activation.  
 **Evidence date:** 2026-11-25. Main inspected `f46459615189ea0657c630f589219b082aee9b71`.
@@ -254,3 +254,60 @@ Allowed future scope, subject to separate exact approval: existing synthetic tes
 ### P4 — G3 gate recommendation
 
 Recommend owner review of the policy baseline P1–P4: accept the source-level inventory as a starting point (not parity), retention principles without new durations, staged experiment *proposal only*, and explicit blockers. Require a further bounded scope decision before E1 implementation, and a separate reviewed technical design before E2. No automatic authorization from accepting this document, direction approval or CI. Independent technical acceptance unrecorded, production NOT ACCEPTED, G6 NOT AUTHORIZED. Full RH-03 PARTIAL; no change to canonical contracts/governance, no merge or activation.
+
+## Exact bounded E1 approval package — proposed, not authorized
+
+[Owner policy baseline P1–P4 acceptance](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7152543073) authorizes preparation of this package only. Prior documentation HEAD cf34cee053c132dc03865d7c15ff8a79472f4e7c passed 5/5 workflows. Inspected main f46459615189ea0657c630f589219b082aee9b71. #81 remains unmerged; no dependency import.
+
+### Goal
+Evaluate a small, pure test-only model of evidence completeness and review classification for E1. Establish only consistency of proposed policy classifications using invented labels, not actual recovery, credential invalidation, authentication, or release. E1 is deliberately narrower than RF-01–07; a model PASS cannot close any full RF acceptance requirement.
+
+### Scope
+One separate Draft experiment from the then-confirmed main after explicit owner acceptance of this exact package. Use in-memory symbolic fixtures and Go standard-library tests only. No actual Identity state, database, credentials, proof material, providers, deployment, network, subprocesses, files containing fixture data, or mutable external state. All classifications remain HOLD with respect to access/release. A complete synthetic review record may be classified as ready for review, never eligible to activate. Do not create production policy interfaces or reusable recovery tooling.
+
+### AC IDs (proposal-local E1 references, not contract amendments)
+
+| ID | Synthetic evidence case | Expected review classification | Required status |
+|---|---|---|---|
+| E1-01 | All expected categories present, consistent, known, complete symbolic scope | REVIEW_COMPLETE; HOLD | NOT RUN |
+| E1-02 | No evidence | INCOMPLETE; HOLD | NOT RUN |
+| E1-03 | Required category absent | INCOMPLETE; HOLD | NOT RUN |
+| E1-04 | Required category present but outcome unknown | UNKNOWN; HOLD | NOT RUN |
+| E1-05 | Contradictory observations | CONTRADICTORY; HOLD | NOT RUN |
+| E1-06 | Evidence references an older symbolic revision | STALE; HOLD | NOT RUN |
+| E1-07 | Evidence references a different symbolic scope | MISMATCH; HOLD | NOT RUN |
+| E1-08 | One reviewed group and one unresolved group | INCOMPLETE; HOLD | NOT RUN |
+| E1-09 | Identical duplicate observation | Same review outcome; no additional logical evidence | NOT RUN |
+| E1-10 | Conflicting duplicate observation | CONTRADICTORY; HOLD | NOT RUN |
+| E1-11 | Unrecognized evidence category | UNKNOWN; HOLD | NOT RUN |
+| E1-12 | Equivalent observations reordered and evaluated repeatedly | Same classification and unchanged input; HOLD | NOT RUN |
+
+The classification vocabulary is proposed for a toy model; it is not a registry, state machine, production evidence validator, or authority. Use one isolated defect per negative case; do not claim a precedence policy for simultaneously conflicting failures. Every case independently asserts HOLD and zero release/authorization behavior. Explicit expected outcomes must be authored independently of model output; do not weaken assertions to make tests pass. No actual durable effects are expected or simulated as committed user actions.
+
+### Sources (path and heading)
+- docs/proposals/identity-recovery-fence.md: D1–D5, C1–C4, P1–P4, RF-01–08 and this E1 package, reviewed in #102.
+- docs/contracts/identity.md: IAM-08/10/11; docs/contracts/platform.md: FND-08/12.
+- docs/runbooks/recovery.md: Recover compromised identity or approval state.
+- docs/development-workflow.md: Critical lifecycle and bounded solo synthetic mode.
+- docs/testing.md: testing strategy; Makefile: check, race, test-repeat.
+- .agents/skills/mamony-context-pack/SKILL.md and mamony-pr-evidence/SKILL.md: context pack and exact evidence requirements.
+- #14 scope split; #95 historical bounded evidence only; #78/#81 dependency unchanged.
+
+### Invariants
+HOLD is not an account status or permission; no decision authorizes release. Unknown scope, missing evidence or contradiction cannot be silently accepted. No actual authority or event mutation, no fabricated consumption, no source/held-target access, no credential material, no broad coverage claim, no changed canonical contract. Pure deterministic evaluation of symbolic cases, no clock/environment dependencies. Do not turn model output into a real evidence validator.
+
+### Allowed packages / exact file allowlist (future experiment, not created here)
+- New: internal/modules/identity/recovery_fence_policy_model_test.go (only test-local types, model and table-driven tests, standard library; package identity; no new non-test source).
+- New: docs/proposals/identity-recovery-fence-e1-evidence.md (scope, exact-head evidence and limitations only).
+Two files maximum. The paths are proposed, absent at inspected base; recheck before creating the branch. No edits to existing source, existing tests, workflows, Makefile, migrations, contracts, governance, dependencies, configuration, #95 or #81. Existing checks run unchanged. No additional artifacts, services, permissions or dependencies. Separate proposal #102 remains docs-only; E1 changes must never be added to it.
+
+### Interfaces/contracts
+No application-facing interface, API, schema, roles, config, DB call, production package dependency, release integration or new canonical AC. Test-local inputs are invented category/scope/revision labels and abstract observations only. No credential fields or connection parameters. Results are review classifications, not authorization decisions. No runtime wiring.
+
+### Checks (planned, NOT RUN)
+After separate approval, verify exact approved base and allowlist; targeted test: go test -count=1 -run '^TestIdentityRecoveryFencePolicyModel$' ./internal/modules/identity; targeted repeat: go test -shuffle=on -count=3 -run '^TestIdentityRecoveryFencePolicyModel$' ./internal/modules/identity. Existing repository gates: make check, make race, make test-repeat; all five exact-head workflows / seven required job contexts under existing ruleset. Actual case evidence must be inspected; routine integration CI is regression evidence only, not E1 database evidence. No new CI gate, no direct external call or special fixture. Record PASS/FAIL/NOT RUN honestly, including any checks not independently executed. Resource boundary: 12 small in-memory cases, no dedicated infrastructure, no new retained fixture artifacts; stop if evaluation needs any external state or change beyond allowlist. Normal existing CI resource and retention settings unchanged.
+
+### Unresolved decisions / final approval gate
+E1 implementation BLOCKED until explicit owner approval of this package at the exact reviewed proposal head and base, including confirmation of bounded synthetic environment and authorized solo experiment scope if independent technical review is deferred. Recheck main and proposal revisions before writing; changed scope/base or new security semantics requires review. A failure, unexpected behavior, missing coverage, dependency, or need to change another file is a stop condition, not permission to expand scope. E2 actual capability behavior requires its own design and approval. RF-01–07 NOT RUN, RF-08 BLOCKED on #81; independent technical acceptance unrecorded for this proposal. No merge, migration, registry, role changes, live credentials, production activation or held-target release authorization.
+
+Suggested owner decision after reviewing exact candidate: authorize ONLY E1 test-local symbolic model and evidence document within the two-file allowlist, on a separate Draft PR; confirm bounded synthetic environment and explicitly defer independent technical acceptance for this experiment under adopted solo policy if applicable. No E2, production, migration, registry, governance, #81 changes, or merge authorization. Without explicit acceptance, no files may be created for the experiment.
