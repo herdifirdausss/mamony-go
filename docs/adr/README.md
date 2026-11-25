@@ -47,4 +47,6 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 
 | [ADR-0041 — Atomic staged-passkey possession verification](0041-passkey-atomic-activation.md) | **OWNER-ACCEPTED BOUNDED DIRECTION / FINAL REVIEW PENDING:** internal one-use possession, non-login `POSSESSION_VERIFIED`, atomic event/notice; independent acceptance and production readiness NOT ACCEPTED. |
 
+| [ADR-0042 — Context-aware forward-only migration executor](0042-context-aware-migration-executor.md) | **PROPOSED DEC-01 amendment; owner-accepted design candidate only:** native pgx per-version atomicity and outcome classification; current engine unchanged, implementation/cutover not authorized. |
+
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.

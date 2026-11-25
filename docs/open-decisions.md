@@ -14,6 +14,10 @@ Use the local [architecture decision index](adr/README.md) for baseline requirem
 | DEC-04 | Choose a screening matcher and rule version policy. Choose list age and review limits. | Synthetic false-positive and miss fixtures. A missing or stale list always causes hold. |
 | DEC-05 | Approve a job role only when its access cannot use an existing service boundary. Define its exact grants. | Runtime catalog test, least privilege, and no access from a request handler. |
 
+### Proposed DEC-01 amendment — Foundation #105
+
+The owner accepted C1–C6 as the **detailed design candidate for review**, not as an effective replacement of DEC-01. See [ADR-0042](adr/0042-context-aware-migration-executor.md), [compatibility and fault-test proposal](proposals/native-pgx-migration-executor.md), and the [proposed migration contract](contracts/postgresql.md#proposed-native-migration-contract-not-effective). The current golang-migrate v4 engine, existing SQL/history, roles, administrative entry point and active DEC-01 remain authoritative. Native pgx implementation, actual fault execution, engine selection/cutover and merge each require separate authorization. Independent technical acceptance DEFERRED; production readiness NOT ACCEPTED. All new native-executor evidence is NOT RUN.
+
 ## Money and recovery
 
 | ID | Choice | Decision evidence |

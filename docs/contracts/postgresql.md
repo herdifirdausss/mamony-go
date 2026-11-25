@@ -39,3 +39,27 @@ Use a separate named role for a job that must cross tenants. Grant only the oper
 - Restore a backup onto a fresh database. Verify the ledger, outbox, roles, and grants. Record the observed recovery time.
 
 Keep `make check` independent of PostgreSQL. Record database test results in the [PR evidence](../../.github/pull_request_template.md).
+
+
+## Proposed native migration contract (not effective)
+
+**Candidate only.** [ADR-0042](../adr/0042-context-aware-migration-executor.md) proposes an amendment to DEC-01; current DEC-01 and [current operations runbook](../runbooks/platform-migrations.md) remain effective. Owner accepted detailed design candidate C1–C6 for documentation review only. No change to the active engine, migration behavior or permissions is authorized here.
+
+The candidate must satisfy the following before separate engine cutover approval:
+
+| Local proposed requirement | Acceptance boundary |
+|---|---|
+| M105-R1 | Fixed per-capability target and dedicated schema owner, immutable reviewed forward-only manifest; no untrusted SQL/target input or app pool. |
+| M105-R2 | Context-aware admission and work; bounded connection, statement, lock, transaction and cleanup budgets. Stop starting versions once cancellation observed; no claim cancellation proves rollback. |
+| M105-R3 | Separate termination cause, requested version, attempted version, last verified prefix and durable outcome. Success only on exact requested target with settled cleanup. |
+| M105-R4 | One explicit transaction per version includes reviewed SQL body, existing fingerprint trailer and clean version record; prior versions remain committed. |
+| M105-R5 | Refuse legacy dirty, missing/contradictory history, unknown state or identity. No automatic force, repair, down or replay. |
+| M105-R6 | Dedicated session owns fixed advisory lock through verification and writes; bounded cleanup; independent settled observation and durable operational quarantine across restarts. |
+| M105-R7 | Preserve historical bytes, digests, timestamps, metadata shape and ownership; actual old/new equivalence and supported upgrade evidence. |
+| M105-R8 | Actual disposable fault tests, independent observation and regression; no weakening existing legacy characterization or production acceptance inference. |
+
+Outcome vocabulary: REJECTED_BEFORE_EXECUTION (no mutation proved), NO_CHANGE_VERIFIED (already exact target), APPLIED_VERIFIED (exact target reached), STOPPED_AT_VERIFIED_PREFIX (settled clean prefix, current failed version not applied), RECOVERY_REQUIRED (legacy dirty/inconsistent), OUTCOME_UNKNOWN (unsettled execution or unverified result). No-change or applied success additionally requires settled resource cleanup. Cancellation/timeout/transport error alone is not evidence of rollback. Acknowledged commit is not reversed by later cancellation; a postflight failure may still mean durable change. Keep separate cause and effect fields.
+
+An unresolved outcome must block further mutations until an explicitly reviewed reconciliation. Durable quarantine/restart enforcement mechanism remains a design blocker; a process-local error is not sufficient. No new metadata registry or live orchestrator is authorized.
+
+All candidate requirements and [AC105-01–11](../proposals/native-pgx-migration-executor.md#actual-fault-test-acceptance) are **NOT RUN** as native implementation evidence. This proposal is not FND-03/08/09 completion, production recovery, or permission for K2b/K3 or runtime integration.
