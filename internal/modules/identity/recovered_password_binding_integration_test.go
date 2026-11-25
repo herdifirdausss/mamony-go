@@ -143,7 +143,9 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 			t.Fatal("password rotation store unavailable")
 		}
 		changer, err := usecase.NewAuthenticatedPasswordChange(sessions, flow, grants, kdf, rotation,
-			domain.PasswordPolicy{IsBlocked: func(_, _ string) bool { return false }})
+			domain.PasswordPolicy{IsBlocked: func(normalized, _ string) bool {
+				return normalized == "an obviously compromised password"
+			}})
 		if err != nil {
 			t.Fatal("password change authority unavailable")
 		}
