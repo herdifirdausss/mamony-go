@@ -12,6 +12,10 @@ The current binary reads listener addresses at startup and shuts down on cancell
 | FND-04 | Use structured logs with a correlation ID. Record the actor, action, target, outcome, time, and capability for controlled changes. | Follow one request across a job and a consumer. Check redaction and trace continuity. |
 | FND-05 | Provide one local startup command once PostgreSQL joins the application. Give the process bounded startup and shutdown. | Start from a clean clone with synthetic fixtures. Cancel the process during a job. Check that work can resume. |
 
+### FND-02a — curated reference experiment
+
+The owner accepted the bounded synthetic slice in [#92](https://github.com/herdifirdausss/mamony-go/issues/92). Platform owns one immutable reference catalog for the curated currency and country codes; see [source manifest](../../internal/platform/reference/README.md). Lookup must fail for unknown or malformed codes; undefined exponents must not become zero. Validate canonical bytes, reject duplicates and conflicting definitions, preserve minor-unit definition identity across unrelated release updates, and refuse a mismatched code/version/exponent. Initial scope covers IDR/2, JPY/0, KWD/3, SGD/2, USD/2 and ID, JP, KW, SG, US. Membership does not enable a currency or authorize a financial operation. No shared Money domain, provider exponent, public wire semantics, database, or runtime wiring in this experiment. Capability integration, supported-currency policy, broader reference coverage and historical identity decisions remain outstanding. Test lookup, invalid data, version identity, checksum, and concurrent read isolation; no claim of full FND-02 acceptance.
+
 ## Local transactions
 
 - Each write has one owner. Use the owner role only for migrations. Use a limited runtime role for the application.
