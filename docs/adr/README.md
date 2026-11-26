@@ -5,7 +5,7 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | Decision | Status |
 |---|---|
 | [ADR-0001 — One process with capability boundaries](0001-go-modular-monolith.md) | Proposed architecture. The current bootstrap uses one process and two listeners. |
-| [ADR-0002 — Ledger and data ownership](0002-ledger-and-data-ownership.md) | Contract baseline. PostgreSQL work is pending. |
+| [ADR-0002 — Ledger and data ownership](0002-ledger-and-data-ownership.md) | Owner-accepted bounded design direction. Canonical documentation alignment merged. |
 | [ADR-0003 — Public HTTP contract](0003-public-http-contract.md) | Contract baseline. The wire-amount decision is open. |
 | [ADR-0004 — Internal password-authentication foundation](0004-password-authentication-foundation.md) | Candidate only; read-only authenticator, no login/session route. |
 | [ADR-0005 — Pre-Argon2id login admission](0005-login-admission-before-argon2id.md) | Candidate only; durable global/client/alias quotas before KDF, no login/session route. |
@@ -44,7 +44,7 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 | [ADR-0038 — Atomic provisional passkey credential staging and mandatory notice](0038-webauthn-atomic-provisional-registration.md) | PROPOSED: v33 globally unique non-active PENDING_ASSERTION, one-use nonce+admission consumption, atomic audit and queued (not sent) security notice. |
 | [ADR-0039 — Isolated challenge and evidence for provisional passkey possession](0039-passkey-activation-challenge-evidence.md) | PROPOSED: v34 one-use 3-minute assertion nonce bound to originally staged pending credential and same session, separate issuer and reader; no signature verification or activation. |
 | [ADR-0040 — Signed WebAuthn assertion verification for provisional passkeys](0040-passkey-activation-signed-assertion-verifier.md) | PROPOSED: verify genuine ES256 webauthn.get signatures against v34 COSE key/challenge with pinned library; fail-closed clone/counter policy, no nonce consumption/activation. |
-| [ADR-0041 — Atomic staged-passkey possession verification](0041-passkey-atomic-activation.md) | **OWNER-ACCEPTED BOUNDED DIRECTION / FINAL REVIEW PENDING:** internal one-use possession, non-login `POSSESSION_VERIFIED`, atomic event/notice; independent acceptance and production readiness NOT ACCEPTED. |
+| [ADR-0041 — Atomic staged-passkey possession verification](0041-passkey-atomic-activation.md) | Owner-accepted bounded direction. Internal one-use possession merged for synthetic use. Independent technical acceptance DEFERRED. Production readiness NOT ACCEPTED. |
 | [ADR-0042 — Context-aware forward-only migration executor](0042-context-aware-migration-executor.md) | **PROPOSED DEC-01 amendment; owner-accepted design candidate only:** native pgx per-version atomicity and outcome classification; current engine unchanged, implementation/cutover not authorized. |
 
 A baseline defines what an implementation must preserve. A proposed choice needs owner review. Use the [task-specific documentation index](../index.md) to find the tests and implementation status.

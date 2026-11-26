@@ -10,6 +10,7 @@
 - Intake issue and approved product decision (for Critical; otherwise issue/contract):
 - Research/PRD/technical design proposal (when required) and any accepted ADR:
 - Requirement IDs from the owning contract and relevant implementation changes:
+- If this PR introduces a milestone or experiment ID, link its definition. If it changes a milestone's status, list the affected status pages.
 - AC-to-test mapping; identify negative, concurrency, migration and recovery cases:
 - Any departure from accepted scope and its explicit acceptance:
 - If solo synthetic mode applies: implementation approval, containment evidence, independent acceptance status, production blockers, separate exact-head owner merge authorization (otherwise not applicable):

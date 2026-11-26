@@ -2,7 +2,7 @@
 
 The identity module owns tenants, users, sessions, API credentials, roles, and change approvals. Capabilities own their resources. They supply the resource and tenant context for authorization.
 
-**Implementation status:** Internal Profile A slices through v35 are merged ([#22](https://github.com/herdifirdausss/mamony-go/pull/22)–[#77](https://github.com/herdifirdausss/mamony-go/pull/77)); enrollment and email proof, password authentication, opaque sessions, password change/recovery, security notice and WebAuthn verification candidates exist. The default HTTP process mounts health only; these capabilities are not released. The v35 verifier does not consume the challenge or activate the pending passkey. v36 remains in Draft ([#79](https://github.com/herdifirdausss/mamony-go/pull/79), [#80](https://github.com/herdifirdausss/mamony-go/pull/80), [#81](https://github.com/herdifirdausss/mamony-go/pull/81)). Full Phase 1, public routes, real delivery, passkey login and end-to-end tenant/resource and financial authorization are not accepted. See [current state](../current-state.md) and [#20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Implementation status:** Internal Profile A enrollment, password authentication, opaque sessions, password change and recovery, security notices and WebAuthn verification are merged. [#81](https://github.com/herdifirdausss/mamony-go/pull/81) completed the bounded synthetic one-use passkey possession slice. The default HTTP process mounts health endpoints only. Full Phase 1, production delivery, passkey login, and tenant/resource and financial authorization remain open. See [current state](../current-state.md) and [#20](https://github.com/herdifirdausss/mamony-go/issues/20).
 
 The sections below record successive implementation slices. Earlier statements describe the scope at that slice, not the latest cumulative capability; later sections supersede earlier limitations where explicitly demonstrated. Historical Draft headings are retained to preserve existing deep links; all referenced PRs #22–#77 are merged.
 
@@ -404,9 +404,11 @@ The internal **unmounted** `PasskeyActivationAssertionVerifier` retrieves the st
 
 **No nonce consumption or passkey activation exists in v35.** `VerifyOnly` may accept replayed valid signatures while v34 challenge remains available; v36 must atomically consume the same challenge with the state/counter transition and mandatory audit/notice under fresh locks. The v33 credential remains `PENDING_ASSERTION`; there is no passkey login, independent factor or browser endpoint. A real security-notice worker remains a separate production gate.
 
-## Bounded synthetic passkey possession — Identity v36 (unmerged candidate #81)
+<a name="bounded-synthetic-passkey-possession--identity-v36-unmerged-candidate-81"></a>
 
-**Owner-accepted requirements, not a release or merge decision.** The [D1–D4 decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178) accepts this limited scope under the adopted bounded solo synthetic workflow. Implementation and verification remain subject to exact-candidate review. Independent technical acceptance and production readiness are NOT ACCEPTED.
+## Bounded synthetic passkey possession
+
+**Decision:** The owner accepted [D1–D4](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178) for bounded synthetic use. **Implementation:** [#81](https://github.com/herdifirdausss/mamony-go/pull/81) merged Identity slice v36. It uses SQL migration `000035` because Identity slice v35 added Go signature verification without a SQL migration. **Activation:** The operation remains internal and unmounted. Independent technical acceptance is DEFERRED. Production readiness is NOT ACCEPTED.
 
 The permitted state transition establishes possession evidence only. It confers no login, session issuance, independent recovery, authorization, or financial approval authority. The existing three-minute assertion challenge and ten-minute staging limit remain unchanged. Profile A trusts the owning application and database; stronger independent authority guarantees are out of scope.
 

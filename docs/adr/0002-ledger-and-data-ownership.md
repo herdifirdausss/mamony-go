@@ -1,6 +1,6 @@
 # ADR-0002 — Ledger and data ownership
 
-**Status:** Owner-accepted bounded design direction, proposed canonical alignment in Draft [#87](https://github.com/herdifirdausss/mamony-go/pull/87). Independent technical acceptance DEFERRED; production readiness NOT ACCEPTED. No K2 implementation or activation authorized.
+**Status:** Owner-accepted bounded design direction. [#87](https://github.com/herdifirdausss/mamony-go/pull/87) merged the canonical documentation alignment. [K2a](../proposals/ledger-k2a-isolated-persistence.md) was a separately approved synthetic persistence slice. Independent technical acceptance is DEFERRED. Production readiness is NOT ACCEPTED.
 
 ## Ledger ownership
 

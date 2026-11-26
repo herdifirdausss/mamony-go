@@ -1,13 +1,13 @@
 # Platform native PostgreSQL recovery lab
 
-**Status:** OWNER LAB SCOPE ACCEPTED; independent G3 technical acceptance pending; RH-01a/b/c and RH-02a/b/c observed PASS for bounded synthetic fixtures at b40d98a; no merge or release authorization.
-**Owner:** Platform/database foundation ([Issue #14](https://github.com/herdifirdausss/mamony-go/issues/14), PGF-06). Identity dependency: #78; separate Draft #81 is unchanged.
+**Status:** The bounded synthetic native PostgreSQL point-in-time recovery lab merged in [#88](https://github.com/herdifirdausss/mamony-go/pull/88). RH-01 and RH-02 cover the scoped fixture evidence. Independent technical acceptance and production recovery acceptance remain open. See [current state](../current-state.md) for the separate state reconciliation work.
+**Owner:** Platform database foundation ([Issue #14](https://github.com/herdifirdausss/mamony-go/issues/14), PGF-06). See [Identity #78](https://github.com/herdifirdausss/mamony-go/issues/78) for credential and possession dependencies.
 **Decision record:** [owner acceptance](https://github.com/herdifirdausss/mamony-go/issues/14#issuecomment-7133295432). Risk path: Critical recovery verification. No production behavior is approved.
 **Contracts:** [PostgreSQL](../contracts/postgresql.md), [Platform](../contracts/platform.md) FND-08/FND-12, [recovery runbook](../runbooks/recovery.md), DEC-01/12/17. Checked 2026-11-24.
 
 ## G1 — Research and gap
 
-The Identity logical restore and repeat-target tests on Draft #81 (19158ff, PostgreSQL run 45405294442) established bounded hold and review-record binding; they did not exercise physical backup, WAL replay, or an independent archive. Main's PostgreSQL contract requires a fresh restore and observed recovery time. PGF-06 remains partial. Use the accepted PostgreSQL 18.7 rather than a custom event replay engine.
+During the original research, the Identity logical restore and repeat-target tests in the then-draft #81 (19158ff, PostgreSQL run 45405294442) established bounded hold and review-record binding; they did not exercise physical backup, WAL replay, or an independent archive. Main's PostgreSQL contract requires a fresh restore and observed recovery time. PGF-06 remains partial. Use the accepted PostgreSQL 18.7 rather than a custom event replay engine.
 
 | Primary source (PostgreSQL 18) | Finding and limitation |
 |---|---|
