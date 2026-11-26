@@ -6,11 +6,6 @@ workdir: internal
 allow:
   depOnAnyVendor: false
   deepScan: true
-# This exact integration-only file wires independent adapters under a test
-# fixture. The custom architecture checker and the mandatory real-DB gate
-# still analyze/run it. Do not exempt any production package or directory.
-excludeFiles:
-  - "^.*mailgun_mock_integration_test\\.go$"
 # Only the platform adapter can import the selected DB and migration libraries.
 vendors:
   pgx:
@@ -42,6 +37,8 @@ components:
     in: modules/ledger
   identity_facade:
     in: modules/identity
+  identity_integration:
+    in: modules/identity/internal/integration/**
   app:
     in: app/**
   platform:
@@ -72,6 +69,21 @@ deps:
       - ledger_domain
   identity_facade:
     mayDependOn:
+      - identity_handler
+      - identity_domain
+      - identity_usecase
+      - identity_credential
+      - identity_mailcrypto
+      - identity_mailgun
+      - identity_webauthn
+      - identity_postgres
+      - platform
+    canUse:
+      - pgx
+  identity_integration:
+    mayDependOn:
+      - identity_integration
+      - identity_facade
       - identity_handler
       - identity_domain
       - identity_usecase

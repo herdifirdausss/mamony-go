@@ -17,7 +17,7 @@ import (
 
 const requiredPackage = "github.com/herdifirdausss/mamony-go/tools/postgrestest"
 const identityPackage = "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/postgres"
-const identityIntegrationPackage = "github.com/herdifirdausss/mamony-go/internal/modules/identity"
+const identityIntegrationPackage = "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/integration"
 
 var requiredTests = []string{
 	"TestPostgresLedgerK2aMigration",
@@ -322,7 +322,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZRecoveryEpochInvalidationMechanism|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZPasskeyRegistrationAtomicStage|ZPasskeyActivationChallenge|ZPasskeyAtomicPossession|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZRecoveryEpochInvalidationMechanism|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZPasskeyRegistrationAtomicStage|ZPasskeyActivationChallenge|ZPasskeyAtomicPossession|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/integration"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())

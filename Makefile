@@ -44,7 +44,7 @@ skills:
 
 archlint:
 	@command -v go-arch-lint >/dev/null || { echo 'NOT RUN: install github.com/fe3dback/go-arch-lint@v1.19.2'; exit 2; }
-	go-arch-lint check --project-path .
+	GOFLAGS="$$GOFLAGS -tags=integration,browser_e2e" go-arch-lint check --project-path .
 
 test-report:
 	@command -v gotestsum >/dev/null || { echo 'NOT RUN: install gotest.tools/gotestsum@v1.13.0'; exit 2; }

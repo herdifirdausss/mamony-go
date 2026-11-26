@@ -21,6 +21,7 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 
 - Test names express behavior, e.g. `TestJournalRejectsDifferentPayloadForSameKey`. Use table-driven cases and descriptive `t.Run` names for variants. Distinguish valid and rejected transitions.
 - Use **black-box packages** (`package foo_test`) when testing public contracts; white-box tests are acceptable for precise private invariants. Do not create exports only for tests.
+- Put integration tests that wire several layers in `internal/modules/<capability>/internal/integration`. Put browser tests in its `browser` subpackage. Keep adapter-level tests beside the adapter and shared suite fixtures in `integration/internal/fixture`.
 - Inject time, IDs and I/O effects when deterministic ordering matters. Avoid sleeps, global environment mutations under `t.Parallel`, execution-order assumptions and fragile magic numbers.
 - For each authorization operation, test missing identity, wrong tenant, wrong owner, missing permission, suspended subject, stale session and success as applicable.
 - For money, test zero/negative/overflow, mixed currency, imbalance, duplicate/reused key with changed payload, simultaneous postings, rollback, commit-then-lost-response, replay and restore.
