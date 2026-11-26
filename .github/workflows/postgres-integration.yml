@@ -127,3 +127,29 @@ jobs:
           grep -F 'RH-02b PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
           grep -F 'RH-02c PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
           grep -F 'RH-02a PASS:' "$RUNNER_TEMP/platform-native-pitr.log"
+
+      - name: Verify bounded synthetic Identity reconciliation
+        env:
+          PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          bash -n tools/postgrestest/check-platform-identity-reconciliation.sh
+          set -o pipefail
+          bash tools/postgrestest/check-platform-identity-reconciliation.sh | tee "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03a1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03b1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03c1 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03a2 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03b2 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03c2 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03a3 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03a4 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+          grep -F 'RH-03a5 PASS:' "$RUNNER_TEMP/platform-identity-reconciliation.log"
+
+      - name: Verify recovered application password and session binding
+        run: |
+          bash -n tools/postgrestest/check-platform-identity-execution.sh
+          set -o pipefail
+          bash tools/postgrestest/check-platform-identity-execution.sh | tee "$RUNNER_TEMP/platform-identity-execution.log"
+          grep -F 'RH-03b3a PASS:' "$RUNNER_TEMP/platform-identity-execution.log"
+          grep -F 'RH-03b3b PASS:' "$RUNNER_TEMP/platform-identity-execution.log"
+          grep -F 'RH-03b3c PASS:' "$RUNNER_TEMP/platform-identity-execution.log"
