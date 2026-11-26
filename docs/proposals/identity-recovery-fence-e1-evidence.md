@@ -1,6 +1,6 @@
 # Bounded E1 symbolic recovery-policy evaluation
 
-**Status:** Draft synthetic experiment; implementation candidate; verification pending; independent technical acceptance DEFERRED for E1 only; G6 NOT AUTHORIZED; production NOT ACCEPTED.
+**Status:** Draft synthetic experiment; implementation candidate; package-level CI evidence recorded; named-case execution not separately established; independent technical acceptance DEFERRED for E1 only; G6 NOT AUTHORIZED; production NOT ACCEPTED.
 **Owner:** Identity; related Platform #14 and Identity #78; proposal #102.
 **Approval:** [Exact owner authorization](https://github.com/herdifirdausss/mamony-go/pull/102#issuecomment-7152644973) for proposal HEAD `cf2429650f73405add5fbf3593f6bfb158531ca8`, base `f46459615189ea0657c630f589219b082aee9b71`, separate Draft PR, exactly two new files and E1-01–12. Bounded synthetic environment attested. No E2, migration, registry, runtime changes, merge or activation authorized.
 
@@ -23,13 +23,13 @@ Test-only symbolic model: [recovery_fence_policy_model_test.go](../../internal/m
 | E1-11 | UNKNOWN / HOLD | NOT RUN |
 | E1-12 | REVIEW_COMPLETE / HOLD; deterministic reordered repeated input | NOT RUN |
 
-## Planned verification
+## Verification record and original plan
 
 - Targeted: go test -count=1 -run '^TestIdentityRecoveryFencePolicyModel$' ./internal/modules/identity — NOT RUN.
 - Targeted randomized repeat: go test -shuffle=on -count=3 -run '^TestIdentityRecoveryFencePolicyModel$' ./internal/modules/identity — NOT RUN.
-- make check, make race, make test-repeat, five exact-head workflows / seven required job contexts — NOT RUN pending actual evidence.
+- At candidate `c2eeac56ee77183a302630e328cb26b6a89bcb03` against main `53e1552df1b9b8872f0187dc57fc27f0d5e0b01b`, all five PR workflows passed. [Foundation job](https://github.com/herdifirdausss/mamony-go/actions/runs/45866802476/job/140071610680) records Identity package success in unit, race and repeat checks. It does not print individual E1 case results. The case table retains NOT RUN for separately observed named-case execution; do not claim standalone execution or individual 12/12 results from aggregate package output. New exact-head verification is required after this documentation edit.
 - Verify exact two-file diff and review actual test execution. Existing regression CI is not E1 database evidence. Record exact-head verification in PR review/comments to avoid changing the tested candidate.
 
 ## Limits
 
-A passing toy model would establish only consistent symbolic review classification for enumerated cases. It does not authenticate evidence, demonstrate actual Identity invalidation, implement release policy, or close RF-01–07. RF-08 is blocked by separate v36 adoption (#81). Full RH-03 PARTIAL; E2 requires separately reviewed design and authorization. No production behavior, new CI gate, dependency, registry, migration, contract, governance or access change; no change to #95, #81 or #102 source. No merge or production activation. Independent technical acceptance DEFERRED for E1 only.
+E1-08 overlaps the missing-category classification case. HOLD is built into this symbolic model. A passing model would establish only consistent symbolic review classification for enumerated cases. It does not authenticate evidence, demonstrate actual Identity invalidation, implement release policy, or close RF-01–07. RF-08 integrated acceptance is NOT RUN. The #81 adoption and #95 bounded compatibility blockers are closed; this symbolic evaluation supplies no integrated recovery evidence. Full RH-03 PARTIAL; E2 requires separately reviewed design and authorization. No production behavior, new CI gate, dependency, registry, migration, contract, governance or access change; no change to #95, #81 or #102 source. No merge or production activation. Independent technical acceptance DEFERRED for E1 only.
