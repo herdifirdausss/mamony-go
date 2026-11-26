@@ -161,6 +161,77 @@ func TestIdentityEmailVerification(t *testing.T) {
 		verifyPending(t, pending.SubjectID, "ACTIVE")
 	})
 
+	// These subject-scoped fixture changes are not a recovery operation.
+	t.Run("recovery epoch alone does not invalidate email proof", func(t *testing.T) {
+		pending := newPending(t)
+		out, err := service.Prepare(ctx, pending.SubjectID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, secret := out.ForTrustedDelivery()
+		tag, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1", pending.SubjectID)
+		if err != nil || tag.RowsAffected() != 1 {
+			t.Fatal("scoped epoch fixture mutation failed")
+		}
+		// Deliberate negative control: EMAIL_VERIFY is contact-bound, not
+		// epoch-bound. A successful confirmation demonstrates this limit.
+		if err := service.Confirm(ctx, secret); err != nil {
+			t.Fatalf("email epoch-only negative control not reproduced: %v", err)
+		}
+		verifyPending(t, pending.SubjectID, "ACTIVE")
+		t.Log("IRF-EMAIL NEGATIVE CONTROL: epoch-only change did not invalidate contact-bound proof")
+	})
+	t.Run("explicit recovery email revocation preserves unconsumed history", func(t *testing.T) {
+		pending := newPending(t)
+		first, err := service.Prepare(ctx, pending.SubjectID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, old := first.ForTrustedDelivery()
+		tag, err := admin.Exec(ctx, `UPDATE mamony_identity.email_verification_challenges
+			SET revoked_at=clock_timestamp()
+			WHERE subject_id=$1 AND purpose='EMAIL_VERIFY'
+			  AND consumed_at IS NULL AND revoked_at IS NULL
+			  AND expires_at>clock_timestamp()`, pending.SubjectID)
+		if err != nil || tag.RowsAffected() != 1 {
+			t.Fatal("live synthetic challenge not revoked")
+		}
+		if err := service.Confirm(ctx, old); !errors.Is(err, usecase.ErrEmailProofInvalid) {
+			t.Fatalf("revoked email proof not authoritatively denied: %v", err)
+		}
+		verifyPending(t, pending.SubjectID, "UNVERIFIED")
+		var preserved bool
+		if err := admin.QueryRow(ctx, `SELECT
+			(SELECT count(*)=1 FROM mamony_identity.email_verification_challenges
+			 WHERE subject_id=$1 AND consumed_at IS NULL AND revoked_at IS NOT NULL
+			   AND expires_at>clock_timestamp())
+			AND (SELECT count(*)=1 FROM mamony_identity.security_outbox
+			 WHERE subject_id=$1 AND event_type='EMAIL_PROOF_ISSUED')
+			AND NOT EXISTS (SELECT 1 FROM mamony_identity.security_outbox
+			 WHERE subject_id=$1 AND event_type='CONTACT_VERIFIED')`, pending.SubjectID).Scan(&preserved); err != nil || !preserved {
+			t.Fatal("revocation erased evidence or fabricated successful confirmation")
+		}
+		// Explicitly move the synthetic issuance time outside cooldown.
+		// This does not change or bypass production rate-limit policy.
+		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.email_verification_challenges
+			SET requested_at=clock_timestamp()-interval '65 seconds' WHERE subject_id=$1`, pending.SubjectID); err != nil {
+			t.Fatal(err)
+		}
+		fresh, err := service.Prepare(ctx, pending.SubjectID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, next := fresh.ForTrustedDelivery()
+		if err := service.Confirm(ctx, old); !errors.Is(err, usecase.ErrEmailProofInvalid) {
+			t.Fatal("fresh issue revived revoked proof")
+		}
+		if err := service.Confirm(ctx, next); err != nil {
+			t.Fatal("fresh synthetic proof positive control failed")
+		}
+		verifyPending(t, pending.SubjectID, "ACTIVE")
+		t.Log("IRF-EMAIL REVOCATION MECHANISM PASS: old proof denied, history retained, fresh proof accepted")
+	})
+
 	t.Run("expired proof refuses activation", func(t *testing.T) {
 		pending := newPending(t)
 		out, err := service.Prepare(ctx, pending.SubjectID)
