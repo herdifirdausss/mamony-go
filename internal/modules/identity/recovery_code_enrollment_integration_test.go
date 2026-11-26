@@ -426,4 +426,74 @@ func TestIdentityZRecoveryCodeEnrollmentRotation(t *testing.T) {
 	if who, err := sessions.Resolve(ctx, bearer); err != nil || who != subject {
 		t.Fatal("offline code rotation unexpectedly invalidated healthy session epoch")
 	}
+
+	// Local recovery mechanism only: preserve the existing synthetic code
+	// set and advance the subject epoch. A new session and rotation grant
+	// must not confer authority on the retained prior-epoch code.
+	var oldCode [32]byte
+	var oldCodeBytes []byte
+	if err := admin.QueryRow(ctx, `SELECT code_digest
+		FROM mamony_identity.password_recovery_offline_codes
+		WHERE subject_id=$1 AND enrolled_epoch=$2 AND consumed_at IS NULL
+		ORDER BY code_digest LIMIT 1`, subject, epoch).Scan(&oldCodeBytes); err != nil || len(oldCodeBytes) != len(oldCode) {
+		t.Fatal("current saved-code fixture missing")
+	}
+	copy(oldCode[:], oldCodeBytes)
+	oldRotation := stage("before-recovery-epoch")
+	tag, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1", subject)
+	if err != nil || tag.RowsAffected() != 1 {
+		t.Fatal("scoped epoch fixture mutation failed")
+	}
+	if who, err := sessions.Resolve(ctx, bearer); who != "" || !errors.Is(err, usecase.ErrSessionInvalid) {
+		t.Fatal("old session survived fixture epoch invalidation")
+	}
+	// Stage via the actual restricted SQL roles; this is a synthetic
+	// assertion, not proof of current password or recovery release.
+	freshLogin := sha256.Sum256([]byte("synthetic recovery epoch login " + subject))
+	freshSession := sha256.Sum256([]byte("synthetic recovery epoch session " + subject))
+	var allowed bool
+	if err := grantConn.QueryRow(ctx, "SELECT mamony_identity.stage_password_auth_grant($1,$2,$3)",
+		subject, epoch+1, freshLogin[:]).Scan(&allowed); err != nil || !allowed {
+		t.Fatal("fresh fixture login grant denied")
+	}
+	sessionConn, err := pgx.Connect(ctx, sessionDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sessionConn.Close(context.Background()) }()
+	if err := sessionConn.QueryRow(ctx, "SELECT mamony_identity.issue_opaque_session_with_grant($1,$2,$3)",
+		freshLogin[:], freshSession[:], randomSyntheticID(t, "evt_")).Scan(&allowed); err != nil || !allowed {
+		t.Fatal("fresh fixture session denied")
+	}
+	var owner string
+	if err := sessionConn.QueryRow(ctx, "SELECT coalesce(mamony_identity.resolve_opaque_session($1),'')", freshSession[:]).Scan(&owner); err != nil || owner != subject {
+		t.Fatal("fresh fixture session not valid")
+	}
+	freshRotation := sha256.Sum256([]byte("synthetic recovery epoch rotation " + subject))
+	if err := grantConn.QueryRow(ctx, "SELECT mamony_identity.stage_recovery_code_rotation_grant($1,$2,$3)",
+		subject, epoch+1, freshRotation[:]).Scan(&allowed); err != nil || !allowed {
+		t.Fatal("fresh fixture rotation grant denied")
+	}
+	for i, proof := range [][32]byte{oldRotation, freshRotation} {
+		if ok, err := managerStore.Replace(ctx, freshSession, proof, oldCode,
+			newCodeDigests("epoch denial "+string(rune('a'+i))), randomSyntheticID(t, "evt_")); err != nil || ok {
+			t.Fatal("retained prior-epoch code or rotation grant not cleanly denied")
+		}
+	}
+	var retained bool
+	if err := admin.QueryRow(ctx, `SELECT
+		(SELECT count(*)=5 FROM mamony_identity.password_recovery_offline_codes
+		 WHERE subject_id=$1 AND enrolled_epoch=$2 AND consumed_at IS NULL)
+		AND EXISTS (SELECT 1 FROM mamony_identity.password_recovery_offline_codes
+		 WHERE subject_id=$1 AND code_digest=$3 AND consumed_at IS NULL)
+		AND (SELECT count(*)=2 FROM mamony_identity.password_login_grants
+		 WHERE subject_id=$1 AND grant_digest IN ($4,$5) AND consumed_at IS NULL
+		   AND expires_at>clock_timestamp())
+		AND (SELECT count(*)=3 FROM mamony_identity.security_outbox
+		 WHERE subject_id=$1 AND event_type IN ('RECOVERY_CODES_ENROLLED','RECOVERY_CODES_ROTATED'))
+		AND (SELECT count(*)=3 FROM mamony_identity.password_recovery_code_notices
+		 WHERE subject_id=$1)`, subject, epoch, oldCode[:], oldRotation[:], freshRotation[:]).Scan(&retained); err != nil || !retained {
+		t.Fatal("denial changed code set, consumed a grant, or fabricated event/notice")
+	}
+	t.Log("IRF-OFFLINE MECHANISM PASS: old code denied with fresh session and rotation grant; prior set and evidence retained")
 }
