@@ -222,3 +222,34 @@ The #81 merge is verified at main `76d417d35571b28b7aa748577861fc3a1f9e6dcb`. Su
 | Exact impact, containment and review | Use a separately scoped Critical change only after the first three decisions are supported; no automatic transfer of #81 or E1 review deferrals. | Qualified reviewer signs off the proposed scope and applicable risks, owner authorizes the exact bounded implementation and containment, and the relevant independent review gate is recorded. |
 
 **Decision requested:** accept these constraint and audit-policy recommendations as documentation-only design direction, or defer the capability. Acceptance of this recommendation does not establish any missing evidence or adopt canonical contract amendments. The authoritative evidence source and concrete integration feasibility remain blocking; a further generic policy review cannot resolve them. Do not mark RSC-01–07 or RF-01–08 PASS from this review. RSC-04 remains BLOCKED, RSC-05 PARTIAL source review, RH-03 PARTIAL, E2 BLOCKED, G6 NOT AUTHORIZED, production readiness NOT ACCEPTED. No implementation, migration, registry, runtime, governance, merge or activation authorized.
+
+## Targeted evidence and feasibility assessment — owner-accepted B01–B04
+
+The owner accepted the B01–B04 design direction (Profile A, Identity ownership, administrative audit and existing retention, Critical gate), and authorized this documentation-only assessment. This acceptance resolves architectural direction; it does not adopt a new trust root, operational procedure, event taxonomy, canonical contract or implementation.
+
+### Evidence suitability and dependency disposition
+
+| Existing evidence | Permitted conclusion | Not established |
+|---|---|---|
+| Merged [#88 native PITR lab](platform-native-pitr-lab.md) | RH-01/RH-02 bounded native restoration and selected evidence rejection at a known synthetic boundary | Complete acknowledged history, independently administered custody, deployed recovery objectives |
+| Merged [#81 and restore-fencing evidence](identity-restore-fencing.md) | Local passkey persistence and selected local lifecycle evidence on disposable fixtures | Independent currentness, recovery-specific session disposition, integrated release |
+| Draft [#95](https://github.com/herdifirdausss/mamony-go/pull/95) | Prior selected preservation evidence is historical; current compatibility review identifies post-#81 fixture mismatch | Current exact-candidate preservation and recovered application acceptance; full history or custody |
+| Draft [#106](https://github.com/herdifirdausss/mamony-go/pull/106) | Bounded symbolic E1 evidence only | Actual application behavior or recovery-session feasibility |
+| Existing owning contracts IAM-03/08/10/11/12, FND-08/12 | Required boundaries and compatibility constraints | Actual implementation of the proposed distinct recovery-session policy |
+
+The restored database alone cannot establish the missing independent currentness property. The merged lab uses a process-local reference, not independent durable custody; local event identifiers and timestamps do not prove complete history. Reusing the bounded synthetic reference is suitable only for previously scoped lab observations, not a new currentness acceptance claim. A separately accepted evidence source and its completeness/custody justification remain unavailable; retain HOLD on unknown scope. No external backend or registry is selected.
+
+### Updated decision disposition
+
+| Decision | Accepted direction | Remaining exit condition / responsibility |
+|---|---|---|
+| B01 | Profile A retained; no implicit stronger authority | Platform #14 and Identity #108 must establish acceptable currentness and affected-scope evidence. BLOCKED on evidence, not further wording. |
+| B02 | Identity owns the distinct logical capability; no new service/registry | Existing normal lifecycle is a compatibility baseline, not equivalent behavior. A qualified component/dependency and consistency feasibility assessment is still required; cannot conclude implementation-ready. |
+| B03 | Administrative audit policy, preservation of original obligations and existing retention accepted as direction | Identity/security reviewer must settle event/notice applicability for the actual capability and evidence custody/access. No new event, retention period, or storage contract. |
+| B04 | Critical review gate and separate bounded implementation authority accepted | Exact impact and containment cannot be accepted before evidence/feasibility and a concrete reviewed candidate. Independent acceptance not established. |
+
+### Changed Platform dependency
+
+[#95 compatibility checkpoint](https://github.com/herdifirdausss/mamony-go/pull/95#issuecomment-7195266212) records an observed PostgreSQL failure on c93a23db after #81 merge; subsequent recovered application verification was skipped. Draft e3afd71449d0f0cc2807df6966bf611867bdcbf0 documents the proposed bounded remediation; its PostgreSQL workflow was still in progress at inspection. Keep the fixture compatibility work and any approval in #95; do not expand #109 to repair it. A later #95 PASS would supply selected preservation evidence only, not independent currentness or session-policy acceptance.
+
+**Feasibility disposition:** no architectural contradiction identified in the accepted module ownership, but actual integration feasibility remains unestablished. Do not repeat generic policy approval, create another symbolic model, or infer feasibility from baseline CI. Before any E2 implementation decision, obtain the missing Platform evidence and a qualified technical assessment for the actual proposed capability. RSC-01/02/03/06/07 NOT RUN; RSC-04 BLOCKED; RSC-05 PARTIAL source review; RF-01–08 NOT RUN; RH-03 PARTIAL; E2 BLOCKED. G6 NOT AUTHORIZED; production readiness NOT ACCEPTED. No code, migration, registry, runtime, canonical contract, governance, merge or activation authorized.
