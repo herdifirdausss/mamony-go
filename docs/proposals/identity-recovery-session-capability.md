@@ -128,3 +128,61 @@ Recommend separate administrative recovery-disposition meaning, distinct from us
 | D-CAP-05 | Not authorized for implementation | Accepted design, exact scope, containment and independent review decision |
 
 Consolidated review is prepared, not implementation-ready G3 acceptance. Next owner decision should consider either a separate bounded technical-design scope for an actual capability change, explicitly identifying any proposed runtime/migration/role implications for separate approval, or deferral. No further symbolic policy experiment or generic requirements-renaming round is recommended. Do not create code or execute tests to close these blockers under current authority. Actual E2 remains BLOCKED; all new RSC evidence NOT RUN (fresh control blocked), RF-01–07 NOT RUN, RF-08 BLOCKED (#81 observed unmerged head 6c12b5cee007acbc98109fa67f3b216ae16abd1d), full RH-03 PARTIAL. No E1 independent review deferral transfer, G6 authorization or production acceptance. No changes to runtime, migrations, registry, canonical contracts, governance, #95/#81/#102/#106 code or release.
+
+## Consolidated technical-design package (2026-11-26)
+
+[Owner D-CAP-01–04 acceptance and design-only authorization](https://github.com/herdifirdausss/mamony-go/pull/109#issuecomment-7194673324). Prior candidate 732e2b0f6f34da007783d9b844f3f0a8d29913ab passed five workflows and seven required contexts. During review, synchronization to e0ea68497885ea3bc44fcc2343a9c3a34dc3068b was observed at d7c89d949684a18326ecadcef33db7612651f1ed; proposal blob unchanged, one-file diff. No synchronization performed by this review and no merge approval inferred. Main delta since prior base comprises five documentation files concerning proposed native migration executor/ADR-0042. Current DEC-01 and golang-migrate remain effective; no native-executor adoption assumed.
+
+### Capability and compatibility
+
+Select a distinct logical Identity-owned capability within the modular monolith, not a service, ordinary logout, credential reset, or public recovery flow. Platform provenance is contextual evidence, not authorization. Subject is the unit of scoped evaluation; whole-Identity HOLD remains in effect pending separate release governance. Preserve existing normal authentication assurance, purpose, idle/absolute expiry, suspension, revocation, concurrent-session policy and sensitive-action boundaries. Evaluation never confers release, financial permissions or new recovery-proof authority. Prefer owning-boundary consistency for any future authorized security change, rather than distributed service or registry. This is a guarantee, not an implementation mechanism; no original held-target access or mutation proposed.
+
+| Area | Compatibility and dependency decision |
+|---|---|
+| Session and issuance | Direct semantic boundary; preserve existing normal lifecycle and assurance |
+| Authentication grants and dependent operations | Coverage review required; no inherited authorization or implicit grant-family acceptance; affected behavior requires separate scope |
+| Durable bindings | Preserve legitimate credential/contact/factor relationships; independently justified currentness prerequisite |
+| Security events and notices | Preserve original obligations and identities; no external delivery integration |
+| Platform | Provenance, scope, isolation and surviving evidence only |
+| v36, other temporary families, financial approvals | Explicit exclusions from this capability; unresolved coverage remains HOLD; #81 observed unmerged at 9836f0bcb94bd60ecb481ea3959c3bdfaf2515f7 |
+| Registry/release | Separate RH-04/05; no new dependency |
+
+Latest-main tree confirms existing Identity session, authentication/grant, password-change and recovery components. Source-level inventory is not exhaustive call graph, permission audit or deployment attestation. Trace IAM-03/08/10/11/12, FND-08/12, OPS-02, EVT-03 and prior source integration evidence. No new dependency selected.
+
+### Consistency and audit
+
+Prefer owning-transaction consistency for accepted security-state changes and applicable durable audit/notice obligations under OPS-02/FND-12. Unknown, interrupted, partial or contradictory outcomes remain unresolved; explicit policy denial is distinct from unavailability. Eventual design must address concurrent/duplicate outcomes without duplicated logical obligations, fabricated completion or partial authorization; local atomicity does not establish independent completeness. Subject-scoped review does not prescribe transaction granularity.
+
+Recommend attributable mandatory administrative audit for an accepted security change, distinct from user login/logout/password change/proof consumption. Assess user-notification applicability before adopting any new event or notice rule. Preserve original event IDs and obligations irrespective of delivery/provider acknowledgement. Minimize and redact evidence; review custody/access/disposal. Preserve current retention by default; no reconstruction of purged records or new durations. No event identifier, trigger, schema, storage contract, role or technical mutation mechanism adopted.
+
+### Impact assessment
+
+| Area | Assessment | Prerequisite |
+|---|---|---|
+| Identity behavior | Actual distinct policy gap, not another test gap | Separate scope for actual behavior changes |
+| Existing session and issuance | Potential direct impact | Complete dependency and permission review |
+| Persistence and migration | May be needed for durable obligations and disposition; necessity not established | Separate persistence/migration decision under effective DEC-01 |
+| Audit and notices | Potential new administrative event/obligation policy | Resolve applicability, retention and custody |
+| Runtime and deployment | No new service, route, worker, provider or registry proposed | Exact candidate containment review before any experiment |
+| Performance/availability | No measured workload or accepted contention/recovery budget | Establish applicable bounds and evidence; no invented target |
+| Trust | Profile A arbitrary-authority-DB-write and lost independent history risk | Establish trusted evidence assumptions and residual risks; independent acceptance separate |
+
+### RSC-01–07 acceptance trace
+
+| Requirement | Boundary | Evidence / status |
+|---|---|---|
+| RSC-01 | Distinct owning-capability recovery policy, not ordinary expiry or outage | Actual behavior / NOT RUN |
+| RSC-02 | Legitimate bindings and original obligations preserved, no false history | Scoped preservation evidence / NOT RUN |
+| RSC-03 | Unknown, incomplete or interrupted outcome never counts as authorization or completion | Negative and consistency evidence / NOT RUN |
+| RSC-04 | Independently justified fresh control under applicable assurance, never release or financial authority | Separate positive-control review / BLOCKED |
+| RSC-05 | Explicit session/issuance coverage and exclusions; no partial release | Coverage / PARTIAL source review |
+| RSC-06 | Correct durable administrative audit and applicable obligations; no duplicate logical history | Owning consistency evidence / NOT RUN |
+| RSC-07 | Exact bounded synthetic containment and unchanged held target; no live access or transferable artifacts | Exact candidate evidence / NOT RUN |
+
+No new AC names, canonical contract adoption or runnable test plan. Existing regression CI and E1 are context, not behavioral acceptance.
+
+### Disposition and remaining blockers
+
+Recommendations are consolidated: distinct Identity capability, normal lifecycle compatibility, owning consistency guarantee, separate administrative audit, existing retention by default, no registry/release. No more generic policy reviews or toy models recommended. Actual unresolved technical decisions: (1) authoritative currentness and affected-scope evidence including issuance dependencies; (2) feasible integration and durable consistency under an accepted trust boundary; (3) event/notice applicability and evidence custody/retention; (4) exact change impact, permission/containment and independent review. Requirements direction accepted; implementation-ready G3/G4 and stable contract details not adopted. Do not infer that a test-only change can close the gap or that implementation is impossible.
+
+Recommend deferring actual E2 until these prerequisites can be established through separately authorized technical design and qualified review. No operational recovery procedure, credential replay workflow, mutation algorithm, schema, role grants, interfaces or registry design proposed. No implementation authorization requested at this checkpoint. E1 deferral does not transfer. E2 BLOCKED, RF-01–07 NOT RUN, RF-08 BLOCKED, RH-03 PARTIAL, G6 NOT AUTHORIZED, production NOT ACCEPTED. No coding, migration, registry, runtime, canonical contract or governance changes, merge or activation.
