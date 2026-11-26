@@ -19,6 +19,8 @@ func TestImportPolicy(t *testing.T) {
 		{"platform importing module", "internal/platform/httpedge", "internal/modules/ledger", false},
 		{"module importing app", "internal/modules/ledger", "internal/app", false},
 		{"app importing private internals", "internal/app", "internal/modules/ledger/internal/domain", false},
+		{"integration test importing its own fixture", "internal/modules/identity/internal/integration/browser", "internal/modules/identity/internal/integration/internal/fixture", true},
+		{"integration test importing another capability", "internal/modules/identity/internal/integration", "internal/modules/ledger", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -49,6 +51,7 @@ func TestProductionImportPolicy(t *testing.T) {
 		{"repository SQL", "internal/modules/ledger/internal/repository/postgres", "database/sql", true},
 		{"handler HTTP", "internal/modules/ledger/internal/handler/httpapi", "net/http", true},
 		{"platform HTTP", "internal/platform/httpedge", "net/http", true},
+		{"production package importing integration", "internal/modules/identity/internal/repository/postgres", module + "/internal/modules/identity/internal/integration", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,6 +76,8 @@ func TestCapabilityPackageLayout(t *testing.T) {
 		{"usecase feature", "internal/modules/ledger/internal/usecase/posting", true},
 		{"postgres adapter", "internal/modules/ledger/internal/repository/postgres", true},
 		{"http handler", "internal/modules/ledger/internal/handler/httpapi", true},
+		{"capability integration suite", "internal/modules/identity/internal/integration", true},
+		{"capability browser suite", "internal/modules/identity/internal/integration/browser", true},
 		{"non module tool", "tools/archcheck", true},
 		{"public adapter bypass", "internal/modules/ledger/repository/postgres", false},
 		{"unknown layer bypass", "internal/modules/ledger/internal/features/posting", false},
