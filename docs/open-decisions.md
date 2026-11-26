@@ -1,6 +1,6 @@
 # Decisions to resolve before implementation
 
-For merged implementation and active work, see [current state](current-state.md). Identity PRs #22–#77 are merged, not deployed. Historical Draft references below describe the decision at its original slice; they do not mean those PRs are currently open. Operational/production approvals and independent acceptance remain separate. The v36 stack (#79–#81) remains unmerged; no merge authorization.
+See [current state](current-state.md) for merged implementation and active work. The historical Draft references below describe decisions at their original slices. Operational approval and independent technical acceptance remain separate from merge.
 
 Use the local [architecture decision index](adr/README.md) for baseline requirements. Record each choice below when its stage starts. A candidate needs tests in Mamony Go before it becomes an implementation claim.
 
@@ -339,12 +339,7 @@ V35 verifies a **real** ES256-signed `webauthn.get` assertion against the v34 or
 
 ### Atomic passkey possession verification (v36; Critical issue #78)
 
-**Decision status as of 2026-11-25: OWNER-ACCEPTED BOUNDED SYNTHETIC DIRECTION / NO MERGE AUTHORIZATION.** See [owner decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178). Independent technical acceptance and production readiness NOT ACCEPTED.
-[Proposed ADR-0041](adr/0041-passkey-atomic-activation.md) and
-[Critical proposal](proposals/identity-passkey-atomic-activation.md)
-describe the candidate; Issue #78 records bounded owner acceptance, not independent technical acceptance. PRs #79 (design) and #80 (Go handoff) are merged under separate bounded synthetic authorizations; #81 (SQL one-use candidate) remains unmerged and HOLD. Neither adoption establishes production approval. Their Go/SQL
-code and synthetic CI are not a live passkey login, independent recovery
-factor, real delivered security notice, or production authorization.
+The owner accepted the [bounded synthetic direction](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178). The design, Go handoff and SQL finisher merged in #79–#81 under bounded synthetic authorizations. [ADR-0041](adr/0041-passkey-atomic-activation.md) records the decision and evidence. The operation remains internal and unmounted. Independent technical acceptance is DEFERRED. Production readiness is NOT ACCEPTED.
 
 | Decision | Status and consequence |
 |---|---|
