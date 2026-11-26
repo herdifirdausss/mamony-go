@@ -23,7 +23,7 @@ The workflow `.github/workflows/identity-real-browser-e2e.yml` runs a fourth inf
 ```sh
 go test -tags=integration,browser_e2e \
   -run '^TestIdentityZBrowserVerificationE2E$' \
-  -count=1 -timeout=3m ./internal/modules/identity
+  -count=1 -timeout=3m ./internal/modules/identity/internal/integration/browser
 ```
 
 Reproduce locally only after creating the standard disposable PostgreSQL 18 loopback role fixture. Run `make integration-local` first only for the standard database suite, then keep a compatible disposable container available if running browser E2E. The browser job uses npm-installed packages **only for CI** and does not modify `go.mod`, ship npm assets or add a production JavaScript runtime. No Playwright trace, video, screenshot containing a verification fragment, or secret-bearing network log is uploaded automatically.
@@ -49,7 +49,7 @@ The pinned Chromium/PostgreSQL CI job now runs both browser tests:
 ```sh
 go test -tags=integration,browser_e2e \
   -run '^TestIdentityZBrowser(Verification|Session)E2E$' \
-  -count=1 -timeout=4m ./internal/modules/identity
+  -count=1 -timeout=4m ./internal/modules/identity/internal/integration/browser
 ```
 
 The test bridge is **not** a production DNS, TLS ingress or proxy test. A browser E2E passing does not resolve the `mamony_identity_session_runtime` direct-mint privilege, production CSRF key management, MFA, financial authorization or release gates. Keep #43 and #44 Draft and all candidate routes unmounted.

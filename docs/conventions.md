@@ -7,8 +7,9 @@ This is a **project-specific implementation contract** for new Mamony Go capabil
 Introduce only the folders needed by the first accepted vertical slice. Do not pre-generate unused handlers, interfaces, service registries, helpers or empty files.
 
 ```text
+cmd/<program>/                  # executable entry point
 internal/modules/<capability>/
-  module.go                     # exported facade: commands/queries made available to app
+  module.go                     # facade commands and queries available to app
   internal/
     domain/                     # aggregates, value types, invariants; no I/O
     usecase/                    # orchestrates domain and consumer-owned ports
@@ -16,10 +17,13 @@ internal/modules/<capability>/
     handler/httpapi/            # external contract, validation, mapping to usecase
     handler/worker/             # only when a background job exists
 internal/app/                   # composition: wires accepted dependencies
-internal/platform/              # low-level reusable technical primitives only
+internal/platform/              # technical primitives and Platform-owned reference data
+db/migrations/<owner>/          # versioned SQL for the owning capability or Platform
 ```
 
 A capability can omit an adapter or use feature-specific folders beneath an existing layer once the feature is real. Do not create a `service` and a `usecase` layer for identical responsibilities. Do not create a `utils`, `common` or `shared` capability to bypass ownership; use narrowly scoped types/ports and justify a truly shared primitive.
+
+Keep the facade small. Expose capability-owned operation inputs, results, and errors. Have the application map between the consumer's types and the facade's types. Introduce per-process composition under `internal/app/<process>` when a separate deployment needs its own wiring. See [ADR-0001](adr/0001-go-modular-monolith.md#when-to-separate-a-boundary).
 
 | Layer | MAY own | MUST NOT do |
 |---|---|---|
@@ -32,6 +36,8 @@ A capability can omit an adapter or use feature-specific folders beneath an exis
 | platform | Reusable transport/config/storage mechanics with explicit boundaries | Import capabilities or make business authorization decisions |
 
 `tools/archcheck` enforces known capability-layer package roots (feature subpackages must sit within a known layer), cross-capability boundaries, and selected forbidden **production** imports. Test-only imports can use integration fixtures. Static rules do not yet prove all of the business obligations above; reviewers must trace the actual data flow.
+
+For a new deployable, review all transitive package dependencies for the build target and its supported build tags. The default `make architecture` invocation uses `go list -json ./...`, which follows the active Go build context.
 
 ## Go style and deterministic behavior
 
