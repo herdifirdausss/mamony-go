@@ -6,13 +6,19 @@ Use the local [architecture decision index](adr/README.md) for baseline requirem
 
 ## Foundation and access
 
-**DEC-01 ACCEPTED by the repository owner on 2026-11-21:** PostgreSQL 18.7, Go 1.27 (CI toolchain 1.27.4), native pgx v5, and SQL-only golang-migrate v4 with database-committed SHA-256 fingerprint verification and separate owner/migrator/runtime roles. [Research and trade-offs](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) remain available for context. Acceptance of the design is not equivalent to passing migration tests or deploying production credentials; see [migration runbook](runbooks/platform-migrations.md). The release image digest and production secret source must be pinned/verified at deployment.\n\n| ID | Choice | Decision evidence |
+**DEC-01 ACCEPTED by the repository owner on 2026-11-21:** PostgreSQL 18.7, Go 1.27 (CI toolchain 1.27.4), native pgx v5, and SQL-only golang-migrate v4 with database-committed SHA-256 fingerprint verification and separate owner/migrator/runtime roles. [Research and trade-offs](proposals/postgresql-foundation.md#dec-01--proposed-runtimedatabase-implementation-decision-g1g3) remain available for context. Acceptance of the design is not equivalent to passing migration tests or deploying production credentials; see [migration runbook](runbooks/platform-migrations.md). The release image digest and production secret source must be pinned/verified at deployment.
+
+| ID | Choice | Decision evidence |
 |---|---|---|
 | DEC-01 | **ACCEPTED** — PostgreSQL 18.7, Go 1.27, native pgx v5, golang-migrate v4, applied-file SHA-256 verification and separate credentials. | Verify fresh/upgrade migration, dirty state, runtime grants, and restore; implementation evidence remains separately tracked. |
 | DEC-02 | Owner selected Go repository/direct parameterized SQL and Ledger-local ACID as design direction; exact isolation, lock graph, constraints, role matrix, replay/fact encoding and authority remain open. | Same-key contention, floor race, close and post race, and lost response after commit. |
 | DEC-03 | Choose Go password and factor storage, recovery, credential rotation, and revocation timing. | Threat review and tests for operator second factor, revocation, and recovery. |
 | DEC-04 | Choose a screening matcher and rule version policy. Choose list age and review limits. | Synthetic false-positive and miss fixtures. A missing or stale list always causes hold. |
 | DEC-05 | Approve a job role only when its access cannot use an existing service boundary. Define its exact grants. | Runtime catalog test, least privilege, and no access from a request handler. |
+
+### Proposed DEC-01 amendment — Foundation #105
+
+The owner accepted C1–C6 as the **detailed design candidate for review**, not as an effective replacement of DEC-01. See [ADR-0042](adr/0042-context-aware-migration-executor.md), [compatibility and fault-test proposal](proposals/native-pgx-migration-executor.md), and the [proposed migration contract](contracts/postgresql.md#proposed-native-migration-contract-not-effective). The current golang-migrate v4 engine, existing SQL/history, roles, administrative entry point and active DEC-01 remain authoritative. Native pgx implementation, actual fault execution, engine selection/cutover and merge each require separate authorization. Independent technical acceptance DEFERRED; production readiness NOT ACCEPTED. All new native-executor evidence is NOT RUN.
 
 ## Money and recovery
 
