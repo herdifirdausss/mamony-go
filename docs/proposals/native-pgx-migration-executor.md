@@ -1,10 +1,10 @@
 # Foundation #105 — Proposed native pgx migration executor
 
-**Status:** C1–C6, DA-A, IP-D1–D4 and EB-D1–D4 owner-accepted detailed design candidates; documentation-only consolidation, not implementation approval. [Issue #105](https://github.com/herdifirdausss/mamony-go/issues/105) under [#14](https://github.com/herdifirdausss/mamony-go/issues/14). [Research decision](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7152752304), [detailed review](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7152858127), [ADR-0042](../adr/0042-context-aware-migration-executor.md), [proposed contract](../contracts/postgresql.md#proposed-native-migration-contract-not-effective). Existing DEC-01 and runtime unchanged. Independent technical acceptance DEFERRED; production readiness NOT ACCEPTED.
+**Status:** C1–C6 (native executor design), DA-A (durable admission option A), IP-D1–D4 (identity and provisioning decisions), and EB-D1–D4 (execution budgets and evidence decisions) owner-accepted detailed design candidates; documentation-only consolidation, not implementation approval. [Issue #105](https://github.com/herdifirdausss/mamony-go/issues/105) under [#14](https://github.com/herdifirdausss/mamony-go/issues/14). [Research decision](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7152752304), [detailed review](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7152858127), [ADR-0042](../adr/0042-context-aware-migration-executor.md), [proposed contract](../contracts/postgresql.md#proposed-native-migration-contract-not-effective). Existing DEC-01 and runtime unchanged. Independent technical acceptance DEFERRED; production readiness NOT ACCEPTED.
 
 ## C1 — Compatibility inventory
 
-Initial baseline f6b9a2d1f46413e7c87db0cc09d13acc4261c438. Current reviewed baseline 76d417d35571b28b7aa748577861fc3a1f9e6dcb. After #81 merged, the 36 historical blobs remained identical and Identity v35 was added (blob 49441878e45cd251a7a2a96d4f42388cb2ad89d6; recomputed body SHA-256 329725f31728911adddb53780e5827e761ed713a003a2cbbd9385ba3fc845157 matches trailer). Static screening found no obvious nontransactional top-level operation in v35. Current static integrity coverage: 37/37. Actual native equivalence NOT RUN. All 36 committed files fetched at this revision; all returned blob IDs matched the complete tree, and all recomputed SHA-256 body hashes matched exact target/version trailers. Static lexical screening is not PostgreSQL parsing or function-body semantic proof. No obvious top-level nontransactional operation, explicit transaction control, sequence mutation or external database operation detected. No execution or old/new parity evidence. Inventory (T tables/constraints; X ordinary index; F function; G grant/revoke; Tr trigger; B backfill; excludes trailer):
+Initial 36-file audit baseline f6b9a2d1f46413e7c87db0cc09d13acc4261c438. Historical 37-file reviewed corpus baseline 76d417d35571b28b7aa748577861fc3a1f9e6dcb (not a claim about the current main HEAD). After #81 merged, the 36 historical blobs remained identical and Identity v35 was added (blob 49441878e45cd251a7a2a96d4f42388cb2ad89d6; recomputed body SHA-256 329725f31728911adddb53780e5827e761ed713a003a2cbbd9385ba3fc845157 matches trailer). Static screening found no obvious nontransactional top-level operation in v35. Recorded static integrity coverage at the reviewed corpus baseline: 37/37. Actual native equivalence NOT RUN. All 36 committed files were fetched at the initial audit revision; all returned blob IDs matched the complete tree, and all recomputed SHA-256 body hashes matched exact target/version trailers. Static lexical screening is not PostgreSQL parsing or function-body semantic proof. No obvious top-level nontransactional operation, explicit transaction control, sequence mutation or external database operation detected. No execution or old/new parity evidence. Inventory (T tables/constraints; X ordinary index; F function; G grant/revoke; Tr trigger; B backfill; excludes trailer):
 
 | Target/version | Statement classes |
 |---|---|
@@ -105,17 +105,17 @@ All AC105-01–11 are NOT RUN for proposed native engine. Actual fault experimen
 
 ## Consolidated admission, identity and execution design
 
-Owner-approved design directions (not implementation or effective contract approval): [DA-A research](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7194850544), [identity and restore design](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7194979796), [execution and compatibility research](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7195098899). All new native, DA, IP and EB acceptance cases remain NOT RUN.
+Owner-approved design directions (not implementation or effective contract approval): [DA-A research](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7194850544), [identity and restore design](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7194979796), [execution and compatibility research](https://github.com/herdifirdausss/mamony-go/issues/105#issuecomment-7195098899). All new native, DA, IP and EB acceptance cases remain NOT RUN. D identifies a design decision, R a requirement, and AC an acceptance criterion; M105 identifies the proposed parent contract for issue #105, and AC105 its native acceptance cases. H1–H7 identify historical compatibility scenarios. These are local traceability identifiers, not implementation stages or effective contracts.
 
 ### Durable admission — DA-A
 
 The scope is one positively owned Linux administrative host, one preprovisioned persistent local control directory outside the target DB backup/restore set, and one trusted controller/credential path. DA-D1–D7: select the bounded local journal; separate it from target recovery; preserve stable logical slots across incarnations; establish exclusive durable intent before mutation; no expiry of unresolved intent; explicit settled reconciliation without replay; stop and reevaluate DA-C when assumptions fail. A registry in the target cluster can be rewound by physical recovery. An independent control store (DA-C) is a future option for multi-host or insufficient continuity, not selected infrastructure. An orchestrator may wrap the contract but scheduling/job status alone is not durable admission. No extra database table, network service or dependency is authorized.
 
-Use one global administrative gate (IP-D3), not simultaneous per-capability admission. Keep the existing fixed target DB advisory locks. Order: global gate → target lock → version transaction. All managed migration, restore and reconciliation mutations in the lab pass through this sole authority; no raw legacy or alternative execution path in the experiment. Different slots may progress sequentially; no required parallelism. No nested target locks, automatic takeover, timeout-based clearing or lock deletion/replacement. Locks are cooperative, not security authorization. Runtime lacks migration/journal authority. Trusted host/controller/root/migrator are assumptions, not protection against their compromise. Existing default engine outside the isolated experiment is unchanged.
+Use one global administrative gate (IP-D3), not simultaneous per-capability admission. Keep the existing fixed target DB advisory locks. Order: global gate → target lock → version transaction. All managed migration, restore and reconciliation mutations in the lab pass through this sole authority; no raw legacy or alternative execution path in the experiment. Different eligible slots may progress sequentially; no required parallelism. Global serialization is distinct from slot-specific unresolved intent and the restore fence that covers every affected slot. Unavailable or untrusted global authority blocks all admission. Whether an unrelated slot may progress while another slot has unresolved intent is not yet decided; no such progression is authorized here. A separate owner decision must settle this policy before implementation, and acceptance must verify the chosen boundary. Until then, do not admit unrelated work on the assumption that global serialization alone is sufficient. No nested target locks, automatic takeover, timeout-based clearing or lock deletion/replacement. Locks are cooperative, not security authorization. Runtime lacks migration/journal authority. Trusted host/controller/root/migrator are assumptions, not protection against their compromise. Existing default engine outside the isolated experiment is unchanged.
 
 Logical journal record: format/version, independently provisioned journal identity and trusted control storage binding, stable logical DB/slot, approved incarnation/receipt reference, revision within trusted history, attempt ID, release/manifest digest, requested version, starting verified prefix, known effect/cause/cleanup and resolution evidence/authorization. Retain attempt evidence and never delete unresolved intent. No raw SQL, DSN, credentials or sensitive business data. Missing/corrupt/untrusted journal or lock is BLOCKED; do not initialize on runner startup. Exact encoding, capacity, retention, ownership and protected credential path remain open. If bounded capacity is exhausted, refuse; no automatic pruning.
 
-Admission state: READY means trusted continuity and no unresolved attempt; OPEN_INTENT is durably recorded before any mutation (including metadata bootstrap); QUARANTINED is refusal derived from unresolved or uncertain state (no post-crash write needed); RESOLVED retains terminal facts and does not itself authorize a new attempt. No TTL or retry. Under the global gate, validate receipt, manifest and journal; publish durable intent; obtain target lock and recheck identity/role/prefix; execute immutable versions; verify exact outcome and settled backend/lock/cleanup; durably publish terminal resolution; release gate. A known no-mutation or settled stopped prefix may be finalized by the authorized normal path; unknown/dirty/uncertain authority requires explicit owner-reviewed reconciliation. If intent persistence is uncertain, do not mutate; if terminal persistence is uncertain, do not report success. A released host/DB lock or process exit alone is not proof of backend settlement. Read-only observer only after verified quiescence and exclusive authority; no automatic replay, repair or new mutation.
+Admission state: READY means trusted continuity and no unresolved attempt; OPEN_INTENT is durably recorded before any mutation (including metadata bootstrap); QUARANTINED is refusal derived from unresolved or uncertain state (no post-crash write needed); RESOLVED retains terminal facts and does not itself authorize a new attempt. No TTL or retry. Under the global gate, validate receipt, manifest and journal, and obtain a read-only initial identity/role/prefix observation against the independent approved inventory. Record the observed verified starting prefix and binding in durable intent; obtain the target lock and revalidate the same identity, role and prefix against the recorded facts before any target mutation. On mismatch, refuse execution; finalize only with proved no mutation, settled resources and verified authority, otherwise retain unresolved intent. Check continued authority and work budget before each new version. Execute immutable versions, verify exact outcome and settled backend/lock/cleanup, durably publish terminal resolution, then release the gate. H2 clean adoption/no-op follows this admission and resolution sequence without target database mutation, including no metadata rewrite. A known no-mutation or settled stopped prefix may be finalized by the authorized normal path; unknown/dirty/uncertain authority requires explicit owner-reviewed reconciliation. If intent persistence is uncertain, do not mutate; if terminal persistence is uncertain, do not report success. A released host/DB lock or process exit alone is not proof of backend settlement. Read-only observer only after verified quiescence and exclusive authority; no automatic replay, repair or new mutation.
 
 ### Provisioning and restore — IP-D1–D4
 
@@ -140,9 +140,9 @@ Use one monotonic normal work budget of 180s or earlier caller deadline from ent
 | Per-version transaction | 45s including verification and commit |
 | Server statement / lock / transaction / idle-in-transaction | 40s / 5s / 45s / 10s |
 | Final verification | 10s reserved before next version |
-| Additional cleanup, observation and terminal publication | Combined 10s target |
+| Additional cleanup, observation and terminal publication | Combined 10s target (independent cleanup context; no new migration work) |
 
-Conservatively require remaining normal budget ≥55s before starting another version, plus applicable admission, identity and cancellation checks. A shorter test-only budget may be approved for fault fixtures. Restore/reconciliation need separate finite approved budgets; neither can expire a fence. Verify expected writable primary, fsync, synchronous_commit for migration transaction and full_page_writes enabled; no global settings change or failover claim. Statement/lock/transaction limits have different scopes; timeout is not proof of rollback. Preserve known committed facts even if cleanup/reporting fails.
+Use one independent bounded cleanup context for the combined additional 10s target; it permits cleanup, settled observation and terminal publication only. Conservatively require remaining normal budget ≥55s before starting another version, plus applicable admission, identity and cancellation checks. A shorter test-only budget may be approved for fault fixtures. Restore/reconciliation need separate finite approved budgets; neither can expire a fence. Verify expected writable primary, fsync, synchronous_commit for migration transaction and full_page_writes enabled; no global settings change or failover claim. Statement/lock/transaction limits have different scopes; timeout is not proof of rollback. Preserve known committed facts even if cleanup/reporting fails.
 
 Ordinary file write/sync and kernel/storage stalls are not generally context-cancellable. Do not promise a 190s hard return or kill completion. A proposed 200s controller reporting/escalation threshold (180+10+10) is not a DB/OS termination guarantee or CI timeout change. Stop new mutations after observed expiry/loss of authority, do not detach a writer and report completion, retain unresolved intent and verify actual settlement. If cleanup or observation cannot establish outcome, UNKNOWN, no replay.
 
@@ -157,10 +157,10 @@ Use a bounded versioned control record and retained attempt evidence under the s
 | H3 | Populated Identity v11→12: last_seen_at equals issued_at, no artificial activity or expiry revival, existing role/function behavior; separately authorized remainder to v35 |
 | H4 | Populated Identity v26→27: ACCEPTED→SUBMITTED, other notices UNCONFIRMED, no implied delivery, preserve provider/event history; separately authorized remainder to v35 |
 | H5 | Populated Identity v34→35: preserve ordinary data and approved pending credential/challenge/registration history, no possession or activation notice effect from migration alone; role/constraint/function parity and repeat clean no-op |
-| H6 | Test-only signed next Platform/Ledger version for failure machinery; NOT actual committed release upgrade |
+| H6 | Test-only next Platform/Ledger version for failure machinery, with separately approved fixture provenance and authorization; NOT actual committed release upgrade. The source decision calls this fixture signed; exact signing/verification authority and fixture representation remain open, and no new signing system is authorized |
 | H7 | Legacy dirty/inconsistent refusal and independent clean/dirty restore parity, no repair |
 
-Historical bytes immutable. Verify deterministic data exactly and time-derived fields against bounded semantic oracles. Existing mandatory v34→35 legacy test passed on [main PostgreSQL CI](https://github.com/herdifirdausss/mamony-go/actions/runs/45839562241/job/139977339670), not native equivalence or all pending-credential fixtures. Capability v36 corresponds to migration v35. Other starting prefixes are not included in this bounded supported claim. Real Platform/Ledger version-to-version upgrade remains NOT RUN until meaningful next release.
+Historical bytes immutable. Verify deterministic data exactly and time-derived fields against bounded semantic oracles. Existing mandatory v34→35 legacy test passed on [main PostgreSQL CI](https://github.com/herdifirdausss/mamony-go/actions/runs/45839562241/job/139977339670), not native equivalence or all pending-credential fixtures. Identity capability v36 corresponds to Identity SQL migration v35; the capability and migration versions are distinct identifiers. Other starting prefixes are not included in this bounded supported claim. Real Platform/Ledger version-to-version upgrade remains NOT RUN until meaningful next release.
 
 ### Isolated fault infrastructure — EB-D4
 
@@ -172,18 +172,31 @@ Trusted controller owns isolated disposable DBs and separate control directory; 
 
 These requirements refine M105-R1–R8, not new active contracts. The owner accepted DA-R1–8, IP-R1–7 and EB-R1–6 as candidate requirements.
 
-| Requirement IDs | Required boundary | Acceptance mapping |
-|---|---|---|
-| DA-R1, IP-R1–2 | Stable logical slot, externally approved incarnation and resource/session receipt | DA-AC01; IP-AC01–02 |
-| DA-R2, IP-R4 | Sole administrative and credential path, trusted continuity | DA-AC02/08/09; IP-AC04/05/10 |
-| DA-R3–4 | Exclusive durable pre-mutation intent, no expiry or automatic restart | DA-AC02/03/05/06; IP-AC05 |
-| DA-R5 | Separate cause/effect, verified outcome, cleanup and durable resolution | DA-AC04/05/06; EB-AC01–03/06 |
-| DA-R6, IP-R5–6 | Global gate, durable restore fence, explicit verified rebind and preserved old facts | DA-AC07; IP-AC04/06–08 |
-| IP-R3 | Positive fresh/legacy-empty provenance and approved inventory | IP-AC02/03/09 |
-| DA-R7, EB-R2 | Bounded minimal storage and publication, unresolved I/O fails closed | DA-AC05/08/09; EB-AC03 |
-| EB-R1 | Shared monotonic budget and phase ceilings | EB-AC01/02 |
-| EB-R3 | Bounded historical compatibility inventory | EB-AC04/05/07 |
-| DA-R8, IP-R7, EB-R4–6 | Actual isolated evidence, additive mandatory CI and explicit limits | DA-AC09/10; IP-AC09/10; EB-AC06–08 |
+| Requirement | Required boundary | Parent contract | Native acceptance | Supplemental acceptance |
+|---|---|---|---|---|
+| DA-R1 | Stable slot, approved incarnation, journal identity and affected-slot restore fencing | M105-R1/R5/R6 | AC105-07/09/10 | DA-AC01/07; IP-AC01/02/06–08 |
+| DA-R2 | Sole trusted administrative and credential path | M105-R1/R6/R8 | AC105-02/09/11 | DA-AC02/08/09; IP-AC04/05/10 |
+| DA-R3 | Exclusive durable immutable pre-mutation intent; recorded starting facts | M105-R3/R5/R6 | AC105-02/06/07 | DA-AC02/03/05; IP-AC02/05 |
+| DA-R4 | Non-expiring intent, continued authority before each version, restart refusal, no replay | M105-R2/R3/R6 | AC105-03/05/06 | DA-AC03/06/09; IP-AC05; EB-AC01/06 |
+| DA-R5 | Separate cause/effect, verified prefix, settled cleanup and durable resolution | M105-R3/R6 | AC105-03/04/05/06 | DA-AC04/05/06; EB-AC01–03/06 |
+| DA-R6 | Controlled restore, preserved attempt facts and authorized reconciliation | M105-R5/R6/R7 | AC105-06/09/10 | DA-AC06/07/08; IP-AC06–08; EB-AC07 |
+| DA-R7 | Bounded minimal protected storage and redacted evidence | M105-R1/R6/R8 | AC105-06/09/11 | DA-AC05/08/09; EB-AC03 |
+| DA-R8 | Actual isolated evidence and retained regression gate | M105-R8 | AC105-05/06/09/11 | DA-AC09/10; IP-AC10; EB-AC06/08 |
+| IP-R1 | Stable logical slot and external incarnation binding | M105-R1/R5/R6 | AC105-07/09/10 | DA-AC01/07; IP-AC01/06–08 |
+| IP-R2 | Independent owned resource/session/role evidence and immutable receipt | M105-R1/R5 | AC105-02/07/09 | IP-AC01/02/09 |
+| IP-R3 | Positive fresh/legacy-empty provenance and approved inventory | M105-R5/R7 | AC105-07/08/09 | IP-AC02/03/09; EB-AC04 |
+| IP-R4 | Journal continuity and sole host/credential path; no auto-init | M105-R1/R6 | AC105-02/06/09 | DA-AC01/08/09; IP-AC04/05/10 |
+| IP-R5 | Global serialization and durable affected-slot restore fence | M105-R5/R6 | AC105-02/05/10 | DA-AC02/07; IP-AC04/06/07 |
+| IP-R6 | Explicit verified rebind preserving old outcome facts | M105-R3/R5/R6/R7 | AC105-06/09/10 | IP-AC06–08; EB-AC07 |
+| IP-R7 | Actual disposable evidence, no new registry/dependency or production claim | M105-R1/R8 | AC105-09/11 | IP-AC09/10; DA-AC10; EB-AC08 |
+| EB-R1 | Shared monotonic budget and phase ceilings | M105-R2/R3 | AC105-02/03/04 | EB-AC01/02 |
+| EB-R2 | Durable publication and unknown handling; no hard OS/storage deadline claim | M105-R3/R6 | AC105-04/05/06 | DA-AC05/08; EB-AC02/03/06 |
+| EB-R3 | Bounded historical compatibility inventory and immutable bytes | M105-R4/R7 | AC105-01/07/08/10 | EB-AC04/05/07; IP-AC09 |
+| EB-R4 | Actual isolated fault harness, containment and deterministic evidence | M105-R6/R8 | AC105-05/06/09/10 | DA-AC03/04/09; IP-AC06/07/10; EB-AC06/07 |
+| EB-R5 | Additive mandatory CI gate and unchanged legacy guarantees | M105-R8 | AC105-01/11 | DA-AC10; EB-AC08 |
+| EB-R6 | Explicit nonclaims and fail closed on unresolved storage, identity or fault feasibility | M105-R3/R5/R6/R8 | AC105-04/06/09/11 | DA-AC05/08/09; IP-AC05/10; EB-AC03/06/08 |
+
+Mappings are documentation traceability, not evidence of execution. Slash-separated numbers inherit the identifier prefix in the same cell. All parent and supplemental acceptance cases retain their original required conditions. The cross-slot quarantine policy remains open; DA-AC02 and IP-AC04 require sequential progress for eligible slots, not permission to bypass an unresolved slot or restore fence.
 
 ### Supplemental acceptance criteria
 
@@ -192,7 +205,7 @@ All cases below are NOT RUN for the proposed native candidate; they supplement A
 | ID | Required evidence |
 |---|---|
 | DA-AC01 | Positive provisioned journal/target; missing, corrupt, wrong identity, unapproved host or unknown continuity refuses before mutation |
-| DA-AC02 | Independent concurrent contenders; one durable admission, sequential distinct-slot progress under IP global gate; alternate invocation refused |
+| DA-AC02 | Independent concurrent contenders; one durable admission, sequential eligible distinct-slot progress under IP global gate; alternate invocation refused. Test the separately accepted cross-slot quarantine policy |
 | DA-AC03 | Actual interruption before/after durable intent, during execution and before reporting; no mutation without intent, restart refusal |
 | DA-AC04 | Committed, rolled-back and ambiguous effects distinguished; lock release/death cannot clear intent |
 | DA-AC05 | Safely evidenced persistence/permission/space/unavailable/terminal publication failures; no admission/success on uncertainty |
@@ -202,7 +215,7 @@ All cases below are NOT RUN for the proposed native candidate; they supplement A
 | DA-AC09 | Bounded admission and cleanup, redacted evidence, authority loss refuses, no orphan writer |
 | DA-AC10 | Exact-head containment, invariants and existing regression evidence |
 | IP-AC01 | Owned target positive control; wrong endpoint/container/storage/role, recovery/read-only or unknown provenance refuses |
-| IP-AC02 | Fresh and approved legacy-empty positive controls; no metadata mutation before intent |
+| IP-AC02 | Fresh and approved legacy-empty positive controls; no metadata mutation before intent. Verify initial observed facts recorded in intent and locked revalidation; mismatched facts refuse before target mutation |
 | IP-AC03 | Unexpected non-table objects, grants/memberships, missing expected objects/history/receipt or incomplete catalog visibility refused |
 | IP-AC04 | Actual competing same/different slots and restore serialize through global gate |
 | IP-AC05 | Actual worker restart, known stale or invalid control state, continuity unknown and persistence errors refuse |
@@ -214,7 +227,7 @@ All cases below are NOT RUN for the proposed native candidate; they supplement A
 | EB-AC01 | Pre-cancel, exhausted budget, contention and cumulative versions; no new mutation after observed expiry |
 | EB-AC02 | Actual database timeout/commit/cleanup semantics and durability settings with independently settled effects |
 | EB-AC03 | Process-restart journal persistence, stable gate and evidenced storage errors; distinguish injected errors, no power-loss claim |
-| EB-AC04 | H1/H2 old/new fresh and adoption parity, exact history preservation |
+| EB-AC04 | H1/H2 old/new fresh and adoption parity, exact history preservation; H2 durable intent and terminal resolution without target mutation |
 | EB-AC05 | H3/H4/H5 populated upgrade oracle and privilege/data invariants |
 | EB-AC06 | Actual worker interruption and both ambiguous response outcomes; restart refusal and authorized reconciliation |
 | EB-AC07 | Isolated restore/fence/identity/continuity and dirty refusal; no auto-rebind/replay |
@@ -222,7 +235,7 @@ All cases below are NOT RUN for the proposed native candidate; they supplement A
 
 ## Open implementation gates
 
-Architecture directions are accepted candidates, not proven feasibility. Before applicable Gate C: exact journal format/size/retention and atomic publication semantics; trusted single-host storage/mount continuity and exclusive credential/entrypoint enforcement; independently approved fixture-specific inventory, provenance and catalog visibility; exact legacy characterization and supported upgrade seeds/oracles; measured execution/cleanup and filesystem behavior; deterministic safe committed/noncommitted ambiguous-response mechanism; isolated restore and fault harness feasibility; exact G4 path/test allowlist, additive named registration and repeated CI budget evidence; separate owner implementation and execution approval. If single-host assumptions fail, stop for DA-C research. No unresolved blocker is waived by documentation merge. Current scope does not authorize coding, database execution, migrations, dependencies, runtime or merge. #105/#14/#18/#86 remain open; K2a limitations unchanged; K2b/K3 not authorized.
+Architecture directions are accepted candidates, not proven feasibility. Before applicable Gate C: owner resolution of cross-slot quarantine policy; exact journal format/size/retention and atomic publication semantics; trusted single-host storage/mount continuity and exclusive credential/entrypoint enforcement; independently approved fixture-specific inventory, provenance and catalog visibility; exact legacy characterization and supported upgrade seeds/oracles, including H6 fixture signing/authorization semantics; measured execution/cleanup and filesystem behavior; deterministic safe committed/noncommitted ambiguous-response mechanism; isolated restore and fault harness feasibility; exact G4 path/test allowlist, additive named registration and repeated CI budget evidence; separate owner implementation and execution approval. If single-host assumptions fail, stop for DA-C research. No unresolved blocker is waived by documentation merge. Current scope does not authorize coding, database execution, migrations, dependencies, runtime or merge. #105/#14/#18/#86 remain open; K2a limitations unchanged; K2b/K3 not authorized.
 
 ## Sources
 
