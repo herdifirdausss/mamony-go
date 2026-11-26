@@ -4,7 +4,7 @@ These IDs are local to Mamony Go. Read the decision for your change and the cont
 
 | Decision | Status |
 |---|---|
-| [ADR-0001 — One process with capability boundaries](0001-go-modular-monolith.md) | Proposed architecture. The current bootstrap uses one process and two listeners. |
+| [ADR-0001 — Modular monolith and service boundaries](0001-go-modular-monolith.md) | Proposed architecture. One default HTTP application, independent operational commands, and criteria for service or database extraction. |
 | [ADR-0002 — Ledger and data ownership](0002-ledger-and-data-ownership.md) | Owner-accepted bounded design direction. Canonical documentation alignment merged. |
 | [ADR-0003 — Public HTTP contract](0003-public-http-contract.md) | Contract baseline. The wire-amount decision is open. |
 | [ADR-0004 — Internal password-authentication foundation](0004-password-authentication-foundation.md) | Candidate only; read-only authenticator, no login/session route. |
