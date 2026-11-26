@@ -18,8 +18,8 @@ Only `cmd/mamony` is started by the default HTTP run. Other commands and interna
 | `internal/platform/migration` | Standalone versioned platform and Identity migration verification, with separate schema roles and migration histories; never invoked by HTTP startup. |
 | `internal/platform/postgres` | Bounded runtime-only pgxpool plus transaction primitives; Identity uses a dedicated least-privileged pool, not wired to HTTP. |
 | `internal/platform/reference` | Curated immutable synthetic currency/country reference catalog; not mounted. |
-| `internal/modules/identity` | Internal enrollment, authentication, sessions, recovery, security notices and WebAuthn verification through v35; not mounted in the default HTTP process. |
-| `internal/modules/ledger` | Isolated monetary domain and USD-only reference admission; no posting persistence or runtime wiring. |
+| `internal/modules/identity` | Internal enrollment, authentication, sessions, recovery, security notices and one-use passkey possession verification. The default HTTP process mounts health endpoints only. |
+| `internal/modules/ledger` | Isolated monetary domain and USD-only reference admission. The separate [Ledger storage fixture](proposals/ledger-k2a-isolated-persistence.md) runs in disposable PostgreSQL. Posting and runtime wiring remain planned. |
 
 | Listener | Default | Routes |
 |---|---|---|
@@ -41,7 +41,7 @@ See the [data ownership decision](adr/0002-ledger-and-data-ownership.md), [publi
 
 ## Security authority and trust boundaries
 
-**Current HTTP implementation:** only the health listeners run. Internal Identity enrollment, sessions, recovery, notice and WebAuthn candidates through v35 are merged but not publicly mounted. No deployed Mailgun worker, end-to-end tenant/resource authorization, passkey login, or financial approval/posting enforcement is established. The wider security boundaries below remain design contracts, not deployed controls. Mamony uses synthetic identities, balances and providers; these requirements do not imply regulatory compliance or production readiness.
+**Current HTTP implementation:** only the health listeners run. Internal Identity enrollment, sessions, recovery, notices and one-use passkey possession verification are merged for synthetic use. Identity routes remain unmounted. No deployed Mailgun worker, end-to-end tenant/resource authorization, passkey login, or financial approval/posting enforcement is established. The wider security boundaries below remain design contracts, not deployed controls. Mamony uses synthetic identities, balances and providers; these requirements do not imply regulatory compliance or production readiness.
 
 The initial modular-monolith security model assumes the application runtime and its authoritative database remain trusted (**Profile A**). It does **not** claim to resist an arbitrary writer to that authority database or complete application compromise. Before claiming stronger protection (**Profile B**), choose and verify independently controlled identity, approval, and execution authority, including their persistence, deployment administration, key-operation permissions, and recovery roots. Signed rows, checksums, and KMS alone cannot establish fresh, authorized current state when the signing caller or current-state authority is compromised. Multi-region fencing (**Profile G**) is deferred.
 
