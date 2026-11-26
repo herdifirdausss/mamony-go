@@ -9,8 +9,8 @@ The default HTTP process exposes **health endpoints only**. The repository also 
 | Capability | Merged baseline |
 |---|---|
 | Platform | PostgreSQL migration tooling, restricted runtime pool, disposable recovery/PITR lab, curated reference catalog |
-| Identity | Internal enrollment, password login, sessions, recovery, security notices and WebAuthn verification through v35; not publicly mounted |
-| Ledger | Isolated K1 monetary domain and USD-only reference admission; no durable posting or money API |
+| Identity | Internal enrollment, password login, sessions, recovery, security notices and one-use passkey possession verification. The default HTTP process mounts health endpoints only. |
+| Ledger | [Monetary domain and isolated persistence](docs/roadmap.md#ledger-implementation-sequence), with USD-only reference admission and disposable PostgreSQL fixtures. Durable journal posting and the money API remain planned. |
 | Payments, payouts, FX and providers | Planned; no money movement or live payment provider integration |
 
 See [current state and active work](docs/current-state.md) for the dated main snapshot, open PRs/issues, evidence and remaining gates. [Documentation index](docs/index.md) · [Roadmap](docs/roadmap.md) · [Change lifecycle](docs/development-workflow.md).
