@@ -85,3 +85,46 @@ No code paths, test execution procedures or allowed implementation files adopted
 ## G5–G7 — Verification and outcome
 
 All RSC behavioral checks NOT RUN (RSC-04 blocked). Prior CI verifies existing behavior/documentation, not this capability. RF-01–07 NOT RUN; RF-08 BLOCKED; RH-03 PARTIAL. E1 bounded review COMPLETE, Draft #106 not authorized for merge. Independent technical acceptance for this Critical proposal unrecorded; G6 NOT AUTHORIZED; production NOT ACCEPTED. No E2 experiment, coding, migrations, runtime, registry, contract, governance, #95/#81/#106 changes, merge or activation. This document does not promote any active security contract.
+
+## Consolidated G2/G3 review — D-CAP-01–04 (2026-11-26)
+
+[Owner RSC-01–07 direction acceptance](https://github.com/herdifirdausss/mamony-go/issues/108#issuecomment-7180999826) authorizes consolidated documentation review only. Prior exact HEAD 24cd55b7740d82752d3a071aca43655be5440d90 passed five CI workflows. Main inspected f6b9a2d1f46413e7c87db0cc09d13acc4261c438. The approved architecture is a logical Identity capability; no new execution authority, contract amendment or runtime implementation is adopted.
+
+### D-CAP-01 — Product boundary and acceptance trace
+
+Recommend a session-family-first capability with a narrowly bounded claim, not recovery-wide release. The unit of review is a subject within the identified recovery scope; completeness of the entire affected Identity scope remains a separate requirement. A session family is not complete merely because an existing session is denied: issuance dependencies and session-dependent operations require a coverage decision. Unresolved dependent authority must be identified explicitly and precludes a whole-family or release claim. The target outcome is denial of in-scope pre-recovery session authority under accepted policy, legitimate durable binding preservation, and a separately justified fresh control. Unknown affected scope retains whole-Identity HOLD. No new capability authorizes financial or privileged actions.
+
+RSC-01–07 requirements direction is owner-accepted; the table above remains the proposed acceptance detail. Map RSC-01/04/05 to IAM-03/08/10/11/12, RSC-02/06 to FND-12 and OPS-02/EVT-03, RSC-03/07 to FND-08/12 and the recovery runbook. Stable owning-contract AC IDs and effective amendments remain unadopted. Recommend one eventual reviewed contract/design package rather than another cycle of renaming proposal-local requirements.
+
+### D-CAP-02 — Dependency and feasibility decision
+
+| Boundary | Architectural decision | Evidence or prerequisite |
+|---|---|---|
+| Session eligibility | Identity-owned distinct recovery policy, preserve ordinary lifecycle contract | Actual capability behavior not established |
+| Issuance and dependent authority | Explicit coverage review; no inherited authority or permission inflation | IAM-08/10/12; not all-family acceptance |
+| Legitimate durable bindings | Independently justified currentness required | IAM-11; selected #95 evidence insufficient for independent completeness |
+| Platform provenance and isolation | Required contextual evidence, not Identity access authority | FND-08; recovery runbook |
+| Other temporary families, notices/delivery, v36 | Keep as explicit dependencies or exclusions; do not imply complete recovery | RF-03/06/08; #81 still unmerged |
+| Registry and release authority | Separate RH-04/05; no new implementation dependency authorized | Whole-Identity HOLD retained |
+
+Compare existing lifecycle reuse (insufficient without proven semantic equivalence), distinct Identity policy (preferred; actual capability and integration boundary unresolved), and separate trust infrastructure (outside scope). No evidence establishes that current approved semantics alone suffice. The feasibility result is **conditional**, not a guarantee of implementation or a proof of impossibility. Source review is not full runtime call graph, role/ACL inventory or deployed attestation. Recommend the owner explicitly decide whether to consider a future capability change, with separately reviewed technical scope, rather than assume the current test-only restriction can close the gap.
+
+### D-CAP-03 — Consistency and failure decision
+
+Recommend preserving security state and applicable durable obligations within the owning consistency boundary under OPS-02/FND-12. Subject-scoped review is a granularity for evidence collection, not a prescription for transaction granularity. Overall review completeness cannot be inferred from local atomicity. An explicit expected denial is only evidence of the policy actually evaluated. Infrastructure unavailability, incomplete evidence, contradictory observations and uncertain durable outcomes remain unresolved; no automatic retry, fabricated completion or partial release. The future accepted design must address duplicate/concurrent/interrupted behavior and the relation between session and issuance dependencies without weakening existing normal lifecycle guarantees. No transaction mechanism, operational procedure, schema, new interfaces, roles or release mechanism is adopted. Actual durability and concurrency feasibility remain open.
+
+### D-CAP-04 — Audit, notice and retention decision
+
+Recommend separate administrative recovery-disposition meaning, distinct from user authentication, logout, password change or proof consumption. Preserve original event identity, legitimate bindings and existing notice obligations; associated audit and applicable notices must meet owning-transaction consistency under OPS-02. Distinguish logical obligation, dispatch and observed receipt. Existing retention is unchanged; no reconstruction of purged historical records or extension of retention without policy review. Require minimal redacted, attributable evidence and custody/access/disposal review. New event taxonomy, notification applicability, retention periods and persistence implementation remain explicitly undecided. Independent surviving evidence remains necessary for currentness; Profile A privileged-authority compromise is not contained by local audit or checksums.
+
+### Decision register and exit gate
+
+| Decision | Review result | Remaining blocker |
+|---|---|---|
+| D-CAP-01 | Requirements direction accepted; bounded scope and trace proposed | Stable contract detail and effective adoption |
+| D-CAP-02 | Identity-owned distinct policy recommended | Actual capability boundary and dependency feasibility |
+| D-CAP-03 | Consistency and failure invariants recommended | Technical durability/concurrency design |
+| D-CAP-04 | Audit/retention policy direction recommended | Event/notice applicability, custody and technical retention design |
+| D-CAP-05 | Not authorized for implementation | Accepted design, exact scope, containment and independent review decision |
+
+Consolidated review is prepared, not implementation-ready G3 acceptance. Next owner decision should consider either a separate bounded technical-design scope for an actual capability change, explicitly identifying any proposed runtime/migration/role implications for separate approval, or deferral. No further symbolic policy experiment or generic requirements-renaming round is recommended. Do not create code or execute tests to close these blockers under current authority. Actual E2 remains BLOCKED; all new RSC evidence NOT RUN (fresh control blocked), RF-01–07 NOT RUN, RF-08 BLOCKED (#81 observed unmerged head 6c12b5cee007acbc98109fa67f3b216ae16abd1d), full RH-03 PARTIAL. No E1 independent review deferral transfer, G6 authorization or production acceptance. No changes to runtime, migrations, registry, canonical contracts, governance, #95/#81/#102/#106 code or release.
