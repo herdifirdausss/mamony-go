@@ -4,7 +4,7 @@
 
 - Use the product name in prose, such as **ledger**, **payments**, **payouts**, or **provider connector**. Use a short lowercase noun for a Go package.
 - Under `docs/`, use lowercase words joined by hyphens for Markdown filenames. Use `README.md` for a directory's entry document.
-- Put build order in the [roadmap](roadmap.md). Use stable IDs for architecture decisions and requirements so changes and tests can cite them.
+- Put build order in the [roadmap](roadmap.md). Use stable IDs for architecture decisions and requirements so changes and tests can cite them. On first use in a document, pair a milestone or experiment ID with a descriptive name and link to its owning definition. Reserve each ID for one meaning within its scope.
 - Name a document for what it explains. Keep research pack names in [development history](history.md). Use a version in a published API, event schema, or dependency when versioning carries compatibility meaning.
 
 ## From idea to reviewed implementation

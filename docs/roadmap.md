@@ -20,10 +20,24 @@ Use the [security verification matrix](engineering.md#security-verification) and
 | Order | Contract | Prerequisites and outcome |
 |---:|---|---|
 | 1 | [Platform foundation](contracts/platform.md) | DEC-01 accepted; synthetic migration tooling, runtime pool, recovery lab and reference catalog merged. Full recovery, capability authorization integration, operational configuration, audit/event relay and production evidence remain open. |
-| 2 | [Identity Phase 1](contracts/identity.md) | Internal Profile A enrollment, login/session, recovery and passkey verification through v35 merged; v36 remains Draft. Complete resource authorization, recovery and operational gates before public activation. Phase 1 is not complete. |
-| 3 | [Ledger](contracts/ledger.md) | K1 pure domain and FND-02a–d reference slices merged as isolated synthetic work. Canonical ownership alignment and initial USD definition freeze are owner-accepted design direction only; K2 remains unauthorized. Real historical lifecycle and design details remain open; durable posting, replay, reversal, delivery, restore and posting authorization remain unimplemented. |
+| 2 | [Identity Phase 1](contracts/identity.md) | Internal enrollment, sessions, recovery and one-use passkey possession verification are merged for synthetic use. Public activation requires resource authorization, recovery and operational acceptance. |
+| 3 | [Ledger](contracts/ledger.md) | Monetary domain, reference admission and isolated persistence are merged for bounded synthetic use. See the [Ledger implementation sequence](#ledger-implementation-sequence) for the remaining stages. |
 
-The bounded synthetic K1/reference experiments may precede full Foundation/Identity acceptance; they do not change delivery or activation order, authorize K2–K6, or satisfy the ledger gate. Pass the ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
+K1 and the reference experiments preceded full Foundation and Identity acceptance. The owner separately approved a one-time sequencing exception for K2a. The existing capability delivery order and Ledger gate still apply. Pass the Ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
+
+### Ledger implementation sequence
+
+| Stage | Scope | Status at the documented baseline |
+|---|---|---|
+| K1 | Monetary domain and exact journal invariants | Merged as a [bounded domain experiment](contracts/ledger.md#k1-isolated-monetary-domain-synthetic-experiment). |
+| K2 | Ledger-owned schema, role separation and account lifecycle | Full stage remains planned. |
+| K2a | Isolated persistence foundation within K2 | Merged as a [bounded synthetic exception](proposals/ledger-k2a-isolated-persistence.md). It covers the initial schema, fixed USD definition and disposable storage and restore fixtures. Account lifecycle and runtime wiring remain outside this slice. |
+| K3 | Atomic authorized journal posting, replay and outbox creation | Planned after K2 and accepted posting authority. |
+| K4 | Full reversal and authorized statement reads | Planned after K3. |
+| K5 | Per-account outbox delivery and consumer replay | Planned after K3 and verified relay prerequisites. |
+| K6 | Independent Ledger verification and restore acceptance | Planned after posting, reversal and delivery evidence. |
+
+Older K2a records use `K2b` to refer to follow-on work outside the synthetic exception. Its scope requires a separate design and approval. The [detailed design proposal](proposals/ledger-cross-border-payments.md#ledger-implementation-plan-stage-k) records dependencies and candidate acceptance checks. See [current state](current-state.md) for merge and activation status.
 
 ## Simulated pilot
 
