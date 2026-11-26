@@ -83,7 +83,7 @@ func localPath(path string) string {
 }
 
 // packagePathViolation prevents a capability from evading layer rules by
-// inventing new package roots. Feature subpackages belong inside known layers.
+// inventing new package roots. Feature and integration packages have distinct roots.
 func packagePathViolation(importPath string) string {
 	path := localPath(importPath)
 	parts := strings.Split(path, "/")
@@ -97,10 +97,10 @@ func packagePathViolation(importPath string) string {
 		return "capability implementation packages must be under internal/<layer>"
 	}
 	switch parts[4] {
-	case "domain", "usecase", "repository", "handler":
+	case "domain", "usecase", "repository", "handler", "integration":
 		return ""
 	default:
-		return "unknown capability layer: use domain, usecase, repository or handler"
+		return "unknown capability package: use domain, usecase, repository, handler or integration"
 	}
 }
 
@@ -152,6 +152,9 @@ func violation(from, to string) string {
 func productionViolation(from, to string) string {
 	if msg := violation(from, to); msg != "" {
 		return msg
+	}
+	if _, layer := capLayer(localPath(to)); layer == "integration" {
+		return "integration packages are for test imports"
 	}
 	a := localPath(from)
 	capName, layer := capLayer(a)
