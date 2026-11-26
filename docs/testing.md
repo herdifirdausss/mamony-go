@@ -39,6 +39,7 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 | `make coverage` | Generates `test-reports/coverage.out` and per-function coverage; diagnostic only, no arbitrary percentage gate. |
 | `make integration` | Runs real tagged PostgreSQL **fixture** checks against strictly guarded runtime/admin test URLs; fails on missing or empty tests. Requires `psql`. |
 | `make integration-local` | Runs those tests against an isolated ephemeral Docker container on a random loopback port and removes it after the test. |
+| [Identity login performance](runbooks/identity-login-performance.md) | Measures the candidate login flow against a new local PostgreSQL cluster with a fixed CPU affinity and Go memory target. |
 | `make lint`, `make security`, `make archlint` | Static/vulnerability/dependency gates; not a substitute for behavioral proof. |
 | `make test-report` | Test evidence for base Go suite via gotestsum; does not cover absent database tests. |
 
