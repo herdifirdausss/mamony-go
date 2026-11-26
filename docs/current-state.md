@@ -1,57 +1,41 @@
 # Current state and active work
 
-Snapshot: **2026-11-25 (WIB)**. Inspected `main` at [`dd0e5453`](https://github.com/herdifirdausss/mamony-go/commit/dd0e5453087ba01e6b325b8e983d9005760416f1), after [#96](https://github.com/herdifirdausss/mamony-go/pull/96). This is an observation, not a new requirement, approval, release or independent technical review. [Open pull requests](https://github.com/herdifirdausss/mamony-go/pulls) and [open issues](https://github.com/herdifirdausss/mamony-go/issues) are live; counts below are point-in-time (before this documentation PR). Contracts, ADRs and issue acceptance criteria remain authoritative.
+Snapshot inspected on **2026-11-26 (WIB)** at [main `76d417d`](https://github.com/herdifirdausss/mamony-go/commit/76d417d35571b28b7aa748577861fc3a1f9e6dcb). For live status, see [open pull requests](https://github.com/herdifirdausss/mamony-go/pulls) and [open issues](https://github.com/herdifirdausss/mamony-go/issues). The [roadmap](roadmap.md) records delivery order. The owning contracts and ADRs record requirements and design decisions.
 
 ## What actually runs
 
-- Default `make run` / `cmd/mamony`: public GET /livez, private GET /livez and /readyz; process readiness only. No Identity or Ledger routes are mounted.
-- Separate migration, maintenance, reconciliation and Identity worker entrypoints exist; they are not started by the default HTTP process. No production deployment or live delivery is established.
-- Profile A trusts its authoritative runtime/database; independent authority and multi-region profiles are not established. Independent technical acceptance for bounded solo experiments is **DEFERRED** and production readiness **NOT ACCEPTED**.
+- The default `make run` / `cmd/mamony` serves only health endpoints. The public listener serves GET /livez. The private listener serves GET /livez and /readyz. Readiness covers the HTTP process.
+- The repository has separate migration, maintenance, reconciliation and Identity worker entrypoints. The default HTTP process starts only the health listeners. Production deployment and live delivery remain unverified.
+- [Profile A](architecture.md#security-authority-and-trust-boundaries) trusts the application runtime and its authoritative database. Independent technical acceptance for the merged bounded synthetic slices is **DEFERRED**. Production readiness is **NOT ACCEPTED**.
 
 ## Merged baseline and remaining gates
 
-| Area | Merged / observed scope | Remaining |
+| Area | Decision and merged scope | Remaining |
 |---|---|---|
-| Governance | Solo ruleset baseline tracked by [#13](https://github.com/herdifirdausss/mamony-go/issues/13); bounded synthetic policy [#89](https://github.com/herdifirdausss/mamony-go/pull/89) | Independent human review and remaining admin verification; separate exact-head owner authorization for eligible synthetic merges |
-| PostgreSQL | DEC-01, disposable role/RLS fixture, migration integrity and bounded pool ([#15](https://github.com/herdifirdausss/mamony-go/pull/15)–[#19](https://github.com/herdifirdausss/mamony-go/pull/19)); separate Identity migrations | [#14](https://github.com/herdifirdausss/mamony-go/issues/14), [#18](https://github.com/herdifirdausss/mamony-go/issues/18): deployment, role/grant parity, capability authorization and recovery acceptance |
-| Recovery | [#88](https://github.com/herdifirdausss/mamony-go/pull/88) RH-01/RH-02 native PITR lab with six scoped synthetic acceptance markers | RH-03 partial in Draft [#95](https://github.com/herdifirdausss/mamony-go/pull/95); recovered application enforcement, independent evidence/custody and production recovery objectives not established |
-| Identity | [#22](https://github.com/herdifirdausss/mamony-go/pull/22)–[#77](https://github.com/herdifirdausss/mamony-go/pull/77), through v35: enrollment, email verification, password login, opaque sessions, password change/recovery, security notices and unmounted WebAuthn candidates | [#20](https://github.com/herdifirdausss/mamony-go/issues/20), [#78](https://github.com/herdifirdausss/mamony-go/issues/78), [#18](https://github.com/herdifirdausss/mamony-go/issues/18); public activation, tenant/resource authorization, operational delivery, passkey login and full recovery not accepted |
-| Ledger K1 | [#91](https://github.com/herdifirdausss/mamony-go/pull/91): isolated pure monetary domain, balanced-journal validation and deterministic account mutation planning | No durable posting, database, replay, reversal execution, financial authority, outbox or restore; K2–K6 not authorized by this slice |
-| Platform FND-02a | [#93](https://github.com/herdifirdausss/mamony-go/pull/93): curated immutable currency/country catalog | Partial FND-02, not a production registry or complete historical data |
-| Ledger FND-02b | [#96](https://github.com/herdifirdausss/mamony-go/pull/96): USD-only canonical reference admission, unmounted composition helper | Historical definition identity and full FND-02/LGR-09 outstanding; no public posting, runtime activation or database |
-| Financial pilot and later capabilities | Requirements/roadmap; financial design in Draft [#87](https://github.com/herdifirdausss/mamony-go/pull/87) | No accepted end-to-end payments, payouts, FX, provider, screening, settlement or operational pilot |
+| Governance | Active solo ruleset and [bounded synthetic policy](https://github.com/herdifirdausss/mamony-go/pull/89). | [#13](https://github.com/herdifirdausss/mamony-go/issues/13) tracks remaining governance verification and independent review. Each eligible synthetic merge requires separate exact-candidate owner authorization. |
+| PostgreSQL | Effective DEC-01 uses golang-migrate. The disposable role/RLS fixture, migration integrity checks, bounded pool and separate Identity migrations are merged. [ADR-0042](adr/0042-context-aware-migration-executor.md) was merged as a proposed DEC-01 amendment. | [#105](https://github.com/herdifirdausss/mamony-go/issues/105) tracks migration cancellation and crash-outcome design. [#14](https://github.com/herdifirdausss/mamony-go/issues/14) and [#18](https://github.com/herdifirdausss/mamony-go/issues/18) track deployment, grants, recovery and capability authorization. |
+| Recovery | [#88](https://github.com/herdifirdausss/mamony-go/pull/88) merged the disposable native PostgreSQL point-in-time recovery (PITR) lab for RH-01 and RH-02. | The [RH-03 state reconciliation lab](https://github.com/herdifirdausss/mamony-go/pull/95) is partial. Recovered application enforcement, independent evidence and production recovery objectives remain open. |
+| Identity | Internal enrollment, login, sessions, recovery and security-notice slices are merged. [#81](https://github.com/herdifirdausss/mamony-go/pull/81) merged one-use passkey possession verification for bounded synthetic use. The transition records `POSSESSION_VERIFIED` and queues a notice. Identity remains unmounted. | [#20](https://github.com/herdifirdausss/mamony-go/issues/20), [#78](https://github.com/herdifirdausss/mamony-go/issues/78) and [#108](https://github.com/herdifirdausss/mamony-go/issues/108) track Phase 1, residual passkey acceptance and recovery-session design. Passkey login, recovery authority, resource authorization, production delivery and public activation remain open. |
+| Reference data | [FND-02a–d](contracts/platform.md#configuration-data-and-operations) merged the curated catalog, USD-only Ledger admission, private historical identity fixtures and explicit curated definition IDs. | Full historical lifecycle, provenance and full FND-02 acceptance remain open. |
+| Ledger | [K1 — Monetary domain](roadmap.md#ledger-implementation-sequence) merged in [#91](https://github.com/herdifirdausss/mamony-go/pull/91). [#87](https://github.com/herdifirdausss/mamony-go/pull/87) records the accepted ownership and USD definition direction. [K2a — Isolated persistence foundation](proposals/ledger-k2a-isolated-persistence.md) merged in [#104](https://github.com/herdifirdausss/mamony-go/pull/104) as a one-time synthetic sequencing exception with disposable PostgreSQL storage and restore fixtures. | [#86](https://github.com/herdifirdausss/mamony-go/issues/86) tracks remaining design and sequencing. Full K2 account lifecycle, K3 journal posting and later Ledger stages remain outside K2a. Ledger runtime integration and the money API remain pending. |
+| Financial pilot | The [roadmap](roadmap.md#simulated-pilot) identifies the planned capabilities and dependencies. | End-to-end payments, payouts, FX, provider, screening, settlement and operational pilot acceptance remain open. |
 
-Identity v35 verifies signed possession assertions only; it does not consume the challenge or activate the pending credential. K1 and FND-02a/b were bounded synthetic experiments before full Foundation/Identity completion, not a change to the delivery order. See [roadmap](roadmap.md), [Identity contract](contracts/identity.md), [Ledger contract](contracts/ledger.md) and [Platform contract](contracts/platform.md).
+<a name="open-pull-requests-six-all-draft"></a>
 
-## Open pull requests (six, all Draft)
+## Open pull requests
 
-| PR | State at inspection | Next gate / limit |
-|---|---|---|
-| [#79](https://github.com/herdifirdausss/mamony-go/pull/79) | v36 design | Critical design/acceptance under [#78](https://github.com/herdifirdausss/mamony-go/issues/78); not merged |
-| [#80](https://github.com/herdifirdausss/mamony-go/pull/80) | v36 abstract Go handoff, stacked on #79 | No concrete durable activation in this slice; retain Draft |
-| [#81](https://github.com/herdifirdausss/mamony-go/pull/81) | v36 PostgreSQL candidate, stacked on #80 | No merge or activation authority; historical CI evidence does not transfer to a changed head |
-| [#87](https://github.com/herdifirdausss/mamony-go/pull/87) | Ledger/cross-border design; owner G2 direction recorded, G3 handoff | Design review and canonical alignment; not merged, no downstream implementation authority |
-| [#95](https://github.com/herdifirdausss/mamony-go/pull/95) | RH-03 bounded synthetic recovery candidate | Partial; RH-03b3 recovered-application enforcement outstanding; no merge authority |
-| [#98](https://github.com/herdifirdausss/mamony-go/pull/98) | FND-02c historical currency definition experiment | G5 reported complete; separate exact-head owner G6 decision and G7 required; no database, real history import, conversion or activation |
+At this snapshot, the [Platform state reconciliation lab](https://github.com/herdifirdausss/mamony-go/pull/95), [Identity recovery-fence policy](https://github.com/herdifirdausss/mamony-go/pull/102), [symbolic recovery-policy experiment (E1)](https://github.com/herdifirdausss/mamony-go/pull/106) and [recovery-session design](https://github.com/herdifirdausss/mamony-go/pull/109) were Draft. The [recovery-fence policy PR](https://github.com/herdifirdausss/mamony-go/pull/102) records the scope and prerequisites for the proposed follow-up study (E2).
 
-## Open issues (seven)
+<a name="open-issues-seven"></a>
 
-| Issue | Remaining responsibility |
-|---|---|
-| [#13](https://github.com/herdifirdausss/mamony-go/issues/13) | Solo protection baseline active; remaining admin verification/independent review |
-| [#14](https://github.com/herdifirdausss/mamony-go/issues/14) | PostgreSQL foundation and recovery; deployment, grants and RH-03/full recovery evidence |
-| [#18](https://github.com/herdifirdausss/mamony-go/issues/18) | Tenant-aware capability integration and end-to-end authorization |
-| [#20](https://github.com/herdifirdausss/mamony-go/issues/20) | Identity Phase 1 and release blockers |
-| [#78](https://github.com/herdifirdausss/mamony-go/issues/78) | v36 one-use passkey possession transition and related acceptance/recovery |
-| [#86](https://github.com/herdifirdausss/mamony-go/issues/86) | Financial research, design, Ledger requirements and implementation sequencing |
-| [#97](https://github.com/herdifirdausss/mamony-go/issues/97) | FND-02c immutable historical currency definition identity |
+## Open issues
 
-Older issue body statements (for example, #20 saying no PR remains or #14 describing branch protection as deferred) are historical; consult current lists, issue comments, later decisions and actual merge state before acting. Closed slice issues #90, #92 and #94 do not close the parent Ledger/Foundation gates.
+Use the [live issue list](https://github.com/herdifirdausss/mamony-go/issues). Follow the links in the baseline table for the open decisions that block each capability.
 
 ## Evidence at the inspected main commit
 
-The exact main commit has four successful push-triggered check runs: [foundation](https://github.com/herdifirdausss/mamony-go/actions/runs/45529871215/job/138922210310), [lint](https://github.com/herdifirdausss/mamony-go/actions/runs/45529871215/job/138922210778), [vulnerability](https://github.com/herdifirdausss/mamony-go/actions/runs/45529871215/job/138922210839) and [PostgreSQL](https://github.com/herdifirdausss/mamony-go/actions/runs/45529871245/job/138922210323). These are GitHub-reported conclusions, not a new local test execution. PR-specific checks and scoped results are in the linked PRs; do not transfer results between heads. Full production readiness, real delivery, durable Ledger integration and end-to-end authorization are not proven.
+GitHub reported successful push checks at the inspected commit for [foundation](https://github.com/herdifirdausss/mamony-go/actions/runs/45839562201/job/139977340457), [lint](https://github.com/herdifirdausss/mamony-go/actions/runs/45839562201/job/139977340367), [vulnerability](https://github.com/herdifirdausss/mamony-go/actions/runs/45839562201/job/139977340055) and [PostgreSQL](https://github.com/herdifirdausss/mamony-go/actions/runs/45839562241/job/139977339670). See the [passkey possession](https://github.com/herdifirdausss/mamony-go/pull/81#issuecomment-7195023603) and [isolated Ledger storage](https://github.com/herdifirdausss/mamony-go/pull/104#issuecomment-7152708615) merge records for exact candidate evidence and scope limits.
 
 ## Work sequencing
 
-Continue already authorized bounded Draft work and obtain separate review/owner decisions according to the [change lifecycle](development-workflow.md). Do not infer authorization to merge a Draft, activate Identity or financial runtime, import production data, change migrations or begin K2–K6 from this snapshot. Refresh this page when a material milestone merges or acceptance changes; keep detailed evidence in the owning issue/PR and stable requirements in contracts.
+Follow the [roadmap](roadmap.md) and [change lifecycle](development-workflow.md) for prerequisites, acceptance and authorization. Refresh this snapshot when a material milestone merges or acceptance changes. Keep detailed evidence in the owning issue or PR and stable requirements in contracts.
