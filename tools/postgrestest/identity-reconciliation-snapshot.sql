@@ -47,6 +47,10 @@ SELECT 'passkey_registration_notices', count(*),
        encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
            ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')
 FROM mamony_identity.passkey_registration_notices r;
+SELECT 'passkey_activation_notices', count(*),
+       encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
+           ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')
+FROM mamony_identity.passkey_activation_notices r;
 SELECT 'opaque_sessions', count(*),
        encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text, E'\n'
            ORDER BY to_jsonb(r)::text COLLATE "C"), ''), 'UTF8')), 'hex')

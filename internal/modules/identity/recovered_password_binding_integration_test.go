@@ -66,7 +66,7 @@ func TestIdentityRH03RecoveredPasswordBinding(t *testing.T) {
 	}
 	source := connectAdmin(sourceDB)
 	var version int
-	if err := source.QueryRow(ctx, "SELECT max(version) FROM mamony_identity.migration_fingerprints").Scan(&version); err != nil || version != 34 {
+	if err := source.QueryRow(ctx, "SELECT max(version) FROM mamony_identity.migration_fingerprints").Scan(&version); err != nil || version != 35 {
 		t.Fatal("expected approved Identity migration fixture missing")
 	}
 

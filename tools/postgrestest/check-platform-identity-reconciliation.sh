@@ -39,19 +39,19 @@ target_sql() {
   timeout 90 docker exec -i "$target_id" psql -U mamony_test_admin -d mamony_test_rh03 -XqAt -F '|' -v ON_ERROR_STOP=1 "$@"
 }
 [[ "$(source_sql -c 'SELECT current_database()')" == mamony_test_ci ]] || fail "wrong source"
-[[ "$(source_sql -c 'SELECT max(version) FROM mamony_identity.migration_fingerprints')" == 34 ]] || fail "expected main migration fixture missing"
+[[ "$(source_sql -c 'SELECT max(version) FROM mamony_identity.migration_fingerprints')" == 35 ]] || fail "expected main migration fixture missing"
 source_sql < "$snapshot_sql" > "$work/before"
 # Reject vacuous or malformed fixture snapshots; all expected records must exist.
 validate_snapshot() {
   local file=$1
   [[ -s "$file" ]] || return 1
-  [[ "$(wc -l < "$file")" -eq 22 ]] || return 1
+  [[ "$(wc -l < "$file")" -eq 23 ]] || return 1
   awk -F '|' 'NF != 3 || $1 !~ /^[a-z_]+$/ || $2 !~ /^[0-9]+$/ || length($3) != 64 || $3 !~ /^[0-9a-f]+$/ || seen[$1]++ {bad=1} END {exit bad}' "$file" || return 1
   local table
-  for table in subjects email_aliases password_verifiers recovery_code_factor_keys password_recovery_offline_codes passkey_credentials security_outbox password_change_notices password_recovery_notices password_recovery_code_notices passkey_registration_notices opaque_sessions password_recovery_challenges password_recovery_assurance_grants password_recovery_code_enrollment_approvals recovery_code_factor_challenges passkey_activation_challenges migration_fingerprints email_verification_challenges password_login_grants passkey_registration_intents passkey_registration_admissions; do
+  for table in subjects email_aliases password_verifiers recovery_code_factor_keys password_recovery_offline_codes passkey_credentials security_outbox password_change_notices password_recovery_notices password_recovery_code_notices passkey_registration_notices opaque_sessions password_recovery_challenges password_recovery_assurance_grants password_recovery_code_enrollment_approvals recovery_code_factor_challenges passkey_activation_challenges migration_fingerprints email_verification_challenges password_login_grants passkey_registration_intents passkey_registration_admissions passkey_activation_notices; do
     awk -F '|' -v t="$table" '$1==t {found=1} END {exit !found}' "$file" || return 1
   done
-  for table in subjects email_aliases password_verifiers recovery_code_factor_keys password_recovery_offline_codes passkey_credentials security_outbox password_change_notices password_recovery_notices password_recovery_code_notices passkey_registration_notices opaque_sessions migration_fingerprints; do
+  for table in subjects email_aliases password_verifiers recovery_code_factor_keys password_recovery_offline_codes passkey_credentials security_outbox password_change_notices password_recovery_notices password_recovery_code_notices passkey_registration_notices opaque_sessions migration_fingerprints passkey_activation_notices; do
     awk -F '|' -v t="$table" '$1==t && $2>0 {found=1} END {exit !found}' "$file" || return 1
   done
 }
