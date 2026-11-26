@@ -112,3 +112,29 @@ C: Expand to all authority families or full recovery fence. Out of scope; separa
 | AC-3 incomplete/contradictory evidence remains HOLD | Fail-closed prerequisite actually stopped the lab; bounded acceptance scenarios not re-executed on this head. Preserve all prior rejection and containment assertions. |
 
 Before a separately authorized remediation, approve exact allowed test/fixture scope and evidence boundary (A or B), confirm source-only compatibility and no weakening of existing assertions, and resolve any new obligation evidence gap. A future exact-candidate review must observe all twelve RH-03 and six RH-01/RH-02 required markers, as well as applicable merged Identity regression gates, or explicitly record NOT RUN/FAIL and remain blocked. CI success alone cannot extend the authority claim. No implementation plan, executable test instructions, migration/role changes, registry or new recovery behavior authorized. RF-08 integrated acceptance NOT RUN after #81 merge; E2 BLOCKED. RH-03 PARTIAL, current exact-head acceptance BLOCKED, independent technical acceptance DEFERRED only for previously approved bounded scope, G6 NOT AUTHORIZED, production NOT ACCEPTED. No test, implementation, migration, runtime, governance or merge changes in this review.
+
+## Option B — exact remediation scope and evidence review (documentation only)
+
+[Owner Option B direction](https://github.com/herdifirdausss/mamony-go/pull/95#issuecomment-7195336146). Reviewed e3afd71449d0f0cc2807df6966bf611867bdcbf0 against 76d417d35571b28b7aa748577861fc3a1f9e6dcb. The selected scope direction is 23 read-only preservation observations, retaining the original 22 and adding the activation-notice obligation. This does not authorize code or test changes. The earlier exact failed PostgreSQL job 139977471005 actually reported passkey atomic possession, crash-recovery and logical backup-restore PASS before the RH-03 prerequisite failure. Its existing synthetic evidence supports the feasibility of observing nonempty activation notices, but the new RH-03 observation has not run and its nonvacuity at the actual source boundary must be demonstrated, not inferred from separate steps.
+
+### Affected files — proposed maximum review boundary
+
+| Existing path | Review concern |
+|---|---|
+| tools/postgrestest/check-platform-identity-reconciliation.sh | Exact migrated baseline compatibility and internally consistent selected inventory validation; retain fail-closed guards and all earlier negative cases |
+| tools/postgrestest/identity-reconciliation-snapshot.sql | Selected activation-notice preservation evidence; preserve all existing observations and privacy bounds |
+| internal/modules/identity/recovered_password_binding_integration_test.go | Compatibility with merged migration baseline; preserve existing recovered password/session/grant checks |
+| docs/proposals/platform-identity-reconciliation-lab.md | Evidence, scope limits and exact candidate outcome |
+
+These are the only proposed affected paths, not authorization to edit. No change proposed to CI workflow, existing witness/lifecycle queries, native evidence test, execution wrapper, merged passkey tests or inventory, canonical contracts, migrations, role bootstrap, dependencies, runtime composition or deployment. If another path or new authority action is necessary, stop for separate scope review. Existing stage witnesses and eight lifecycle observations remain unchanged. No executable remediation or new test procedure specified.
+
+### Evidence requirements and traceability
+
+| Existing acceptance scope | Evidence required after separate authorization | Status |
+|---|---|---|
+| AC-1; RH-03a1–a5 | Existing selected observations plus new notice preservation, nonempty legitimate source evidence, original obligation identity and stable equality within the already approved isolated boundaries; all earlier five witnesses and eight lifecycle counts retained | NOT RUN for Option B |
+| AC-2; RH-03b1/b2/b3a/b3b/b3c | Re-establish prior bounded containment and recovered application evidence with original scope unchanged; no additional passkey authority claim | NOT RUN |
+| AC-3; RH-03c1/c2 and existing rejection cases | Preserve refusal on missing, inconsistent or incompatible evidence; no release or fabricated success | NOT RUN |
+| RH-01/RH-02 and merged Identity regression | All six required RH-01/02 markers and applicable existing CI checks, in addition to all twelve RH-03 markers | NOT RUN for remediation |
+
+Existing source PASS is not independent recovery history or evidence of delivery. If the actual source boundary lacks a legitimate nonempty notice observation, or prior evidence coverage cannot be retained, the proposed scope is blocked; no empty-equality substitute, synthetic new authority operation, acceptance weakening or automatic expansion. Review exact candidate and actual logs, not just workflow conclusions. AC-1/2 remain PARTIAL overall; AC-3 historical bounded PASS only. No full family, RF-08, E2 or production acceptance follows. Current exact-candidate G6 NOT AUTHORIZED; independent acceptance for changed scope not recorded; previous bounded deferral not automatically transferable. Next gate: owner review of the proposed four-path maximum scope and nonvacuity condition; separate technical acceptance and authorization required before any implementation. No tests, migrations, runtime, registry, governance or merge changes in this review.
