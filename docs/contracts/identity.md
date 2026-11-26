@@ -403,3 +403,22 @@ V34 introduces an **unmounted, EXECUTE-only, one-challenge-per-subject** `PASSKE
 The internal **unmounted** `PasskeyActivationAssertionVerifier` retrieves the still-live v34 expected challenge and pending credential via the already isolated EXECUTE-only reader; it validates a bounded `webauthn.get` response using the pinned **go-webauthn v0.18.2** library `ParseCredentialRequestResponseBytes` and `ValidateLogin`. It reconstructs the exact expected DB challenge, RP ID/origin, subject/user handle and only allowed credential ID with the original COSE public key. Verification checks real P-256/ES256 signature (and other library-supported keys), UP, **required UV**, challenge/type/origin/RP hash, credential ID/user handle, BE/BS consistency, and explicit counter clone-warning denial. Zero/zero counters remain permissible but offer no clone detection. The verified result is a defensive copy, not a credential or authentication grant. See [ADR-0040](../adr/0040-passkey-activation-signed-assertion-verifier.md).
 
 **No nonce consumption or passkey activation exists in v35.** `VerifyOnly` may accept replayed valid signatures while v34 challenge remains available; v36 must atomically consume the same challenge with the state/counter transition and mandatory audit/notice under fresh locks. The v33 credential remains `PENDING_ASSERTION`; there is no passkey login, independent factor or browser endpoint. A real security-notice worker remains a separate production gate.
+
+## Bounded synthetic passkey possession — Identity v36 (unmerged candidate #81)
+
+**Owner-accepted requirements, not a release or merge decision.** The [D1–D4 decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178) accepts this limited scope under the adopted bounded solo synthetic workflow. Implementation and verification remain subject to exact-candidate review. Independent technical acceptance and production readiness are NOT ACCEPTED.
+
+The permitted state transition establishes possession evidence only. It confers no login, session issuance, independent recovery, authorization, or financial approval authority. The existing three-minute assertion challenge and ten-minute staging limit remain unchanged. Profile A trusts the owning application and database; stronger independent authority guarantees are out of scope.
+
+| ID | Accepted bounded requirement | Required verification |
+|---|---|---|
+| PKA-01 | Bind verified possession to the exact original server-owned evidence. | Positive and negative signed-assertion and binding tests. |
+| PKA-02 | Allow at most one durable completion for the original challenge, including concurrent attempts. | Real PostgreSQL concurrency and duplicate-denial evidence. |
+| PKA-03 | Recheck current subject, session, credential, policy, provenance and expiry before effect. | Real database stale-state and expiry tests. |
+| PKA-04 | Enforce the approved WebAuthn verification, counter and backup-state policy. | Signed fixture and persistence checks; no general clone-detection claim. |
+| PKA-05 | Persist credential change, challenge consumption, identifier-only audit and pending notice atomically. | Commit and rollback evidence; pending notice is not delivered. |
+| PKA-06 | Restrict completion to the separately authorized finisher role; deny unauthorized direct access. | Database privilege and isolation tests. |
+| PKA-07 | Remain unmounted; do not authorize login, sessions, independent recovery or live providers. | Route, runtime, deployment and negative activation review. |
+| PKA-08 | Fail closed on unexpected storage or uncertain commit outcomes; sanitize errors and do not automatically retry. | Unit and integration error-handling evidence. |
+
+The [detailed proposal](../proposals/identity-passkey-atomic-activation.md) retains the complete accepted requirement definitions and test matrix. These summaries do not relax that matrix, establish blanket PASS, or certify recovery after stale restore. Platform #14 owns shared recovery foundation; Identity #78 owns credential semantics and security obligations. Production notification delivery, recovery continuity, role custody, ingress, independent review and separate release approval remain blockers. No automatic cleanup or recovery release is authorized by this slice.

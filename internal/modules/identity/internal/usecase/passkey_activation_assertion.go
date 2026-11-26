@@ -16,7 +16,7 @@ const maxPasskeyActivationAssertionResponseBytes = 128 << 10
 // PasskeyActivationAssertionResult reports signature-verified assertion facts
 // ONLY; it does not confer account access, credential activation, recovery
 // assurance or permission to reuse a v34 nonce. The result must be paired
-// with its original v34 evidence in a future independently fenced DB commit.
+// with its original v34 evidence in a separately fenced DB commit.
 type PasskeyActivationAssertionResult struct {
 	CredentialID   []byte
 	Counter        uint32
@@ -62,7 +62,7 @@ func (v *PasskeyActivationAssertionVerifier) VerifyOnly(ctx context.Context,
 
 // verifyForActivation preserves EXACT v34 evidence used in the signature
 // verification; no re-reading a replaced nonce between Verify and Commit.
-// This is package-private because only a reviewed future activation
+// This is package-private because only a reviewed activation
 // coordinator may pair it with an independently checked SQL fence.
 func (v *PasskeyActivationAssertionVerifier) verifyForActivation(ctx context.Context,
 	bearer, challengeID string, raw []byte) (

@@ -387,6 +387,64 @@ func TestIdentityZPasswordRecoveryRedemption(t *testing.T) {
 			t.Fatal("contact update did not advance subject epoch")
 		}
 	})
+	t.Run("recovery epoch rejects old challenge even with current assurance", func(t *testing.T) {
+		s, alias, _, digest, before := newFixture(t, 0x7b)
+		// Positive control: the original challenge and assurance are usable
+		// under the original epoch. Roll back the actual redemption, so
+		// it cannot leave a password, audit, or notice mutation.
+		conn := connect(redeemerDSN)
+		salt := bytes.Repeat([]byte{0x41}, 16)
+		verifier := bytes.Repeat([]byte{0x42}, 32)
+		tx, err := conn.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(context.Background()) }()
+		var allowed bool
+		if err := tx.QueryRow(ctx, "SELECT mamony_identity.redeem_password_recovery($1,$2,$3,$4,$5)",
+			digest[:], alias, salt, verifier, randomSyntheticID(t, "evt_")).Scan(&allowed); err != nil || !allowed {
+			t.Fatal("original synthetic challenge and assurance not usable")
+		}
+		if err := tx.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+		tag, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1", s)
+		if err != nil || tag.RowsAffected() != 1 {
+			t.Fatal("scoped recovery epoch fixture mutation failed")
+		}
+		// Test-only privileged assurance update isolates the old challenge
+		// epoch as the rejection cause. It is not a legitimate approval path.
+		tag, err = admin.Exec(ctx, "UPDATE mamony_identity.password_recovery_assurance_grants SET subject_epoch=$2 WHERE subject_id=$1", s, before+1)
+		if err != nil || tag.RowsAffected() != 1 {
+			t.Fatal("synthetic current-epoch assurance fixture failed")
+		}
+		var live bool
+		if err := admin.QueryRow(ctx, `SELECT c.subject_epoch=$2 AND c.consumed_at IS NULL
+			AND c.revoked_at IS NULL AND c.expires_at>clock_timestamp()
+			AND g.subject_epoch=$2+1 AND g.consumed_at IS NULL AND g.expires_at>clock_timestamp()
+			AND g.challenge_id=c.challenge_id
+			FROM mamony_identity.password_recovery_challenges c
+			JOIN mamony_identity.password_recovery_assurance_grants g USING(subject_id)
+			WHERE c.subject_id=$1`, s, before).Scan(&live); err != nil || !live {
+			t.Fatal("stale challenge or synthetic assurance fixture not live")
+		}
+		if err := conn.QueryRow(ctx, "SELECT mamony_identity.redeem_password_recovery($1,$2,$3,$4,$5)",
+			digest[:], alias, salt, verifier, randomSyntheticID(t, "evt_")).Scan(&allowed); err != nil || allowed {
+			t.Fatal("old challenge was not cleanly denied with current assurance")
+		}
+		var unchanged bool
+		if err := admin.QueryRow(ctx, `SELECT
+			(SELECT session_epoch=$2+1 FROM mamony_identity.subjects WHERE subject_id=$1)
+			AND (SELECT consumed_at IS NULL AND revoked_at IS NULL FROM mamony_identity.password_recovery_challenges WHERE subject_id=$1)
+			AND (SELECT consumed_at IS NULL FROM mamony_identity.password_recovery_assurance_grants WHERE subject_id=$1)
+			AND (SELECT salt<>$3 AND digest<>$4 FROM mamony_identity.password_verifiers WHERE subject_id=$1)
+			AND NOT EXISTS (SELECT 1 FROM mamony_identity.security_outbox WHERE subject_id=$1 AND event_type='PASSWORD_RECOVERED')
+			AND NOT EXISTS (SELECT 1 FROM mamony_identity.password_recovery_notices WHERE subject_id=$1)`,
+			s, before, salt, verifier).Scan(&unchanged); err != nil || !unchanged {
+			t.Fatal("denial changed credential, epoch, consumption or notice history")
+		}
+		t.Log("IRF-RECOVERY MECHANISM PASS: live old challenge denied with synthetic current assurance; original positive control rolled back")
+	})
 	t.Run("DB expiry during redemption denies proof", func(t *testing.T) {
 		s, alias, bearer, digest, before := newFixture(t, 0x7a)
 		if _, err := admin.Exec(ctx, `UPDATE mamony_identity.password_recovery_challenges

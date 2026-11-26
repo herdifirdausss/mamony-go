@@ -61,6 +61,9 @@ func TestIdentitySessionCandidateMethodsRemainUnmounted(t *testing.T) {
 		// authority, durable WebAuthn ceremony and RP/origin verification.
 		{http.MethodPost, "/v1/identity/passkeys/register/begin"},
 		{http.MethodPost, "/v1/identity/passkeys/register/finish"},
+		// The bounded possession candidate must remain unmounted too.
+		{http.MethodPost, "/v1/identity/passkeys/activate/begin"},
+		{http.MethodPost, "/v1/identity/passkeys/activate/finish"},
 		{http.MethodPost, "/v1/identity/passkeys/authenticate/begin"},
 		{http.MethodPost, "/v1/identity/passkeys/authenticate/finish"},
 	}

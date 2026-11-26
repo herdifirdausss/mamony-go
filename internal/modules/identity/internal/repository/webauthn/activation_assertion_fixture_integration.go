@@ -48,6 +48,15 @@ func (s *SyntheticActivationSigner) PublicCOSE() ([]byte, error) {
 // user handle for a real cryptographic assertion, not a mocked return.
 func (s *SyntheticActivationSigner) SignedResponse(
 	challenge [32]byte, credentialID []byte, subject string, counter uint32) ([]byte, error) {
+	return s.SignedResponseWithFlags(challenge, credentialID, subject, counter, 0x05)
+}
+
+// SignedResponseWithFlags signs arbitrary authenticator UP/UV/BE/BS flags
+// using the REAL test-only ES256 private key. It deliberately permits
+// invalid flags so adversarial negative cases reach the actual verifier.
+func (s *SyntheticActivationSigner) SignedResponseWithFlags(
+	challenge [32]byte, credentialID []byte, subject string, counter uint32,
+	flags byte) ([]byte, error) {
 	if s == nil || s.private == nil || len(credentialID) < 16 ||
 		challenge == ([32]byte{}) || subject == "" {
 		return nil, errors.New("invalid test assertion inputs")
@@ -63,7 +72,7 @@ func (s *SyntheticActivationSigner) SignedResponse(
 	}
 	rpHash := sha256.Sum256([]byte("login.example.test"))
 	authData := append([]byte(nil), rpHash[:]...)
-	authData = append(authData, 0x05) // required UP+UV
+	authData = append(authData, flags) // signed authenticator flags, including BE/BS
 	var count [4]byte
 	binary.BigEndian.PutUint32(count[:], counter)
 	authData = append(authData, count[:]...)

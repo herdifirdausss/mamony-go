@@ -15,7 +15,7 @@ var (
 
 // PasskeyActivationFinishRequest is the ONE cryptographically verified v35
 // snapshot paired with its original v34 nonce. It is not an approval, session,
-// or independent recovery factor. A future isolated SQL authority MUST compare
+// or independent recovery factor. The isolated SQL authority MUST compare
 // every expected value to freshly locked server rows before any transition.
 type PasskeyActivationFinishRequest struct {
 	SessionDigest [32]byte
@@ -25,19 +25,22 @@ type PasskeyActivationFinishRequest struct {
 	EventID       string
 }
 
-// PasskeyActivationFinishStore is intentionally UNIMPLEMENTED by any runtime.
-// The future EXECUTE-only PostgreSQL role must perform nonce consumption,
+// PasskeyActivationFinishStore is deliberately absent from HTTP/runtime wiring.
+// The candidate SQL adapter implements nonce consumption,
 // credential state/counter transition, identifier-only audit and mandatory
 // notice as ONE transaction. No caller may implement this with independent
 // UPDATEs or use its boolean result as a login/recovery authorization.
+// A nil error with false denotes a definitive rejection; any error denotes
+// unavailable processing, which may include an unknown transaction outcome.
+// A nil error with true denotes committed possession only.
 type PasskeyActivationFinishStore interface {
 	Finish(context.Context, PasskeyActivationFinishRequest) (bool, error)
 }
 
 // PasskeyActivationCommitter prepares an exact signature-to-SQL handoff.
-// It is intentionally unmounted and has no concrete SQL store/role. No
-// POSSESSION_VERIFIED or ACTIVE state exists yet. The implementation cannot
-// be used until the Critical design is accepted and independently reviewed.
+// It remains unmounted. Candidate migration 000035 and the SQL adapter
+// can persist POSSESSION_VERIFIED only, with no ACTIVE/login authority.
+// Neither component is approved for deployment or public use.
 type PasskeyActivationCommitter struct {
 	proof  *PasskeyActivationAssertionVerifier
 	store  PasskeyActivationFinishStore
@@ -62,6 +65,8 @@ func NewPasskeyActivationCommitter(
 // The store is required to reject stale/overwritten evidence under fresh SQL
 // locks, including nonce ID+bytes, COSE key, RP, epoch, session, flags and
 // previous counter. This method does NOT implement that database fence.
+// DENIED denotes a definitive rejection; UNAVAILABLE denotes processing that
+// could not establish success. UNAVAILABLE is not evidence of rollback.
 // Unknown COMMIT outcome always maps to UNAVAILABLE and is never retried.
 func (c *PasskeyActivationCommitter) Finish(ctx context.Context,
 	bearer, challengeID string, rawAssertion []byte) error {
@@ -79,6 +84,8 @@ func (c *PasskeyActivationCommitter) Finish(ctx context.Context,
 		return ErrPasskeyActivationCommitUnavailable
 	}
 
+	// The usecase validates the verified handoff contract; the adapter separately
+	// validates its persistence boundary. Neither replaces SQL authority checks.
 	// Defence-in-depth before handing the *signed* facts to the separately
 	// privileged transaction. A compromised or replaced store is not an
 	// independent cryptographic verifier (Profile A residual risk).
@@ -124,7 +131,7 @@ func (c *PasskeyActivationCommitter) Finish(ctx context.Context,
 	if !ok {
 		return ErrPasskeyActivationCommitDenied
 	}
-	// This is only the future store's possession-commit result; it does not
+	// This is only the store's possession-commit result; it does not
 	// confer login, a session, independent factor assurance or authorization.
 	return nil
 }

@@ -33,6 +33,9 @@ var requiredTests = []string{
 	"TestPostgresRuntimePoolIsolation",
 	"TestPostgresRuntimePoolRejectsElevatedRole",
 	"TestPostgresIdentityMigration",
+	"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade",
+	"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade/populated_data_preservation",
+	"TestPostgresIdentityMigration/isolated_v34_to_v35_upgrade/applied_manifest_verification",
 	"TestPostgresIdentityVerifierRole",
 	"TestPostgresIdentityZAuthenticatorRole",
 	"TestPostgresIdentityZSessionRole",
@@ -52,6 +55,7 @@ var requiredTests = []string{
 	"TestPostgresIdentityZPasskeyRegistrationAdmissionRole",
 	"TestPostgresIdentityZPasskeyRegistrationStageRole",
 	"TestPostgresIdentityZPasskeyActivationRoles",
+	"TestPostgresIdentityZPasskeyActivationFinisherRole",
 	"TestPostgresIdentityZRecoveryCodeSecurityNoticeRoles",
 	"TestPostgresIdentityZRecoveryCodeNoticeWebhookRole",
 	"TestPostgresIdentityZRecoverySecurityNoticeRoles",
@@ -68,6 +72,7 @@ var requiredTests = []string{
 	"TestIdentityZSessionIdleExpiry",
 	"TestIdentityZMaxActiveSessions",
 	"TestIdentityZAuthMaterialEpochFence",
+	"TestIdentityZRecoveryEpochInvalidationMechanism",
 	"TestIdentityZAuthenticatedPasswordChange",
 	"TestIdentityZPasswordRecoveryRedemption",
 	"TestIdentityZRecoveryOfflineAssurance",
@@ -77,6 +82,7 @@ var requiredTests = []string{
 	"TestIdentityZPasskeyRegistrationAdmission",
 	"TestIdentityZPasskeyRegistrationAtomicStage",
 	"TestIdentityZPasskeyActivationChallenge",
+	"TestIdentityZPasskeyAtomicPossession",
 	"TestIdentityZSecurityNoticeOutbox",
 	"TestIdentityEmailVerification",
 	"TestIdentityProofDeliveryOutbox",
@@ -141,6 +147,7 @@ func run() error {
 	identityPasskeyStageDSN := os.Getenv("TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL")
 	identityPasskeyActivationIssuerDSN := os.Getenv("TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL")
 	identityPasskeyActivationReaderDSN := os.Getenv("TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL")
+	identityPasskeyActivationFinisherDSN := os.Getenv("TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL")
 	identityRecoveryCodeNoticeDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_URL")
 	identityRecoveryCodeNoticeWebhookDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_WEBHOOK_URL")
 	identityRecoveryCodeNoticeMonitorDSN := os.Getenv("TEST_IDENTITY_RECOVERY_CODE_NOTICE_MONITOR_URL")
@@ -222,6 +229,9 @@ func run() error {
 	if err := validateDSN(identityPasskeyActivationReaderDSN, "mamony_identity_passkey_activation_reader_runtime"); err != nil {
 		return fmt.Errorf("identity passkey activation reader fixture: %w", err)
 	}
+	if err := validateDSN(identityPasskeyActivationFinisherDSN, "mamony_identity_passkey_activation_finisher_runtime"); err != nil {
+		return fmt.Errorf("identity passkey activation finisher fixture: %w", err)
+	}
 	if err := validateDSN(identityRecoveryCodeManagerDSN, "mamony_identity_recovery_code_manager_runtime"); err != nil {
 		return fmt.Errorf("identity recovery code manager fixture: %w", err)
 	}
@@ -281,6 +291,7 @@ func run() error {
 	identityPasskeyStageURL, _ := url.Parse(identityPasskeyStageDSN)
 	identityPasskeyActivationIssuerURL, _ := url.Parse(identityPasskeyActivationIssuerDSN)
 	identityPasskeyActivationReaderURL, _ := url.Parse(identityPasskeyActivationReaderDSN)
+	identityPasskeyActivationFinisherURL, _ := url.Parse(identityPasskeyActivationFinisherDSN)
 	identityRecoveryCodeNoticeURL, _ := url.Parse(identityRecoveryCodeNoticeDSN)
 	identityRecoveryCodeNoticeWebhookURL, _ := url.Parse(identityRecoveryCodeNoticeWebhookDSN)
 	identityRecoveryCodeNoticeMonitorURL, _ := url.Parse(identityRecoveryCodeNoticeMonitorDSN)
@@ -293,7 +304,7 @@ func run() error {
 	identityWebhookURL, _ := url.Parse(identityWebhookDSN)
 	identityMonitorURL, _ := url.Parse(identityMonitorDSN)
 	identityMaintenanceURL, _ := url.Parse(identityMaintenanceDSN)
-	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryFactorIssuerURL, identityRecoveryFactorVerifierURL, identityPasskeyIssuerURL, identityPasskeyReaderURL, identityPasskeyAdmissionURL, identityPasskeyStageURL, identityPasskeyActivationIssuerURL, identityPasskeyActivationReaderURL, identityRecoveryCodeManagerURL, identityRecoveryCodeNoticeURL, identityRecoveryCodeNoticeWebhookURL, identityRecoveryCodeNoticeMonitorURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
+	for _, other := range []*url.URL{adminURL, migratorURL, platformRuntimeURL, identityMigratorURL, identityRuntimeURL, identityVerifierURL, identityAuthenticatorURL, identityAuthGrantURL, identityPasswordChangeURL, identityRecoveryIssuerURL, identityRecoveryDeliveryURL, identityRecoveryRedeemerURL, identityRecoveryAssuranceURL, identityRecoveryFactorIssuerURL, identityRecoveryFactorVerifierURL, identityPasskeyIssuerURL, identityPasskeyReaderURL, identityPasskeyAdmissionURL, identityPasskeyStageURL, identityPasskeyActivationIssuerURL, identityPasskeyActivationReaderURL, identityPasskeyActivationFinisherURL, identityRecoveryCodeManagerURL, identityRecoveryCodeNoticeURL, identityRecoveryCodeNoticeWebhookURL, identityRecoveryCodeNoticeMonitorURL, identityRecoveryNoticeURL, identityRecoveryNoticeMonitorURL, identityRecoveryNoticeWebhookURL, identitySessionURL, identityNoticeURL, identityWebhookURL, identityMonitorURL, identityDeliveryURL, identityMaintenanceURL} {
 		if runtimeURL.Path != other.Path || runtimeURL.Port() != other.Port() || runtimeURL.Hostname() != other.Hostname() {
 			return errors.New("all test roles must target the same isolated test database")
 		}
@@ -311,7 +322,7 @@ func run() error {
 		exec.Command("go", "test", "-json", "-tags=integration",
 			"-run", "^TestIdentity", "-count=1", "-timeout=3m", "./internal/modules/identity/internal/repository/postgres"),
 		exec.Command("go", "test", "-json", "-tags=integration",
-			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZPasskeyRegistrationAtomicStage|ZPasskeyActivationChallenge|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
+			"-run", "^TestIdentity(MailgunMock|MailgunNoticeMonitorRole|HTTPEnrollmentDB|ZEnrollmentReconciliationDB|ZEnrollmentBacklogDB|ZEmailConfirmationHTTPDB|ZConfirmationAdmissionHTTPDB|PasswordAuthentication|OpaqueSessions|ZSessionFreezeIssueInterleavings|ZDirectSessionMintThreatFixture|ZAuthenticationGrants|ZSessionIdleExpiry|ZMaxActiveSessions|ZAuthMaterialEpochFence|ZRecoveryEpochInvalidationMechanism|ZAuthenticatedPasswordChange|ZPasswordRecoveryRedemption|ZRecoveryOfflineAssurance|ZRecoveryCodeEnrollmentRotation|ZRecoveryFactorSignedChallenge|ZPasskeyRegistrationIntent|ZPasskeyRegistrationAdmission|ZPasskeyRegistrationAtomicStage|ZPasskeyActivationChallenge|ZPasskeyAtomicPossession|ZSecurityNoticeOutbox)", "-count=1", "-timeout=3m", "./internal/modules/identity"),
 	} {
 		// Never inherit libpq overrides in the child tests.
 		cmd.Env = stripPGEnv(os.Environ())
@@ -395,6 +406,16 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 				return nil, fmt.Errorf("write integration output: %w", err)
 			}
 		}
+		// Only explicitly required subtests from the PostgreSQL integration
+		// package count. Arbitrary subtests cannot satisfy a parent test.
+		if ev.Action == "pass" && ev.Package == requiredPackage && strings.Contains(ev.Test, "/") {
+			for _, name := range requiredTests {
+				if ev.Test == name {
+					passed[name] = true
+					break
+				}
+			}
+		}
 		if ev.Action == "pass" && !strings.Contains(ev.Test, "/") {
 			if (ev.Package == requiredPackage && strings.HasPrefix(ev.Test, "TestPostgres")) ||
 				(ev.Package == identityPackage && strings.HasPrefix(ev.Test, "TestIdentity")) ||
@@ -414,6 +435,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZSessionIdleExpiry") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZMaxActiveSessions") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZAuthMaterialEpochFence") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryEpochInvalidationMechanism") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZAuthenticatedPasswordChange") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZPasswordRecoveryRedemption") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZRecoveryOfflineAssurance") ||
@@ -423,6 +445,7 @@ func summarizeEvents(src io.Reader, output io.Writer) (map[string]bool, error) {
 						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyRegistrationAdmission") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyRegistrationAtomicStage") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyActivationChallenge") ||
+						strings.HasPrefix(ev.Test, "TestIdentityZPasskeyAtomicPossession") ||
 						strings.HasPrefix(ev.Test, "TestIdentityMailgunMockRecoveryCodeSecurityNotice") ||
 						strings.HasPrefix(ev.Test, "TestIdentityZSecurityNoticeOutbox"))) {
 				passed[ev.Test] = true
