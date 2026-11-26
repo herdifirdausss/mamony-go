@@ -13,7 +13,7 @@ cleanup() {
 }
 trap cleanup EXIT
 CGO_ENABLED=0 go build -o "$work/migrate" ./cmd/mamony-identity-migrate
-CGO_ENABLED=0 go test -tags integration -c -o "$work/identity.test" ./internal/modules/identity
+CGO_ENABLED=0 go test -tags integration -c -o "$work/identity.test" ./internal/modules/identity/internal/integration
 id=$(timeout 90 docker run --rm -d --network none --label mamony.synthetic-rh03-exec=true \
   -e POSTGRES_DB=mamony_test_rh03_exec_source -e POSTGRES_USER=mamony_test_admin \
   -e POSTGRES_PASSWORD=local-test-rh03-exec-admin postgres:18.7 \

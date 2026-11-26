@@ -39,6 +39,12 @@ Set `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to override the addresses. Th
 
 See the [data ownership decision](adr/0002-ledger-and-data-ownership.md), [public HTTP contract](adr/0003-public-http-contract.md), and [roadmap](roadmap.md) for planned work.
 
+## Service extraction
+
+The repository has one root Go module. A separate command defines an entry point. An independently deployed service also needs an owned runtime and a contract for its callers. See the [criteria for process, network, database, and Go module changes](adr/0001-go-modular-monolith.md#when-to-separate-a-boundary).
+
+Use a narrow interface in the consuming use case and map input and output in the app adapter. For example, a future Payments use case can request a Ledger posting through an in-process adapter. If Ledger moves to its own process, the Payments-side adapter can call the remote Ledger operation. Ledger owns posting authorization and the local posting transaction. Payments owns its workflow progress. If a call times out, Payments resolves the result through the Ledger contract using the same operation ID. The [Ledger contract](contracts/ledger.md) defines the intended posting and replay behavior.
+
 ## Security authority and trust boundaries
 
 **Current HTTP implementation:** only the health listeners run. Internal Identity enrollment, sessions, recovery, notices and one-use passkey possession verification are merged for synthetic use. Identity routes remain unmounted. No deployed Mailgun worker, end-to-end tenant/resource authorization, passkey login, or financial approval/posting enforcement is established. The wider security boundaries below remain design contracts, not deployed controls. Mamony uses synthetic identities, balances and providers; these requirements do not imply regulatory compliance or production readiness.
