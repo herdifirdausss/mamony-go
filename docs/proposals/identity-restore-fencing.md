@@ -7,7 +7,7 @@
  
 ## G1 — Evidence and problem
 
-The v36 candidate is not deployed. Exact candidate SHA `0549bc9f3d918af68deb90740811c2a716ad5330` has five successful workflows; [PostgreSQL integration](https://github.com/herdifirdausss/mamony-go/actions/runs/45382063847) includes PKA-R01 negative control, crash/restart and post-commit restore. The negative control demonstrates loss of security continuity on stale restore. It is NOT a passed recovery protection. CI evidence applies to that commit only.
+The bounded synthetic passkey possession implementation merged in [#81](https://github.com/herdifirdausss/mamony-go/pull/81) and remains unmounted. The following recovery evidence describes historical candidate SHA `0549bc9f3d918af68deb90740811c2a716ad5330`. Five workflows passed. The [PostgreSQL integration](https://github.com/herdifirdausss/mamony-go/actions/runs/45382063847) includes PKA-R01 negative control, crash/restart and post-commit restore. The negative control demonstrates loss of security continuity on stale restore. It is NOT a passed recovery protection. CI evidence applies to that commit only.
 
 | Source | Observation | Limitation |
 |---|---|---|

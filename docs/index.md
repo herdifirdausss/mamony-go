@@ -7,6 +7,7 @@ Start with [current state and active work](current-state.md) for the dated merge
 | Start a new feature from research through requirements, PRD, design and verification | [Change lifecycle](development-workflow.md) and [proposal template](templates/feature-proposal.md) |
 | Understand the product and capability ownership | [Product scope](product.md) |
 | Pick work or find its requirements and acceptance checks | [Roadmap and contracts](roadmap.md) |
+| Look up a Ledger stage or its prerequisites | [Ledger implementation sequence](roadmap.md#ledger-implementation-sequence) |
 | Change Go packages, listeners, or cross-module interfaces | [Architecture](architecture.md) and [architecture decisions](adr/README.md) |
 | Check a design choice before implementing it | [Open decisions](open-decisions.md) |
 | Follow Go conventions and capability package patterns | [Go conventions](conventions.md) |
