@@ -224,7 +224,7 @@ func testIdentityMigrationUpgrade(t *testing.T, dir string) {
 			"INSERT INTO mamony_identity.email_aliases (canonical_email,subject_id,created_at) VALUES ('"+email+"','"+subjectID+"','2026-01-01T00:00:00Z'); COMMIT;"); err != nil {
 		t.Fatal("cannot insert ordinary synthetic upgrade fixture")
 	}
-	const dataQuery = "SELECT row_to_json(s)::text || ':' || row_to_json(a)::text FROM mamony_identity.subjects s JOIN mamony_identity.email_aliases a USING (subject_id) WHERE s.subject_id='"+subjectID+"'"
+	const dataQuery = "SELECT row_to_json(s)::text || ':' || row_to_json(a)::text FROM mamony_identity.subjects s JOIN mamony_identity.email_aliases a USING (subject_id) WHERE s.subject_id='" + subjectID + "'"
 	dataBefore, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c", dataQuery)
 	if err != nil || dataBefore == "" {
 		t.Fatal("cannot capture original synthetic business rows")
