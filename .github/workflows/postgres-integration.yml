@@ -51,6 +51,7 @@ jobs:
       TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL: postgres://mamony_identity_passkey_registration_stage_runtime:local-test-passkey-registration-stage@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL: postgres://mamony_identity_passkey_activation_issuer_runtime:local-test-passkey-activation-issuer@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL: postgres://mamony_identity_passkey_activation_reader_runtime:local-test-passkey-activation-reader@127.0.0.1:5432/mamony_test_ci?sslmode=disable
+      TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL: postgres://mamony_identity_passkey_activation_finisher_runtime:local-test-passkey-activation-finisher@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_RECOVERY_CODE_MANAGER_URL: postgres://mamony_identity_recovery_code_manager_runtime:local-test-identity-recovery-code-manager@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_RECOVERY_ASSURANCE_URL: postgres://mamony_identity_recovery_assurance_runtime:local-test-identity-recovery-assurance@127.0.0.1:5432/mamony_test_ci?sslmode=disable
       TEST_IDENTITY_RECOVERY_REDEEMER_URL: postgres://mamony_identity_recovery_redeemer_runtime:local-test-identity-recovery-redeemer@127.0.0.1:5432/mamony_test_ci?sslmode=disable
@@ -73,8 +74,48 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Verify synthetic database roles and RLS behavior
-        run: make integration
+      - name: Verify synthetic database roles and RLS behavior (including stale-restore negative control)
+        env:
+          MAMONY_TEST_PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
+        shell: bash
+        run: |
+          set -o pipefail
+          make integration | tee "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'PKA-R01 NEGATIVE CONTROL: previously consumed signed assertion accepted on stale restore' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-RESTORE HOLD MECHANISM PASS: actual stale Identity target denies three runtime logins; surviving event/notice absent; no release authorized' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-REVIEW RECORD MECHANISM PASS: actual stale target held for missing checkpoint; missing corrupt and mismatched bindings rejected; synthetic review only' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-REPEAT RESTORE MECHANISM PASS: actual second cluster rejects first review record; new record remains held; three runtime logins denied' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-EMAIL NEGATIVE CONTROL: epoch-only change did not invalidate contact-bound proof' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-EMAIL REVOCATION MECHANISM PASS: old proof denied, history retained, fresh proof accepted' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-RECOVERY MECHANISM PASS: live old challenge denied with synthetic current assurance; original positive control rolled back' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-OFFLINE MECHANISM PASS: old code denied with fresh session and rotation grant; prior set and evidence retained' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-FACTOR MECHANISM PASS: revoked prior-epoch approval denied with fresh authority; revocation and proof history retained' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-ASSURANCE MECHANISM PASS: old offline code denied with current challenge; current code accepted and old history retained' "$RUNNER_TEMP/mamony-integration.log"
+          grep -Fq 'IRF-APPROVAL MECHANISM PASS: old enrollment approval denied with current key, session and rotation grant' "$RUNNER_TEMP/mamony-integration.log"
+      - name: Verify Identity recovery inventory against migrated PostgreSQL catalog
+        env:
+          PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$PG_SERVICE_CONTAINER_ID" =~ ^[[:xdigit:]]{64}$ ]]
+          [[ "$(docker inspect --format '{{.Config.Image}}' "$PG_SERVICE_CONTAINER_ID")" == postgres:18.7 ]]
+          result="$(docker exec -i "$PG_SERVICE_CONTAINER_ID" psql -U mamony_test_admin -d mamony_test_ci -X -qAt -v ON_ERROR_STOP=1 < tools/postgrestest/identity-recovery-inventory.sql)"
+          [[ "$result" == '30|30|0|0|0|-|-' ]] || { echo "Identity recovery inventory mismatch: $result" >&2; exit 1; }
+          echo 'IDENTITY RECOVERY INVENTORY PASS: 30 classified tables; zero missing, unexpected or duplicate names'
+          provenance="$(docker exec -i "$PG_SERVICE_CONTAINER_ID" psql -U mamony_test_admin -d mamony_test_ci -X -qAt -v ON_ERROR_STOP=1 < tools/postgrestest/identity-recovery-provenance.sql)"
+          [[ "$provenance" == '17|0|-' ]] || { echo "Identity recovery provenance mismatch: $provenance" >&2; exit 1; }
+          echo 'IDENTITY RECOVERY PROVENANCE PASS: 17 selected validated non-cascading foreign keys'
+      - name: Verify v36 passkey persistence after forced PostgreSQL SIGKILL/restart
+        env:
+          PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: bash tools/postgrestest/check-passkey-crash-recovery.sh
+      - name: Verify v36 logical backup restore on separate disposable PostgreSQL
+        env:
+          PG_SERVICE_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: bash tools/postgrestest/check-passkey-backup-restore.sh
+      - name: Verify isolated Identity recovery fence mechanism (IRF lab)
+        run: bash tools/postgrestest/check-identity-recovery-fence.sh
       - name: Verify native PostgreSQL synthetic recovery boundary
         run: |
           bash -n tools/postgrestest/check-platform-native-pitr.sh

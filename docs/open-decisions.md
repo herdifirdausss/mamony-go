@@ -1,6 +1,6 @@
 # Decisions to resolve before implementation
 
-For merged implementation and active work, see [current state](current-state.md). Identity PRs #22–#77 are merged, not deployed. Historical Draft references below describe the decision at its original slice; they do not mean those PRs are currently open. Operational/production approvals and independent acceptance remain separate. The v36 stack (#79–#81) is still Draft.
+For merged implementation and active work, see [current state](current-state.md). Identity PRs #22–#77 are merged, not deployed. Historical Draft references below describe the decision at its original slice; they do not mean those PRs are currently open. Operational/production approvals and independent acceptance remain separate. The v36 stack (#79–#81) remains unmerged; no merge authorization.
 
 Use the local [architecture decision index](adr/README.md) for baseline requirements. Record each choice below when its stage starts. A candidate needs tests in Mamony Go before it becomes an implementation claim.
 
@@ -336,3 +336,37 @@ The internal v34 challenge issuer creates a unique 3-minute (and no later than 1
 ### Signed WebAuthn passkey activation proof (v35 / Draft #77)
 
 V35 verifies a **real** ES256-signed `webauthn.get` assertion against the v34 original session-bound nonce and DB-stored COSE key with maintained go-webauthn v0.18.2; challenge/type/origin/RP hash/UP+UV, exact credential/user handle, backup flags, and explicit clone/nonprogressing-counter handling are checked. Fixture tests include real cryptography and negative cases; real PostgreSQL integration uses the same v34 EXECUTE-only reader. **The read-only result is replayable while the challenge remains unconsumed and is NOT an authorization decision.** Next review must implement independently fenced v36 atomic one-time activation, signed-evidence/counter binding, user consent/risk policy and a real security-notice sender. Credential remains `PENDING_ASSERTION`. See [ADR-0040](adr/0040-passkey-activation-signed-assertion-verifier.md).
+
+### Atomic passkey possession verification (v36; Critical issue #78)
+
+**Decision status as of 2026-11-25: OWNER-ACCEPTED BOUNDED SYNTHETIC DIRECTION / NO MERGE AUTHORIZATION.** See [owner decision record](https://github.com/herdifirdausss/mamony-go/issues/78#issuecomment-7150570178). Independent technical acceptance and production readiness NOT ACCEPTED.
+[Proposed ADR-0041](adr/0041-passkey-atomic-activation.md) and
+[Critical proposal](proposals/identity-passkey-atomic-activation.md)
+describe the candidate; Issue #78 records bounded owner acceptance, not independent technical acceptance. PRs #79 (design) and #80 (Go handoff) are merged under separate bounded synthetic authorizations; #81 (SQL one-use candidate) remains unmerged and HOLD. Neither adoption establishes production approval. Their Go/SQL
+code and synthetic CI are not a live passkey login, independent recovery
+factor, real delivered security notice, or production authorization.
+
+| Decision | Status and consequence |
+|---|---|
+| D1 — non-login possession semantics | **ACCEPTED (bounded)**: possession evidence only; no login, session, independent recovery or authorization. |
+| D2 — activation security audit/notice | **ACCEPTED (bounded)**: mandatory atomic audit and pending notice; delivery/retry/retention/incident policy remains a release blocker. |
+| D3 — privileged finisher signature-claim oracle | **ACCEPTED (bounded)**: trusted Profile A with explicit residual risks; no independent authority claim or live credentials. |
+| D4 — expiration and operations | **ACCEPTED (bounded)**: existing three-minute challenge, ten-minute staging limit; no automatic cleanup or recovery release. Platform #14 owns recovery foundation; Identity owns semantics and obligations. Production recovery and ingress remain release blockers. |
+
+**Unverified release-sensitive scenarios** remain distinct from achieved CI checks: cross-role
+provisioning outside disposable fixtures, arbitrary network partitions during COMMIT
+(disposable PostgreSQL now passes **pre-COMMIT-request disconnect**,
+**full COMMIT TCP write followed by disconnect before any response**
+with either atomic outcome accepted, **post-server-CommandComplete
+ACK disconnect**, and application-side acknowledgment loss; arbitrary
+partitions during server processing, node crash **during** COMMIT,
+standby failover and **stale-backup recovery** remain unproven;
+a **separate after-test, one-node SIGKILL/restart** and a full **post-commit
+logical dump restored on a second disposable PostgreSQL instance** passed
+with 9 linked credentials/audits/notices; logical restore intentionally
+omits ownership, grants and secrets),
+counter/backup handling on real production authenticators (synthetic real-ES256
+PostgreSQL counter/BE/BS fixtures now exist), genuine
+registration-intent/admission replacement during concurrent writes, rollback
+and recovery after a database restore, and non-synthetic production notification
+delivery. See #78 for the exact-head evidence and acceptance checklist.
