@@ -3,11 +3,19 @@
 package postgrestest
 
 import (
+	"context"
+	"crypto/rand"
+	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/herdifirdausss/mamony-go/internal/platform/migration"
+	"github.com/jackc/pgx/v5"
 )
 
 // TestPostgresIdentityMigration runs on an explicitly guarded disposable
@@ -35,12 +43,12 @@ func TestPostgresIdentityMigration(t *testing.T) {
 
 	out, err := invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT version || ':' || dirty FROM mamony_identity.schema_migrations")
-	if err != nil || out != "34:false" {
-		t.Fatalf("identity migration should be at clean version 34: %q err=%v", out, err)
+	if err != nil || out != "35:false" {
+		t.Fatalf("identity migration should be at clean version 35: %q err=%v", out, err)
 	}
 	out, err = invokePSQL("TEST_IDENTITY_MIGRATION_URL", "-c",
 		"SELECT count(*) FROM mamony_identity.migration_fingerprints")
-	if err != nil || out != "34" {
+	if err != nil || out != "35" {
 		t.Fatalf("identity fingerprint missing: %q err=%v", out, err)
 	}
 
@@ -82,6 +90,205 @@ func TestPostgresIdentityMigration(t *testing.T) {
 			t.Fatalf("cross-schema access must fail: query=%q err=%v output=%q", stmt, err, output)
 		}
 	}
+	t.Run("isolated v34 to v35 upgrade", func(t *testing.T) {
+		testIdentityMigrationUpgrade(t, dir)
+	})
+}
+
+// testIdentityMigrationUpgrade uses an additional disposable database in the
+// already guarded integration cluster. It does not replace the fresh-install
+// test, modify historical SQL, or change any migration privileges.
+func testIdentityMigrationUpgrade(t *testing.T, dir string) {
+	t.Helper()
+	if err := safeFixture(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Stage immutable copies of the original 34 migration files.
+	stage := t.TempDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 35 {
+		t.Fatalf("expected 35 committed identity migrations, got %d", len(entries))
+	}
+	for _, entry := range entries {
+		if entry.Name() == "000035_passkey-atomic-possession.up.sql" {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(stage, entry.Name()), body, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	staged, err := os.ReadDir(stage)
+	if err != nil || len(staged) != 34 {
+		t.Fatalf("expected 34 staged migrations, got %d: %v", len(staged), err)
+	}
+
+	// The random suffix is hex only, so this identifier is never supplied
+	// by the caller or derived from a connection string.
+	var suffix [8]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		t.Fatal(err)
+	}
+	db := fmt.Sprintf("mamony_test_upgrade_%x", suffix)
+	admin, err := url.Parse(os.Getenv("TEST_DATABASE_ADMIN_URL"))
+	if err != nil {
+		t.Fatal("invalid guarded admin URL")
+	}
+	migrator, err := url.Parse(os.Getenv("TEST_IDENTITY_MIGRATION_URL"))
+	if err != nil {
+		t.Fatal("invalid guarded migration URL")
+	}
+	admin.Path = "/" + db
+	admin.RawPath = ""
+	migrator.Path = "/" + db
+	migrator.RawPath = ""
+	t.Setenv("TEST_IDENTITY_UPGRADE_ADMIN_URL", admin.String())
+	t.Setenv("TEST_IDENTITY_UPGRADE_MIGRATION_URL", migrator.String())
+
+	if _, err := invokePSQL("TEST_DATABASE_ADMIN_URL", "-c", "CREATE DATABASE "+db+" TEMPLATE template0"); err != nil {
+		t.Fatalf("create isolated migration fixture: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := invokePSQL("TEST_DATABASE_ADMIN_URL", "-c", "DROP DATABASE "+db); err != nil {
+			t.Errorf("remove isolated migration fixture: %v", err)
+		}
+	})
+	if out, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c", "SELECT current_database()"); err != nil || out != db {
+		t.Fatal("isolated migration fixture identity mismatch")
+	}
+	// Reuse existing test-cluster roles; provision only the new schema.
+	if _, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c",
+		"CREATE SCHEMA mamony_identity AUTHORIZATION mamony_identity_migrator; "+
+			"REVOKE ALL ON SCHEMA mamony_identity FROM PUBLIC; "+
+			"GRANT USAGE ON SCHEMA mamony_identity TO mamony_identity_runtime;"); err != nil {
+		t.Fatalf("provision isolated migration fixture: %v", err)
+	}
+
+	// Build once, then bound each executable invocation independently of the
+	// outer integration suite timeout. Do not emit subprocess environment or
+	// unsanitized output in failure diagnostics.
+	binary := filepath.Join(t.TempDir(), "identity-migrate")
+	buildCtx, cancelBuild := context.WithTimeout(context.Background(), 60*time.Second)
+	build := exec.CommandContext(buildCtx, "go", "build", "-o", binary, "../../cmd/mamony-identity-migrate")
+	build.Env = sanitizedPSQLEnv(os.Environ())
+	buildErr := build.Run()
+	buildTimedOut := buildCtx.Err() != nil
+	cancelBuild()
+	if buildErr != nil || buildTimedOut {
+		t.Fatalf("isolated migration executable build failed (deadline=%v)", buildTimedOut)
+	}
+
+	run := func(migrations string) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, binary)
+		cmd.Env = append(sanitizedPSQLEnv(os.Environ()),
+			"MAMONY_IDENTITY_MIGRATION_DSN="+migrator.String(), "MAMONY_IDENTITY_MIGRATIONS_DIR="+migrations)
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("isolated identity migration failed (deadline=%v)", ctx.Err() != nil)
+		}
+	}
+	require := func(query, want string) {
+		t.Helper()
+		out, err := invokePSQL("TEST_IDENTITY_UPGRADE_MIGRATION_URL", "-c", query)
+		if err != nil || out != want {
+			t.Fatalf("isolated migration assertion failed: %v; got %q want %q", err, out, want)
+		}
+	}
+
+	const versionQuery = "SELECT version || ':' || dirty FROM mamony_identity.schema_migrations"
+	const countQuery = "SELECT count(*) FROM mamony_identity.migration_fingerprints"
+	const historyQuery = "SELECT version || ':' || sha256 FROM mamony_identity.migration_fingerprints WHERE version <= 34 ORDER BY version"
+	run(stage)
+	require(versionQuery, "34:false")
+	require(countQuery, "34")
+	before, err := invokePSQL("TEST_IDENTITY_UPGRADE_MIGRATION_URL", "-c", historyQuery)
+	if err != nil || len(strings.Split(before, "\n")) != 34 {
+		t.Fatal("cannot record original migration fingerprints")
+	}
+	// A representative ordinary, unverified subject/contact pair is enough
+	// to exercise preservation of pre-existing business rows without creating
+	// credentials, sessions or elevated account authority.
+	const subjectID = "sub_UUUUUUUUUUUUUUUUUUUUUU"
+	const email = "migration-upgrade@example.test"
+	if _, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c",
+		"BEGIN; INSERT INTO mamony_identity.subjects (subject_id,status,created_at) VALUES ('"+subjectID+"','UNVERIFIED','2026-01-01T00:00:00Z'); "+
+			"INSERT INTO mamony_identity.email_aliases (canonical_email,subject_id,created_at) VALUES ('"+email+"','"+subjectID+"','2026-01-01T00:00:00Z'); COMMIT;"); err != nil {
+		t.Fatal("cannot insert ordinary synthetic upgrade fixture")
+	}
+	const dataQuery = "SELECT row_to_json(s)::text || ':' || row_to_json(a)::text FROM mamony_identity.subjects s JOIN mamony_identity.email_aliases a USING (subject_id) WHERE s.subject_id='" + subjectID + "'"
+	dataBefore, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c", dataQuery)
+	if err != nil || dataBefore == "" {
+		t.Fatal("cannot capture original synthetic business rows")
+	}
+	verifyData := func() {
+		t.Helper()
+		out, err := invokePSQL("TEST_IDENTITY_UPGRADE_ADMIN_URL", "-c", dataQuery)
+		if err != nil || out != dataBefore {
+			t.Fatal("ordinary synthetic business rows not preserved")
+		}
+	}
+	run(dir)
+	require(versionQuery, "35:false")
+	require(countQuery, "35")
+	require(historyQuery, before)
+	verifyData()
+	run(dir)
+	require(versionQuery, "35:false")
+	require(countQuery, "35")
+	require(historyQuery, before)
+	t.Log("Identity migration upgrade v34 to v35: original fingerprints preserved; repeat clean")
+	t.Run("populated data preservation", func(t *testing.T) {
+		verifyData()
+	})
+
+	// Check the production migrator's read-only history verifier against the
+	// actual upgraded synthetic database. A mismatching manifest is test
+	// data only; no historical SQL, database row or role is changed.
+	t.Run("applied manifest verification", func(t *testing.T) {
+		files, err := migration.LoadIdentity(dir)
+		if err != nil || len(files) != 35 {
+			t.Fatal("cannot load the original identity manifest")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		conn, err := pgx.Connect(ctx, migrator.String())
+		if err != nil {
+			t.Fatal("cannot connect to the isolated migration fixture")
+		}
+		defer func() { _ = conn.Close(ctx) }()
+
+		var actualDB string
+		if err := conn.QueryRow(ctx, "SELECT current_database()").Scan(&actualDB); err != nil || actualDB != db {
+			t.Fatal("isolated history verification fixture identity mismatch")
+		}
+		if err := migration.VerifyIdentity(ctx, conn, files); err != nil {
+			t.Fatal("original applied manifest failed verification")
+		}
+		different := append([]migration.File(nil), files...)
+		different[0].Digest = strings.Repeat("0", 64)
+		if different[0].Digest == files[0].Digest {
+			t.Fatal("fixture manifest must differ from the original")
+		}
+		err = migration.VerifyIdentity(ctx, conn, different)
+		if err == nil || !strings.Contains(err.Error(), "fingerprint mismatch for applied migration") {
+			t.Fatal("applied manifest mismatch was not classified as a fingerprint mismatch")
+		}
+		if err := migration.VerifyIdentity(ctx, conn, files); err != nil {
+			t.Fatal("original applied manifest no longer verifies")
+		}
+	})
+	require(versionQuery, "35:false")
+	require(countQuery, "35")
+	require(historyQuery, before)
 }
 
 func TestPostgresIdentityVerifierRole(t *testing.T) {
@@ -1598,5 +1805,73 @@ func TestPostgresIdentityZPasskeyActivationRoles(t *testing.T) {
 		if err != nil || out != "true" {
 			t.Fatalf("activation role elevated: role=%s out=%q err=%v", role, out, err)
 		}
+	}
+}
+
+// TestPostgresIdentityZPasskeyActivationFinisherRole proves that the new v36
+// signature-claim consumer is EXECUTE-only and isolated from all v30-v35
+// principals. A valid-looking call with no session must return false.
+func TestPostgresIdentityZPasskeyActivationFinisherRole(t *testing.T) {
+	const finish = "SELECT mamony_identity.finish_verified_passkey_possession(" +
+		"decode(repeat('11',32),'hex'),'pav_AAAAAAAAAAAAAAAAAAAAAA'," +
+		"decode(repeat('22',32),'hex'),1,'login.example.test'," +
+		"'https://login.example.test',decode(repeat('33',32),'hex')," +
+		"decode(repeat('44',64),'hex'),decode(repeat('00',16),'hex')," +
+		"0,false,false,1,false,false,true,true,'evt_AAAAAAAAAAAAAAAAAAAAAA')"
+	out, err := invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL", "-c", finish)
+	if err != nil || out != "f" {
+		t.Fatalf("v36 unknown session was not denied: out=%q err=%v", out, err)
+	}
+	for _, sql := range []string{
+		"SELECT * FROM mamony_identity.passkey_credentials",
+		"SELECT * FROM mamony_identity.passkey_activation_challenges",
+		"SELECT * FROM mamony_identity.passkey_activation_notices",
+		"SELECT * FROM mamony_identity.opaque_sessions",
+		"SELECT * FROM mamony_identity.security_outbox",
+		"SELECT * FROM mamony_identity.passkey_registration_intents",
+		"UPDATE mamony_identity.passkey_credentials SET state='POSSESSION_VERIFIED'",
+		"UPDATE mamony_identity.passkey_activation_challenges SET consumed_at=clock_timestamp()",
+		"DELETE FROM mamony_identity.passkey_activation_notices",
+		"SELECT mamony_identity.issue_passkey_activation_challenge(" +
+			"decode(repeat('11',32),'hex'),decode(repeat('22',32),'hex')," +
+			"'pav_AAAAAAAAAAAAAAAAAAAAAA',decode(repeat('33',32),'hex')," +
+			"'login.example.test','https://login.example.test')",
+		"SELECT * FROM mamony_identity.read_passkey_activation_challenge(" +
+			"decode(repeat('11',32),'hex'),'pav_AAAAAAAAAAAAAAAAAAAAAA')",
+		"CREATE TABLE mamony_identity.passkey_finisher_escape(x int)",
+		"SET ROLE mamony_identity_migrator",
+	} {
+		out, err := invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL", "-c", sql)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("v36 finisher role bypassed limitation: sql=%q out=%q err=%v", sql, out, err)
+		}
+	}
+	for _, role := range []string{
+		"TEST_IDENTITY_RUNTIME_URL",
+		"TEST_IDENTITY_VERIFIER_URL",
+		"TEST_IDENTITY_AUTHENTICATOR_URL",
+		"TEST_IDENTITY_AUTH_GRANT_URL",
+		"TEST_IDENTITY_SESSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_READER_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_ADMISSION_URL",
+		"TEST_IDENTITY_PASSKEY_REGISTRATION_STAGE_URL",
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_ISSUER_URL",
+		"TEST_IDENTITY_PASSKEY_ACTIVATION_READER_URL",
+		"TEST_IDENTITY_RECOVERY_FACTOR_VERIFIER_URL",
+		"TEST_PLATFORM_RUNTIME_URL",
+	} {
+		out, err := invokePSQL(role, "-c", finish)
+		if err == nil || !strings.Contains(out, "42501") {
+			t.Fatalf("v36 other runtime acquired finisher: role=%s out=%q err=%v",
+				role, out, err)
+		}
+	}
+	out, err = invokePSQL("TEST_IDENTITY_PASSKEY_ACTIVATION_FINISHER_URL", "-c",
+		"SELECT (NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole "+
+			"AND NOT rolreplication AND NOT rolbypassrls)::text "+
+			"FROM pg_roles WHERE rolname=current_user")
+	if err != nil || out != "true" {
+		t.Fatalf("v36 finisher unexpectedly elevated: out=%q err=%v", out, err)
 	}
 }

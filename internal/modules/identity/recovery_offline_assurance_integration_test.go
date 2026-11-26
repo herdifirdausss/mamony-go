@@ -376,4 +376,50 @@ func TestIdentityZRecoveryOfflineAssurance(t *testing.T) {
 	if err := assurer.Approve(ctx, stale.token.ForTrustedDelivery(), staleCode.TrustedOfflineDisplay()); !errors.Is(err, usecase.ErrRecoveryAssuranceDenied) || usedCode(staleCode) {
 		t.Fatal("stale subject epoch was permitted to approve recovery")
 	}
+
+	// Isolate the saved-code epoch: the new challenge is current, the
+	// old code is unused, and a separate current code is eligible.
+	current := makeSubject()
+	oldCode := enroll(current)
+	oldEpoch := current.epoch
+	tag, err := admin.Exec(ctx, "UPDATE mamony_identity.subjects SET session_epoch=session_epoch+1 WHERE subject_id=$1", current.subject)
+	if err != nil || tag.RowsAffected() != 1 {
+		t.Fatal("scoped assurance epoch mutation failed")
+	}
+	current.epoch++
+	// Test-only pre-enrollment fixture, not a production re-enrollment.
+	currentCode := enroll(current)
+	current = issue(current)
+	oldDigest := oldCode.Digest()
+	var live bool
+	if err := admin.QueryRow(ctx, `SELECT
+		c.subject_epoch=s.session_epoch AND c.expires_at>clock_timestamp()
+		AND c.consumed_at IS NULL AND c.revoked_at IS NULL
+		AND b.enrolled_epoch=$3 AND b.enrolled_at<c.requested_at
+		AND b.contact_version=c.contact_version AND b.consumed_at IS NULL
+		FROM mamony_identity.password_recovery_challenges c
+		JOIN mamony_identity.subjects s ON s.subject_id=c.subject_id
+		JOIN mamony_identity.password_recovery_offline_codes b ON b.subject_id=s.subject_id
+		WHERE c.challenge_id=$1 AND b.code_digest=$2`,
+		current.challenge, oldDigest[:], oldEpoch).Scan(&live); err != nil || !live {
+		t.Fatal("old code and current challenge fixture not live")
+	}
+	if err := assurer.Approve(ctx, current.token.ForTrustedDelivery(), oldCode.TrustedOfflineDisplay()); !errors.Is(err, usecase.ErrRecoveryAssuranceDenied) || usedCode(oldCode) {
+		t.Fatal("current recovery challenge accepted or burned prior-epoch code")
+	}
+	if bound, _ := existingGrant(current); bound != "" {
+		t.Fatal("old code created assurance grant")
+	}
+	var approvedEvents int
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM mamony_identity.security_outbox
+		WHERE subject_id=$1 AND event_type='RECOVERY_ASSURANCE_APPROVED'`, current.subject).Scan(&approvedEvents); err != nil || approvedEvents != 0 {
+		t.Fatal("old code fabricated assurance event")
+	}
+	if err := assurer.Approve(ctx, current.token.ForTrustedDelivery(), currentCode.TrustedOfflineDisplay()); err != nil || !usedCode(currentCode) || usedCode(oldCode) {
+		t.Fatal("current-code positive control failed or old code consumed")
+	}
+	if bound, consumed := existingGrant(current); bound != current.challenge || consumed {
+		t.Fatal("current-code control did not establish challenge-bound assurance")
+	}
+	t.Log("IRF-ASSURANCE MECHANISM PASS: old offline code denied with current challenge; current code accepted and old history retained")
 }
