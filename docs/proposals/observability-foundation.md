@@ -103,7 +103,7 @@ Public ingress accepts arbitrary client headers. The candidate generates its own
 ```text
 Public HTTP handler
   ├── generate request_id and local trace
-  ├── emit structured log with trace_id/span_id when sampled
+  ├── emit structured log with trace_id/span_id when valid, regardless of sampling
   └── selected synthetic job producer
         └── job context (explicit approved propagation)
               └── selected synthetic consumer and retry
