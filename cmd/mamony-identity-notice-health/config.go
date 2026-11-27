@@ -4,10 +4,10 @@ import (
 	"errors"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/herdifirdausss/mamony-go/cmd/internal/secretfile"
 )
 
 var errNoticeProbeConfig = errors.New("identity notice health probe configuration rejected")
@@ -69,26 +69,13 @@ func readProbeConfig(getenv func(string) string, args []string) (probeConfig, er
 }
 
 func readPrivateMonitorDSN(path string) (string, error) {
-	if path == "" || !filepath.IsAbs(path) {
-		return "", errNoticeProbeConfig
-	}
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() ||
-		before.Mode().Perm()&0077 != 0 || before.Mode().Perm()&0400 == 0 {
-		return "", errNoticeProbeConfig
-	}
-	root, err := os.OpenRoot(filepath.Dir(path))
-	if err != nil {
-		return "", errNoticeProbeConfig
-	}
-	defer func() { _ = root.Close() }()
-	file, err := root.Open(filepath.Base(path))
+	file, err := secretfile.OpenPrivate(path)
 	if err != nil {
 		return "", errNoticeProbeConfig
 	}
 	defer func() { _ = file.Close() }()
 	after, err := file.Stat()
-	if err != nil || !os.SameFile(before, after) || after.Size() < 1 || after.Size() > 2048 {
+	if err != nil || after.Size() < 1 || after.Size() > 2048 {
 		return "", errNoticeProbeConfig
 	}
 	contents, err := io.ReadAll(io.LimitReader(file, 2049))
