@@ -13,6 +13,8 @@ The intent or payout owns business state. The provider connector owns the provid
 5. If the provider outcome is unknown, keep the attempt processing. Schedule inquiry to the same provider. Process later results once.
 6. After provider success, make the required ledger postings with stable keys. Consume the fee quote in the posting transaction. Record the ledger result. Only then mark the intent succeeded.
 
+The [fee-quote boundary](fees-limits-and-accounts.md#fee-quotes) links the open FEE-02 conflict with Ledger-local ownership. Resolve that decision before implementing fee consumption in step 6.
+
 | ID | Requirement | Acceptance check |
 |---|---|---|
 | PAY-01 | Enforce valid transitions and at most one active attempt. An intent can require action, enter a hold, process, or end in success, failure, cancellation, or expiry. | Race two confirmations. Race cancellation with a result. Check one accepted transition and one durable attempt. |
@@ -43,6 +45,17 @@ Use durable jobs with claims, expiry, and bounded retry intervals. A restarted w
 ## Pilot evidence
 
 Exercise a successful payment and payout on the chosen corridor. Exercise refusal before dispatch, a lost response after dispatch, a lost response after ledger commit, and duplicate provider results. Reconcile the resulting journal, usage, fee, and provider records.
+
+Use the [simulated pilot roadmap](../roadmap.md#simulated-pilot) for sequencing. Map each scenario to the owning contract and record the evidence from each affected owner.
+
+| Scenario | Evidence to trace |
+|---|---|
+| Refusal or race before dispatch | [Transaction authorization](#transaction-authorization-boundary), OUT-01's committed hold, and [provider operation identity](provider.md#operation-lifecycle). |
+| Unknown result after dispatch | [Provider inquiry](provider.md#operation-lifecycle) uses the original provider and reference. OUT-02 keeps payout funds and usage reserved. See the [operator procedure](../runbooks/recovery.md#recover-an-unknown-provider-outcome). |
+| Provider success with missing local posting | PAY-02 keeps the payment processing and uses the original posting keys on a recoverable error. Payout step 5 pairs paid status with hold settlement. The [reconciliation contract](reconciliation-and-events.md#reconciliation) covers missing or mismatched records. |
+| Lost acknowledgement after Ledger commit | [Ledger replay and restore checks](ledger.md#recovery-tests) use the same key and verify a single journal and outbox effect. |
+| Incomplete currency conversion | [FX execution and recovery](fx.md#execution-and-recovery) defines the current sequential-leg checks and links the proposed atomic alternative. |
+| Duplicate or late provider evidence | [Provider inbound messages](provider.md#inbound-messages) retain conflict evidence. PAY-03 and OUT-03 handle duplicates and late results under their owning workflow. See [reconciliation](reconciliation-and-events.md#reconciliation) for tracked differences. |
 
 ## Transaction authorization boundary
 
