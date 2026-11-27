@@ -21,6 +21,15 @@ Baseline inspected on **2026-11-27 (WIB)** at [main `d600b56`](https://github.co
 | Ledger | [K1 — Monetary domain](roadmap.md#ledger-implementation-sequence) merged in [#91](https://github.com/herdifirdausss/mamony-go/pull/91). [#87](https://github.com/herdifirdausss/mamony-go/pull/87) records the accepted ownership and USD definition direction. [K2a — Isolated persistence foundation](proposals/ledger-k2a-isolated-persistence.md) merged in [#104](https://github.com/herdifirdausss/mamony-go/pull/104) as a one-time synthetic sequencing exception with disposable PostgreSQL storage and restore fixtures. | [#86](https://github.com/herdifirdausss/mamony-go/issues/86) tracks remaining design and sequencing. Full K2 account lifecycle, K3 journal posting and later Ledger stages remain outside K2a. Ledger runtime integration and the money API remain pending. |
 | Financial pilot | The [roadmap](roadmap.md#simulated-pilot) identifies the planned capabilities and dependencies. | End-to-end payments, payouts, FX, provider, screening, settlement and operational pilot acceptance remain open. |
 
+### Recovery evidence IDs
+
+- **RH-01/RH-02**: bounded native PostgreSQL restore and evidence-rejection cases. See the [native recovery lab](proposals/platform-native-pitr-lab.md).
+- **RH-03**: selected Identity-state reconciliation; its overall status remains **PARTIAL**. See the [reconciliation lab](proposals/platform-identity-reconciliation-lab.md).
+- **RF-01–RF-08**: recovery-fence acceptance cases. RF-01–07 remain **NOT RUN**; RF-08 remains **BLOCKED**. See the [recovery-session proposal](proposals/identity-recovery-session-capability.md).
+- **E1/E2**: E1 records a bounded symbolic review, not recovered application behavior. E2 is a future behavioral-verification experiment and remains **BLOCKED**. See the [recovery-session proposal](proposals/identity-recovery-session-capability.md).
+
+These IDs identify scoped evidence and gates. They do not indicate production recovery acceptance.
+
 <a name="open-pull-requests"></a>
 <a name="open-pull-requests-six-all-draft"></a>
 
