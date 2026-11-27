@@ -9,6 +9,7 @@
 | Plan or implement a change | Tracking issue → [change lifecycle](development-workflow.md#choose-a-change-path) → owning contract below → relevant ADR or proposal → [testing strategy](testing.md) |
 | Check a decision or prerequisite | [Decision lookup by capability](open-decisions.md#decision-lookup-by-capability) → linked decision or ADR for its status and scope |
 | Record review evidence or approval | [Verification commands](engineering.md#verification) → [PR template](../.github/pull_request_template.md) |
+| Report a security vulnerability | [Security policy](../SECURITY.md) |
 | Review security or recovery evidence | [Trust boundaries](architecture.md#security-authority-and-trust-boundaries) → owning contract → [security verification](engineering.md#security-verification) → linked PR and test results |
 | Run a procedure | Choose a runbook below and check its scope and prerequisites first. |
 
