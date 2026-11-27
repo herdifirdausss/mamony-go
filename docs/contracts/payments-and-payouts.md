@@ -56,10 +56,9 @@ This is a reading map for the **planned synthetic pilot**. The roadmap gives dep
 | Convert currency when required | Read [FX execution and recovery](fx.md#execution-and-recovery). Check the current sequential-leg behavior and the proposed FX-05/06 atomic-group alternative; do not assume the alternative is accepted. | Apply the same FX contract and decision status when the payout currencies differ. |
 | Dispatch and resolve the provider result | Follow [Payments steps 4–5](#payments) and the [provider operation lifecycle](provider.md#operation-lifecycle). An unknown result remains processing and uses inquiry against the original provider. | Follow [Payouts steps 4–6](#payouts). An unknown result keeps funds and usage reserved; use the original provider reference. |
 | Record and reconcile money movement | Follow [Payments step 6](#payments), the [Ledger gate](ledger.md#ledger-gate-evidence), and [reconciliation](reconciliation-and-events.md#reconciliation). K3 posting and full Ledger runtime integration remain planned. | Follow the payout settlement, release, and return steps, then trace the journal and provider references through [reconciliation](reconciliation-and-events.md#reconciliation). |
-| Check pilot recovery acceptance | Use the [pilot gate](../roadmap.md#simulated-pilot) and [recovery procedure](../runbooks/recovery.md#restore-a-database) for daily reconciliation, worker recovery, and restore evidence. | Apply the same pilot and restore gate to the payout flow. |
+| Check pilot recovery acceptance | Use the [pilot gate](../roadmap.md#simulated-pilot) for daily reconciliation and worker recovery, and the [database restore procedure](../runbooks/recovery.md#restore-a-database) for restore evidence. | Apply the same pilot and restore gate to the payout flow. |
 
 Before implementation, resolve the [FEE-02 fee-consumption boundary](fees-limits-and-accounts.md#fee-quotes) and record the FX-05/06 decision. Read the existing payment and payout step lists for state transitions. The flow map links the contracts; it does not replace their requirements.
-
 
 | Scenario | Evidence to trace |
 |---|---|
