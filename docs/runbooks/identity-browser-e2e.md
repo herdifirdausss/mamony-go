@@ -52,7 +52,7 @@ go test -tags=integration,browser_e2e \
   -count=1 -timeout=4m ./internal/modules/identity/internal/integration/browser
 ```
 
-The test bridge is **not** a production DNS, TLS ingress or proxy test. A browser E2E passing does not resolve the `mamony_identity_session_runtime` direct-mint privilege, production CSRF key management, MFA, financial authorization or release gates. Keep #43 and #44 Draft and all candidate routes unmounted.
+The test bridge is **not** a production DNS, TLS ingress or proxy test. These observations describe the v10 fixture. See [the v11 fixture](#draft-46--grant-bound-session-e2e-candidate) for subsequent evidence on the direct-mint boundary. Production CSRF key management, MFA, financial authorization, and release approval remain open. PRs [#43](https://github.com/herdifirdausss/mamony-go/pull/43) and [#44](https://github.com/herdifirdausss/mamony-go/pull/44) merged the unmounted candidate and its synthetic browser tests.
 
 ## Draft #46 — grant-bound session E2E candidate
 

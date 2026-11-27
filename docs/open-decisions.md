@@ -7,7 +7,7 @@ See [current state](current-state.md) for the merged implementation and verifica
 | Capability | Start here |
 |---|---|
 | Platform and migrations | [Effective DEC-01 and Foundation choices](#foundation-and-access), [proposed DEC-01 amendment](#proposed-dec-01-amendment--foundation-105), [PostgreSQL contract](contracts/postgresql.md) |
-| Identity and public access | [Enrollment release decisions](#identity-enrollment-release-decisions), [owning Identity contract](contracts/identity.md), [security architecture decisions](#security-architecture-decisions), [bounded passkey possession decision](#atomic-passkey-possession-verification-v36-critical-issue-78) |
+| Identity and public access | [Enrollment release decisions](#identity-enrollment-release-decisions), [login and session release decisions](#identity-login-and-session-release-decisions), [owning Identity contract](contracts/identity.md), [security architecture decisions](#security-architecture-decisions), [bounded passkey possession decision](#atomic-passkey-possession-verification-v36-critical-issue-78) |
 | Platform recovery and Identity recovery sessions | [Platform recovery issue #14](https://github.com/herdifirdausss/mamony-go/issues/14), [recovery-fence evidence and E2 status](proposals/identity-recovery-fence.md#current-rf--experiment-disposition-supersedes-earlier-dependency-labels), [separate recovery-session prerequisites](proposals/identity-recovery-session-capability.md#changed-blocker-disposition) |
 | Ledger, money flows, and the pilot | [Money and recovery choices](#money-and-recovery), [Ledger implementation sequence](roadmap.md#ledger-implementation-sequence), [Ledger ownership decision](adr/0002-ledger-and-data-ownership.md) |
 | Governance and system design | [Branch protection and review issue #13](https://github.com/herdifirdausss/mamony-go/issues/13), [architecture decision index](adr/README.md) |
@@ -134,65 +134,60 @@ The original anchors below lead to dated decision records covering PRs #25–#38
 
 [Read the original slice record](history/identity-enrollment.md#dec-id-browser-e2e--stacked-draft-pr-38).
 
-## DEC-ID-PASSWORD-AUTHN — stacked Draft PR #39
+## Identity login and session release decisions
 
-A candidate **internal, non-HTTP, non-session** password verifier now reads minimum credentials from `mamony_identity_authenticator_runtime` (new v8 column-scoped SELECT-only role) rather than broadening registration or email verifier privileges. A valid syntactic unknown alias runs the same Argon2id v1 work class using a dummy verifier, cannot produce a subject and receives the identical generic denied result as wrong/inactive/unverified accounts. Only a real correct password plus current ACTIVE status and verified email yields an internal subject candidate, **not a user session**. SQL/KDF/role failures are sanitized unavailable. Existing roles cannot access password-verifier material, and authenticator cannot read security outbox, email challenges, admission keys or update state.
+Use the [Identity contract](contracts/identity.md#password-login-and-browser-sessions) for the merged internal scope and [issue #20](https://github.com/herdifirdausss/mamony-go/issues/20) for active work. Candidate settings and fixture results apply within their recorded scope. Resolve the following decisions before public activation.
 
-Before any public login route: design/admit a durable *pre-KDF* global+per-client+per-alias HMAC rate gate including nonexistent emails, uniform denial/timing response, Argon2id throughput limits, session creation/revalidation that prevents status-check→session-issuance races, anti-credential-stuffing monitoring and privacy, MFA/step-up and session family/revocation architecture. Production role provisioning is external; tests only provision a synthetic role. No login HTTP route or cookie is enabled by this PR.
+| Decision still open | Evidence and scope |
+|---|---|
+| Login capacity and abuse policy | Measure with deployment resource limits and decide edge load shedding, global and shared-network limits, response timing, retry UX, blocklist operations, and privacy-safe monitoring. Start with the [login performance baseline](runbooks/identity-login-performance.md) and [ADR-0005](adr/0005-login-admission-before-argon2id.md). |
+| Session issuer and credential isolation | Review DEC-19 against actual workload and credential isolation. Separate grant and session roles have synthetic denial evidence. Profile A still trusts the Identity runtime and its authoritative database. Owner and security acceptance of the proposed design and production workload proof are outstanding in [ADR-0009](adr/0009-authentication-to-session-issuance-boundary.md). |
+| Browser boundary | Approve the TLS and trusted proxy model, Origin checks, the pre-login CSRF policy, key handling, cookie settings, and ambiguous logout UX. Check the applicable deployed edge and browsers. [Browser session candidate](adr/0008-unmounted-browser-session-http-candidate.md) |
+| Session lifecycle and access | Review idle and absolute limits, session cap and eviction UX, role and key lifecycle, session-load contention, MFA and reauthentication, recovery, and resource and financial authorization. [Identity contract controls](contracts/identity.md#security-state-and-recovery-threat-controls) · [Session cap design](adr/0011-atomic-five-session-cap.md) |
 
-## DEC-ID-LOGIN-ADMISSION — stacked Draft PR #40
+### Login and session decision history links
 
-A candidate `PasswordLoginFlow` now enforces global/client/email **durable HMAC-keyed admission before any credential lookup or Argon2id**. Database migration v9 adds only the `LOGIN` action and `GLOBAL_MINUTE` scope to the existing atomic bucket table; the action uses a static five-bucket policy (80/global minute, 8/client minute, 80/client hour, 5/email hour, 20/email day) and the original restricted registration admission DB role. Unknown valid email addresses spend the same admission resources as existing ones, even before the dummy KDF from ADR-0004. Storage, context, or untrusted peer failure prevents the KDF entirely. Candidate limits are **not approved for rollout**.
+The original anchors below lead to the decisions at their original implementation slices.
 
-**Open before any public login:** calibrate capacity/NAT/business traffic, deploy **independent perimeter load-shedding** (denied bucket transactions roll back increments and otherwise allow database DoS), decide global hot-row scaling, trusted client IP/proxy and TLS policy, HMAC secret lifecycle/rotation, monitoring and privacy-preserving credential-stuffing response, public 429/unavailable timing/enumeration contract, accessible retry UX, safe step-up/MFA policy, and atomic session creation with status/verified-contact recheck, expiry and revocation. All candidate routes remain unmounted. See `docs/adr/0005-login-admission-before-argon2id.md`.
+#### DEC-ID-PASSWORD-AUTHN — stacked Draft PR #39
 
-## DEC-ID-OPAQUE-SESSIONS — stacked Draft PR #41
+[Read the original slice record](history/identity-login-and-sessions.md#dec-id-password-authn--stacked-draft-pr-39).
 
-An internal candidate session authority now issues **256-bit opaque** tokens only after the #40 pre-KDF admission/password decision **and an atomic DB-side recheck** of ACTIVE status + verified current contact. The session role has EXECUTE on three bounded SECURITY DEFINER functions but no table access; one account status-transition trigger increments session_epoch, preventing freeze/thaw token resurrection. PostgreSQL stores domain-separated digest only; the secret is released only after confirmed commit. DB-clock expiry is 12h absolute, revoke is idempotent with one security event, and bounded retention is maintenance-only after expiry+24h. Public HTTP routes and cookie transport remain disabled.
+#### DEC-ID-LOGIN-ADMISSION — stacked Draft PR #40
 
-Security-sensitive limitation: direct compromise of the session DB role could mint tokens for known eligible subjects; lock down infrastructure and provisioning before any routing. Open: real login/session cookie contract (Secure, HttpOnly, SameSite, __Host- prefix, CSRF), session rotation/idle/refresh policy, logout route, device/account/session limits, MFA/step-up, role credential rotation, request-time resource authorization, password/contact-change epoch revocation, monitoring and rate-edge capacity. A status check and session resolution do not authorize financial actions by themselves. See `docs/adr/0006-opaque-session-authority.md`.
+[Read the original slice record](history/identity-login-and-sessions.md#dec-id-login-admission--stacked-draft-pr-40).
 
-## DEC-ID-SESSION-RACE-AND-HTTP — stacked Draft PR #42
+#### DEC-ID-OPAQUE-SESSIONS — stacked Draft PR #41
 
-The session issuance/freeze race is **now tested with real PostgreSQL interleavings** in `TestIdentityZSessionFreezeIssueInterleavings`: freeze-first denies minting after its commit; issue-first permits a committed digest only before a waiting freeze, which then invalidates it by an epoch bump; explicit rollback leaves no digest or outbox event. Tests use a superuser-only observable database lock barrier against disposable `mamony_test_*` and are enforced by the required PostgreSQL testgate. These are integration evidence for the v10 SQL locking behavior, not public route authorization.
+[Read the original slice record](history/identity-login-and-sessions.md#dec-id-opaque-sessions--stacked-draft-pr-41).
 
-ADR-0007 proposes a first-party **cookie-based** login/session/logout/CSRF HTTP contract, with no handler or route implemented. Proposed cookie attributes: `__Host-mamony_sid`, `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, no Domain, 12h max age, DB expiry authoritative. Proposed logout requires exact Origin, bound CSRF token and DB revoke. Before activation: choose pre-login CSRF, signed/session-bound token derivation and rotation, reverse-proxy TLS model, session-role isolation, public timing/errors/429, edge/NAT quotas, account recovery/credential reset invalidation, finance authorization, and actual browser acceptance tests. A safe lock-interleaving result does not prove protection of later actions when the account changes after session resolution.
+#### DEC-ID-SESSION-RACE-AND-HTTP — stacked Draft PR #42
 
-## DEC-ID-BROWSER-SESSION-CANDIDATE — stacked Draft PR #43
+[Read the original slice record](history/identity-login-and-sessions.md#dec-id-session-race-and-http--stacked-draft-pr-42).
 
-The proposed ADR-0007 four-operation browser contract has a **candidate but unmounted** Go `BrowserSessionHTTP` implementing same-origin direct-TLS login, cookie-only session read, 15-minute per-session/per-origin HMAC CSRF issuance, and CSRF-protected POST logout with DB revocation and cookie deletion. Duplicate cookies, authorization/forwarded header and Origin confusion, malformed or duplicate JSON, ambiguous commit and stale/expired CSRF are tested with `httptest`; default routers still return 404 and no released OpenAPI operation is added. [ADR-0008](adr/0008-unmounted-browser-session-http-candidate.md) owns design/test evidence.
+#### DEC-ID-BROWSER-SESSION-CANDIDATE — stacked Draft PR #43
 
-**Open before launch:** privileged `mamony_identity_session_runtime` may issue tokens for eligible subjects through direct SQL EXECUTE without password proof, so add network/credential isolation and decide whether a stronger binding of password authentication and DB issuance is required. Also build real browser session/cookie/CSRF E2E, configuration/rotation for per-environment 32-byte CSRF key, TLS proxy/Host/Origin topology and security headers, credential stuffing/load/WAF limits, MFA and reauthentication, password/contact-change session epoch invalidation, and financial action-level authorization. Only the reviewer may approve a production route; green CI is insufficient.
+[Read the original slice record](history/identity-login-and-sessions.md#dec-id-browser-session-candidate--stacked-draft-pr-43).
 
-## DEC-19 — Session issuer DB-capability abuse (Draft PR #45; PROPOSED)
+#### DEC-19 — Session issuer DB-capability abuse (Draft PR #45; PROPOSED)
 
-**Current verified boundary:** Identity v10 grants `mamony_identity_session_runtime` direct EXECUTE on `issue_opaque_session(subject,digest,event)` without an Argon2id or authentication grant prerequisite. Merely knowing a synthetic ACTIVE/verified subject and possessing the DB role can create a session. This is demonstrated in `TestIdentityZDirectSessionMintThreatFixture`; that test intentionally passes while the weakness exists and is not mitigation.
+[Read the original slice record](history/identity-login-and-sessions.md#dec-19--session-issuer-db-capability-abuse-draft-pr-45-proposed).
 
-**Proposed G2 decision:** accept a narrowly scoped Profile A objective to defeat compromise of the *session SQL credential alone*, using a restricted, one-time, epoch- and purpose-bound grant created only after the trusted Go password check. The grant writer remains a separate dangerous capability; unless its runtime/credentials are genuinely separated, this does **not** protect against full Identity runtime RCE or administrator compromise. Alternatives, required negative tests, SQL v11 migration/role design and residual risks are in [ADR-0009](adr/0009-authentication-to-session-issuance-boundary.md).
+#### Draft PR #46 — candidate implementation of DEC-19
 
-**Not yet accepted/implemented:** no migration v11, new grant role, changed session API, public login, production deployment or independent authentication issuer. G3 must approve role boundaries, short grant TTL and atomic consume semantics; G4 must replace the positive attack demonstration with a real SQL EXECUTE-denial test after the old issuer is removed. Keep Draft and 404 route isolation.
+[Read the original slice record](history/identity-login-and-sessions.md#draft-pr-46--candidate-implementation-of-dec-19).
 
-## Draft PR #46 — candidate implementation of DEC-19
+#### Draft #47 — server-side session inactivity timeout (proposed, not approved)
 
-Identity migration v11, Go grant staging/consumption, and a dedicated synthetic `mamony_identity_auth_grant_runtime` role are now **code candidates** in Draft PR #46. The old subject-only issuer is dropped; SQL session minting takes a one-use grant reference, not a freely selected subject. The #45 direct-mint fixture is changed into a deny regression and separate tests exercise expiry, replay, rollback and concurrent consume. This does not constitute owner acceptance of DEC-19, evidence of independent runtime isolation, or permission to publish login; see [ADR-0009](adr/0009-authentication-to-session-issuance-boundary.md).
+[Read the original slice record](history/identity-login-and-sessions.md#draft-47--server-side-session-inactivity-timeout-proposed-not-approved).
 
-## Draft #47 — server-side session inactivity timeout (proposed, not approved)
+#### Draft #48 — per-subject five-active-session cap (proposed)
 
-Identity v12 introduces a **candidate 30-minute server-side idle timeout** while keeping the v11 12-hour absolute lifetime and grant-issuance security boundary unchanged. A successful session resolution updates `opaque_sessions.last_seen_at` inside the PostgreSQL transaction; expired, revoked, frozen and stale-epoch sessions cannot refresh or resurrect. Backfilling `last_seen_at=issued_at` intentionally causes old sessions that have already been inactive for 30 minutes to fail closed on migration. A new required disposable-PostgreSQL integration test covers refresh, idle denial and absolute expiry. See [ADR-0010](adr/0010-server-side-session-idle-expiry.md).
+[Read the original slice record](history/identity-login-and-sessions.md#draft-48--per-subject-five-active-session-cap-proposed).
 
-**Unresolved:** owner acceptance of 30-minute policy, traffic/load and subject-lock contention, compromised-workload isolation under DEC-19, browser UX, key lifecycle, MFA/recovery and financial resource/tenant authorization. A `GET` used as a heartbeat would count as server activity, but cannot exceed the absolute 12-hour cutoff. The candidate browser routes remain 404 in application routers; this PR cannot be merged or deployed solely from green CI.
+#### Draft #49 — credential/contact epoch invalidation and stale-KDF grant fence
 
-## Draft #48 — per-subject five-active-session cap (proposed)
-
-Identity migration v13 proposes **at most five currently usable browser sessions per eligible subject** as an atomic grant-consume/session-issue rule. The sixth valid grant-bound login revokes the oldest currently live digest (created time, digest tie-breaker) and inserts a separate `SESSION_REVOKED` outbox record in the same transaction as its replacement session and `SESSION_CREATED` evidence. Sessions expired by DB-clock idle/absolute rules, already revoked, or from a previous account epoch do not occupy a slot. Existing legacy accounts with **more than five live sessions** must be reviewed: further issuance fails closed rather than performing an unbounded bulk revocation. See [ADR-0011](adr/0011-atomic-five-session-cap.md).
-
-**Open:** owner approval of five-session policy and old-device eviction UX, login/resolve/logout subject-lock contention and throughput, operational over-cap remediation, production workload/SQL role credential isolation, password/contact-change revocation, MFA/step-up, remote device management, and financial action-level authorization. This does not protect against compromise of the full Profile A Identity process and does not mount public routes.
-
-## Draft #49 — credential/contact epoch invalidation and stale-KDF grant fence
-
-Identity v14 adds database triggers that increment `subjects.session_epoch` transactionally on real password-verifier updates/deletion and email-alias changes/deletion; an exact no-op verifier update does not invalidate a session. Password-verifier lookup also reads `session_epoch` **in the same SQL snapshot** as the Argon2id verifier. A successful password comparison can stage a one-time grant only if the epoch is still equal to that captured before the KDF; the unversioned SQL grant function is dropped. An in-flight old password proof is rejected even if the account remains ACTIVE and the new verifier differs. See [ADR-0012](adr/0012-auth-material-epoch-grant-fence.md).
-
-**Unresolved:** This does not create an authorized password/email mutation endpoint or a notification event, protect against compromised privileged grant writer, implement recovery/MFA/reauthentication, nor prove workload isolation. Future mutation transactions must lock subject first and supply mandatory audit/notification evidence; direct test-admin SQL updates are synthetic. Owner approval, UI and production load remain outstanding. Keep 404 public route isolation and Draft stack.
+[Read the original slice record](history/identity-login-and-sessions.md#draft-49--credentialcontact-epoch-invalidation-and-stale-kdf-grant-fence).
 
 ## Draft #50 — authenticated internal password change, purpose-bound grant
 
