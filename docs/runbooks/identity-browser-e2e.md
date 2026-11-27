@@ -70,6 +70,16 @@ Mandatory disposable-PostgreSQL `TestIdentityZMaxActiveSessions` exercises five 
 
 Required PostgreSQL `TestIdentityZAuthMaterialEpochFence` uses disposable role-separated SQL to verify that password and current contact changes transactionally invalidate previous opaque sessions and grants, including a deterministic grant-stage SQL wait behind a concurrent password rotation. Snapshot epoch is read with verifier before real Argon2id in existing browser E2E; one-use grant stage now requires the same epoch, so it cannot re-issue with a newly changed account epoch. No reset/password-change HTTP route is introduced or browser-tested. See [ADR-0012](../adr/0012-auth-material-epoch-grant-fence.md).
 
+## Password-change browser evidence
+
+The [password-change E2E test](../../internal/modules/identity/internal/integration/browser/browser_password_change_e2e_integration_test.go) and its [Chromium driver](../../tools/browsercheck/real_browser_password_change_e2e.cjs) run the unmounted mutation and one-shot page against disposable PostgreSQL in the existing [browser workflow](../../.github/workflows/identity-real-browser-e2e.yml). [PR #56](https://github.com/herdifirdausss/mamony-go/pull/56) added the mutation scenarios. [PR #57](https://github.com/herdifirdausss/mamony-go/pull/57) added the page scenarios.
+
+- Confirmed password changes invalidate the previous sessions. The database checks the epoch, the audit event, and its linked pending security notice.
+- After a lost response following commit, the page reports uncertainty and keeps the form locked. The browser test checks that the client sends only one mutation and that the stale session is denied.
+- The fixture uses a local TLS bridge and synthetic credentials. Production ingress, live notification, and account-recovery acceptance have separate evidence requirements.
+
+The following notes describe earlier dependencies at their original slices.
+
 ## Draft #50 — internal password-change integration evidence
 
 Mandatory `TestIdentityZAuthenticatedPasswordChange` runs real disposable PostgreSQL role separation, pre-KDF admission, Argon2id verification, purpose-bound one-use `PASSWORD_CHANGE` grant, a session-bound password-verifier update and transactional audit/epoch invalidation. Adversarial checks reject ordinary login grants as change proof and change grants as login proof; a duplicate outbox event must roll back the password update. The existing Chromium suite continues to test the candidate login/CSRF/logout browser contract; **no public password-change form or browser route has been implemented**. See [ADR-0013](../adr/0013-authenticated-password-change.md).

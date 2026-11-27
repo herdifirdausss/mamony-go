@@ -86,59 +86,18 @@ Test self-approval, an expired approval, payload changes after approval, concurr
 
 **Authority limit:** Profile A trusts its authoritative application database. It does not withstand arbitrary mutation of that same authority. Stronger compromise containment requires [an explicit decision](../open-decisions.md#security-architecture-decisions), independent admin/key/deployment boundaries and adversarial evidence. The initial modular monolith remains the default.
 
-## Internal authenticated password change — stacked Draft #50
+## Authenticated password change and security notices
 
-Candidate v15 adds `AuthenticatedPasswordChange.Change`, which requires a currently usable opaque session **and** fresh old-password verification through mandatory distributed pre-KDF login admission + Argon2id, bound to the same subject and epoch. The new secret is NFC-normalized, checked against the required configured password blocklist, denied if equal to the old normalized secret, and rehashed with a new 128-bit salt. A purpose-bound one-use `PASSWORD_CHANGE` grant (30s) cannot be consumed by the login session issuer. A new EXECUTE-only `mamony_identity_password_change_runtime` can rotate the verifier only with both session and change proof; mutation, v14 `session_epoch` increment and identifier-only `PASSWORD_CHANGED` security event commit atomically. No replacement bearer is issued. See [ADR-0013](../adr/0013-authenticated-password-change.md).
+Use [IAM-08, IAM-09, IAM-11, and IAM-13](#security-state-and-recovery-threat-controls) for the applicable requirements. This scope describes the merged synthetic flow for a signed-in user with the current password. The default HTTP listeners serve health endpoints. Password recovery has a separate proof and authority.
 
-No change-password public endpoint, session cookie/CSRF mutation handler, notification delivery or approved production blocklist is included. The grant stager remains a privileged assertion oracle under Profile A. Owner/security/UX approvals, MFA/step-up, trusted client network and workload secret isolation remain blockers.
+| Part of the flow | Implementation and evidence |
+|---|---|
+| Change the current password | The [password-change use case](../../internal/modules/identity/internal/usecase/change_password.go) checks the live session and current password. The [PostgreSQL store](../../internal/modules/identity/internal/repository/postgres/password_change.go) consumes the change grant and writes the verifier, epoch update, and audit event in the same transaction. See [the scoped design](../adr/0013-authenticated-password-change.md) and [database integration test](../../internal/modules/identity/internal/integration/authenticated_password_change_integration_test.go). |
+| Record and dispatch the security notice | The password-change transaction queues a token-free obligation linked to the audit event. The [notice store](../../internal/modules/identity/internal/repository/postgres/security_notice.go) and [standalone worker](../../cmd/mamony-identity-security-notice-worker/) handle dispatch. See [the durable notice design](../adr/0014-password-change-security-notices.md) and [delivery evidence](../runbooks/identity-delivery.md#password-change-notice-scope). |
+| Reconcile provider results and observe backlog | Use the [callback design](../adr/0016-mailgun-security-notice-webhook-reconciliation.md) and the [read-only health probe](../adr/0017-read-only-notice-health-probe.md) to understand local evidence, unconfirmed outcomes, and the role limits. The callback handler remains unmounted. |
+| Handle a lost browser response | The unmounted [password-change page](../../internal/modules/identity/internal/handler/password_change_page.go) reports an uncertain outcome and locks submission after one attempt. See [Chromium and disposable PostgreSQL evidence](../runbooks/identity-browser-e2e.md#password-change-browser-evidence). |
 
-## Password-change notification obligation — stacked Draft #51
-
-The v15 trusted `PASSWORD_CHANGED` security outbox event now causes a **v16 same-transaction enqueue** in `password_change_notices`; a failed enqueue rolls back the password change. The identifier-only security outbox remains free of email addresses. Only events written under the original `mamony_identity_password_change_runtime` PostgreSQL login can trigger a notice; earlier verifier role outbox INSERT privileges cannot forge an alert. The separate queue captures the currently verified email at the time of mutation; it contains only event ID, subject, recipient and delivery metadata, never a bearer/password/reset URL.
-
-The isolated `mamony_identity_security_notice_runtime` may EXECUTE only claim/finalize functions (not read raw tables, alter Identity state, mint grants or issue sessions). Due notices are claimed with SKIP LOCKED and 45-second fences; retry is capped at five submissions with 1/2/4/8 minute backoff. A contact change or unverified/DELETED recipient before claim marks the notice DEAD to prevent sending to an unbound address. Provider ACCEPTED never means inbox delivered; duplicate sends may occur after worker crashes. Seven-day fixed retention deletes recipient rows while preserving the security event. Refer to [ADR-0014](../adr/0014-password-change-security-notices.md).
-
-No live sender/worker command is activated and no public password-change route exists. Sender is a mockable interface only in this candidate; no user notification can yet be claimed. Remaining policy includes operational delivery monitoring, a trusted provider sender, bounce handling and escalation when stale notices are suppressed.
-
-## Password-change Mailgun security notice sender — stacked Draft #52
-
-The internal `SecurityNoticeSender` abstraction from Draft #51 now has a real Mailgun Messages API implementation limited to the configured US/EU/AU region and verified sending domain. It submits a **fixed text-only password-changed warning**, not a verification token, session, grant, reset URL or user-selected text. No links or dynamic metadata; open/click tracking disabled and Mailgun recipient TLS required. HTTP response/error bodies are never exposed; a successful bounded 200 JSON response means **accepted by provider**, not delivered or read. HTTP 429/420/408/5xx and uncertain outcomes retry under the v16 PostgreSQL bounded lease/backoff; duplicates remain possible after an ambiguous acceptance.
-
-A new dedicated `RunSecurityNoticeDelivery` facade and standalone `cmd/mamony-identity-security-notice-worker` use **only** the `mamony_identity_security_notice_runtime` role; they do not reuse the verification email sender, token envelope keyring or worker DSN. Real email sending needs both `--send-live-security-mailgun` and the exact operator approval, external owner-only secret files, non-CI runtime and verified-full PostgreSQL TLS. **The command is not scheduled/deployed, no real credentials have been connected and no live email has been sent by this implementation.** See [ADR-0015](../adr/0015-mailgun-password-change-notice-worker.md).
-
-## Signed Mailgun notice callbacks and operator counts — stacked Draft #53
-
-Identity v17 extends the password-change notification queue with **SHA-256 of the normalized Mailgun Message-ID** returned only after a successful Mailgun send response. The sender no longer calls an uncorrelated three-argument SQL finalizer: the worker role may only execute the new four-argument `finalize_password_change_notice_v2`. `ACCEPTED` means submitted to provider; independent `provider_state` tracks `SUBMITTED`, `TEMPORARY_FAILURE`, `DELIVERED` (recipient SMTP server only), `PERMANENT_FAILURE`, `COMPLAINED`, and `UNSUBSCRIBED`.
-
-The **unmounted** HMAC-verifying Mailgun webhook candidate accepts only signed JSON event callbacks from the configured sending domain, fixed failure types and a verified Mailgun message-ID. It uses a signing key **different from the API sending key**. A separate `mamony_identity_notice_webhook_runtime` role may only EXECUTE a receipt function; it cannot read tables, access credentials, issue sessions, or alter password verifiers. Replay tokens and Mailgun event IDs are deduplicated in PostgreSQL using digests; receipt payloads store no email/PII. Out-of-order events are durably reconciled, and a later bounce/complaint cannot be hidden by an older delivery callback. A count-only health function is exposed to the isolated maintenance operator role, not the HTTP runtime.
-
-A signed callback cannot be treated as full-body cryptographic attestation: Mailgun signs `timestamp+token`, not the entire JSON. Transport/TLS, domain binding, role isolation and real provider-key ownership must be reviewed before enabling a live endpoint. **No route is registered, no webhook receiver is deployed, no real Mailgun callback is processed and no on-call alert is configured.** Prior uncorrelated ACCEPTED notices cannot be automatically backfilled; ambiguous sender timeouts may produce unmatched provider receipts and duplicate messages. See [ADR-0016](../adr/0016-mailgun-security-notice-webhook-reconciliation.md).
-
-## Read-only Mailgun notice health probe — stacked Draft #54
-
-Identity v18 introduces the isolated `mamony_identity_notice_monitor_runtime` PostgreSQL LOGIN role, with **only** schema USAGE and EXECUTE on the count-only `security_notice_health()` function. It has no retention purge, mail delivery, webhook receipt, contacts, session, password or table permissions. `ReadSecurityNoticeHealthAsMonitor` exclusively accepts this role; the earlier maintenance-only facade remains backwards-compatible.
-
-The unmounted, one-shot `mamony-identity-notice-health` command requires a private DSN file, strict full TLS verification, `--check-security-notices`, five mandatory numeric thresholds, and a non-CI operator environment. It writes only count-only JSON and exits 0 OK, 2 ALERT (configured threshold exceeded), or 1 ERROR (misconfiguration/DB unavailable). No default production thresholds, on-call routing, scheduler or public HTTP health endpoint exist. Counts can report suspected problems, not verify human inbox receipt. See [ADR-0017](../adr/0017-read-only-notice-health-probe.md).
-
-## Unmounted browser password-change boundary — stacked Draft #55
-
-The candidate `BrowserPasswordChangeHTTP` provides a separately constructed but **unmounted** `POST /v1/identity/change-password`. It reuses the existing concrete browser-session handler's exact HTTPS Origin/Host, direct-TLS, no-forwarded-identity, trusted peer, host-only cookie and 15-minute session-bound CSRF requirements. Bounded, duplicate-key-rejecting JSON has exactly `email`, `currentPassword`, `nextPassword`; the email must be canonical, but is **not** trusted as the account authority. A concrete `AuthenticatedPasswordChange` usecase independently verifies the old secret against the session's subject and epoch before the SQL atomic rotation.
-
-On certain success, the response is 204 with the old cookie cleared; v14 SQL epoch invalidation has already revoked all previous sessions, and there is **no replacement session**. Wrong secret, account mismatch, throttle or new-secret policy denial collapse to a generic 401. Unknown commit outcome returns 503 and never claims success or clears the cookie, even if PostgreSQL might have committed. Response headers use no-store and no password or session material is emitted.
-
-This is **not an enabled public or private route**: application routers and `main` remain unchanged, and no real-browser + PostgreSQL test of this new operation has yet passed. MFA/step-up, production password blocklist, live email sender/webhook, trusted ingress, account recovery, user-facing UX and finance authorization remain open. See [ADR-0018](../adr/0018-first-party-password-change-http-candidate.md).
-
-## Actual Chromium password-change proof — stacked Draft #56
-
-The previously unmounted `BrowserPasswordChangeHTTP` candidate is now exercised with real Chromium cookie handling, actual Argon2id, isolated PostgreSQL runtime roles and v15–v18 transactional state in `TestIdentityZBrowserPasswordChangeE2E` (tags `integration,browser_e2e`). Two independent browser sessions on the same account prove a successful password change invalidates both, while the initiator's host-only cookie is cleared and only the new credential can create a fresh session. Denied CSRF, oversized/duplicate JSON, sibling/cross-site requests, and a different account's valid password do not authorize the rotation.
-
-A second scenario deliberately drops the HTTP response **after** PostgreSQL commit: Chromium retains the old cookie but server-side session resolution rejects it; a fresh login needs the new password. The test also proves one epoch increment and exactly one `PASSWORD_CHANGED` event plus pending notice per account. It does not retry ambiguous credential changes or send email. The test-only TLS bridge does not establish deployed ingress or CORS proof. The actual production application routers still return 404 on `POST /v1/identity/change-password`; public deployment, real browser UX and MFA/recovery approvals are open. See [ADR-0019](../adr/0019-browser-password-change-postgres-e2e.md).
-
-## Candidate one-shot browser password-change experience — stacked Draft #57
-
-An explicitly unmounted `PasswordChangePage` now renders static first-party `GET /account/change-password` using the **same** direct-TLS origin and browser session boundary as `BrowserPasswordChangeHTTP`. Its script/style are embedded with exact CSP hashes, no third-party resources or persistent storage. A real active session and session-bound CSRF must be fetched before the form becomes visible; the confirmation password remains client-only. A single deliberate click or keyboard form submit sends the existing strict `email`/`currentPassword`/`nextPassword` JSON request, clears all password input elements and locks the UI against automatic resend.
-
-The page distinguishes confirmed `204` (successful; all sessions invalidated, sign in again), generic `401` (denied, reason undisclosed), and **any uncertain response or network exception** (might have committed; do not repeat the password change; use established trusted sign-in or recovery). No new login/recovery URL is invented or exposed. Real Chromium + PostgreSQL tests cover signed-out state, matching confirmation, certain commit, denial, and HTTP response lost **after** commit. Default production listeners still return 404 for both the candidate page and mutation. See [ADR-0020](../adr/0020-unmounted-password-change-recovery-page.md).
+Use the [release decision register](../open-decisions.md#identity-password-change-release-decisions) for open approval and evidence requirements. See the [password-change history](../history/identity-password-change.md) for the original limits, checks, and candidate status in each slice.
 
 ## Password recovery proof foundation — stacked Draft #58
 
@@ -388,3 +347,39 @@ The original anchors below lead to the corresponding archived sections.
 ### Password/contact-change session invalidation — stacked Draft #49
 
 [Read the original slice record](../history/identity-login-and-sessions.md#passwordcontact-change-session-invalidation--stacked-draft-49).
+
+## Password-change history links
+
+The original anchors below lead to the corresponding archived sections.
+
+### Internal authenticated password change — stacked Draft #50
+
+[Read the original slice record](../history/identity-password-change.md#internal-authenticated-password-change--stacked-draft-50).
+
+### Password-change notification obligation — stacked Draft #51
+
+[Read the original slice record](../history/identity-password-change.md#password-change-notification-obligation--stacked-draft-51).
+
+### Password-change Mailgun security notice sender — stacked Draft #52
+
+[Read the original slice record](../history/identity-password-change.md#password-change-mailgun-security-notice-sender--stacked-draft-52).
+
+### Signed Mailgun notice callbacks and operator counts — stacked Draft #53
+
+[Read the original slice record](../history/identity-password-change.md#signed-mailgun-notice-callbacks-and-operator-counts--stacked-draft-53).
+
+### Read-only Mailgun notice health probe — stacked Draft #54
+
+[Read the original slice record](../history/identity-password-change.md#read-only-mailgun-notice-health-probe--stacked-draft-54).
+
+### Unmounted browser password-change boundary — stacked Draft #55
+
+[Read the original slice record](../history/identity-password-change.md#unmounted-browser-password-change-boundary--stacked-draft-55).
+
+### Actual Chromium password-change proof — stacked Draft #56
+
+[Read the original slice record](../history/identity-password-change.md#actual-chromium-password-change-proof--stacked-draft-56).
+
+### Candidate one-shot browser password-change experience — stacked Draft #57
+
+[Read the original slice record](../history/identity-password-change.md#candidate-one-shot-browser-password-change-experience--stacked-draft-57).
