@@ -10,7 +10,7 @@ var errUnavailable = errors.New("private secret file unavailable")
 
 // OpenPrivate opens an absolute path to a private regular file.
 //
-// It rejects symlinks, group or world permissions, and path replacement
+// It rejects a final-component symlink, group or world permissions, and path replacement
 // between the metadata check and open. The caller must close the returned file.
 func OpenPrivate(path string) (*os.File, error) {
 	if path == "" || !filepath.IsAbs(path) {
