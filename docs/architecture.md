@@ -50,7 +50,7 @@ Set `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to override the addresses. Th
 
 ### Identity notice-health call path
 
-1. The CLI parses `--check-security-notices` and the thresholds, reads a private DSN file, and calls the Identity facade with an eight-second deadline. [CLI entry point](../cmd/mamony-identity-notice-health/main.go)
+1. The CLI parses `--check-security-notices` and the thresholds, reads a private DSN file, and calls the Identity facade with an eight-second deadline. [CLI package](../cmd/mamony-identity-notice-health/)
 2. `identity.ReadSecurityNoticeHealthAsMonitor` opens a one-connection pool configured for `mamony_identity_notice_monitor_runtime`. The Platform pool checks the actual PostgreSQL role before use. [Identity facade](../internal/modules/identity/security_notice_health.go) · [Pool role check](../internal/platform/postgres/pool.go)
 3. `SecurityNoticeHealthStore.Read` calls `mamony_identity.security_notice_health()` in a transaction. The facade returns aggregate counts to the CLI. [Repository query](../internal/modules/identity/internal/repository/postgres/security_notice_health.go) · [Monitor grant](../db/migrations/identity/000018_notice-health-readonly-runtime.up.sql)
 4. The CLI writes a redacted JSON report. Exit code `0` means all monitored counts were within their thresholds, `2` means at least one threshold was exceeded, and `1` means the probe failed. [Probe behavior and operating limits](adr/0017-read-only-notice-health-probe.md)
