@@ -37,7 +37,7 @@ func (h *BrowserSessionHTTP) loginRequest(w http.ResponseWriter, r *http.Request
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, browserLoginBytes)
 	defer func() { _ = r.Body.Close() }()
-	email, password, err := decodeEnrollmentJSON(r.Body, true)
+	email, password, err := decodeEmailPasswordRequestJSON(r.Body, true)
 	if err != nil {
 		var overflow *http.MaxBytesError
 		if errors.As(err, &overflow) {
