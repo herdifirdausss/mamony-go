@@ -1,8 +1,18 @@
 # Decisions to resolve before implementation
 
-See [current state](current-state.md) for merged implementation and active work. The historical Draft references below describe decisions at their original slices. Operational approval and independent technical acceptance remain separate from merge.
+See [current state](current-state.md) for the merged implementation and verification boundaries. The dated Draft references below preserve decisions at their original slices. For working status, follow the current issue, contract, or ADR.
 
-Use the local [architecture decision index](adr/README.md) for baseline requirements. Record each choice below when its stage starts. A candidate needs tests in Mamony Go before it becomes an implementation claim.
+## Decision lookup by capability
+
+| Capability | Start here |
+|---|---|
+| Platform and migrations | [Effective DEC-01 and Foundation choices](#foundation-and-access), [proposed DEC-01 amendment](#proposed-dec-01-amendment--foundation-105), [PostgreSQL contract](contracts/postgresql.md) |
+| Identity and public access | [Owning Identity contract](contracts/identity.md), [security architecture decisions](#security-architecture-decisions), [bounded passkey possession decision](#atomic-passkey-possession-verification-v36-critical-issue-78) |
+| Platform recovery and Identity recovery sessions | [Platform recovery issue #14](https://github.com/herdifirdausss/mamony-go/issues/14), [recovery-fence evidence and E2 status](proposals/identity-recovery-fence.md#current-rf--experiment-disposition-supersedes-earlier-dependency-labels), [separate recovery-session prerequisites](proposals/identity-recovery-session-capability.md#changed-blocker-disposition) |
+| Ledger, money flows, and the pilot | [Money and recovery choices](#money-and-recovery), [Ledger implementation sequence](roadmap.md#ledger-implementation-sequence), [Ledger ownership decision](adr/0002-ledger-and-data-ownership.md) |
+| Governance and system design | [Branch protection and review issue #13](https://github.com/herdifirdausss/mamony-go/issues/13), [architecture decision index](adr/README.md) |
+
+Consult the linked record for the exact decision scope. Independent technical acceptance, implementation verification, merge, and operational approval each have their own evidence.
 
 ## Foundation and access
 

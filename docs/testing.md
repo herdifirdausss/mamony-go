@@ -4,18 +4,18 @@ The aim is to prove **observable behavior, invariants and failure handling**, no
 
 ## Test taxonomy and current state
 
-| Test | Purpose and boundary | Trigger / execution | Status in HTTP bootstrap |
-|---|---|---|---|
-| Unit | Pure domain rules, usecase orchestration, invalid inputs and error classification with fakes for external ports | `make unit`; files named `*_test.go` | **Implemented** for existing bootstrap/checker packages; financial rules absent |
-| HTTP/component | Handler routing, method/resource exposure, request/response mapping, deadlines and private/public listener separation using `httptest` or bound ephemeral listeners | `make unit`; focused Go tests | **Implemented** only for health endpoints |
-| Integration — database | Actual SQL constraints, runtime roles and tenant RLS; future migrations, transaction/retry, outbox, balance-floor and contention | `make integration-local` starts a disposable PostgreSQL 18.7 container; `make integration` verifies exact tagged test cases and requires separate admin/runtime test URLs | **Implemented for synthetic role/RLS primitives only**; production migrations, Go DB pool, ledger and restore remain NOT RUN |
-| Contract | Public OpenAPI/schema compatibility, event versions, external provider signature fixtures and stub behavior | Focused tests when published contracts/adapters exist | **NOT RUN** for payment/provider APIs |
-| Scenario / E2E | Customer/operator flows crossing capability boundaries with synthetic providers, including recovery, denial, retry, duplicate/out-of-order messages | Dedicated scenario tests after target flows exist | **NOT RUN** for financial flows |
-| Concurrency / fault | Race, lost response, concurrent idempotency key, rollback, outbox replay, restart/restore | `make race` for shared memory; real DB multi-connection fault tests for durable state | Race detector runs; **financial fault tests NOT RUN** |
-| Property / fuzz | Arithmetic conservation, allowed state transitions, parsers/decoders on hostile inputs | `go test -fuzz=Fuzz... -fuzztime=... <package>` when targets exist; committed corpus runs during unit tests | **NOT RUN** for absent financial/parser targets |
-| Performance / recovery | Bounded latency, resource budget, load, backups and safe restoration | Dedicated reproducible benchmarks and restore drills with declared fixtures | **NOT RUN** |
+The default HTTP process serves health endpoints. Internal component and lab suites exercise additional paths with synthetic fixtures. See [current state](current-state.md) for exact baseline evidence and release blockers.
 
-**Never claim `make race` proves a SQL concurrency invariant.** Never report `make unit` as a database integration PASS. The `integration` Make target now enforces actual `TestPostgres*` results from Go's JSON events, refusing missing URLs, an unsafe target, unavailable `psql`, missing required tests and any test failure. A file and `TEST_DATABASE_URL` alone never prove tests executed. The synthetic RLS fixture tests **database mechanics**, not production authorization, migration integrity, or ledger semantics.
+| Test | Where to verify | Boundary |
+|---|---|---|
+| Unit and component | `make unit` for Go unit and handler tests | Covers health listeners, internal Identity flows, and isolated Ledger domain rules. Handler fixtures can exercise unmounted routes. |
+| PostgreSQL integration | `make integration-local` or the required PostgreSQL CI job | Covers disposable role/RLS, runtime pool, migration, selected Identity, and Ledger K2a storage and role cases. End-to-end resource authorization and deployed grants remain open. |
+| Contract and E2E | [Identity browser E2E](runbooks/identity-browser-e2e.md) and owning contract checks | Browser and PostgreSQL fixtures cover selected Identity paths. End-to-end financial flows and public payment/provider contracts remain pending. |
+| Concurrency and fault | `make race`, followed by applicable real database tests | The race detector covers executed shared-memory paths. Use separate multi-connection fixtures to establish SQL contention, rollback, and durable outcomes. Ledger posting, replay and outbox fault evidence remain pending. |
+| Property and fuzz | `go test -fuzz=Fuzz... -fuzztime=... <package>` for the applicable target | Record the invariant or parser, target, and run. Committed corpus inputs run during ordinary unit tests. |
+| Performance and recovery | [Login performance runbook](runbooks/identity-login-performance.md), [PostgreSQL stages](#postgresql-integration-stages), and [recovery procedures](runbooks/recovery.md) | The login harness, PITR lab, and isolated Ledger K2a restore have synthetic evidence. Deployed capacity, full Ledger recovery, and production recovery objectives remain open. |
+
+`make integration` requires guarded disposable database URLs and verifies the named required tests from Go's JSON events. It fails on an unsafe target, missing fixtures or checks, unavailable `psql`, or any test failure. Record the actual fixture and command with the result.
 
 ## Go test conventions
 
@@ -47,20 +47,15 @@ Run targeted tests while implementing, then required CI gates. For Critical chan
 
 ## PostgreSQL integration stages
 
-The first fixture-only gate is implemented by `tools/postgrestest` and the `PostgreSQL integration / postgresql` CI job. It tests synthetic owner/runtime privileges and `FORCE ROW LEVEL SECURITY`, including tenant-context expiry on one PostgreSQL connection. Both the Go gate and the tagged suite reject unsafe test URLs. See the [foundation proposal](proposals/postgresql-foundation.md) for scope and limitations.
+The `PostgreSQL integration / postgresql` CI job uses disposable fixtures. Use the record for each scope to verify which cases actually ran.
 
-**Implemented and executed on disposable PostgreSQL:** platform migration v1 with applied-file SHA-256 fingerprints, altered/missing-history rejection, synthetic upgrade, rollback on failing SQL and dirty-state detection (PR #17). The `TestPostgresRuntimePool*` cases verify a real, bounded Go `pgxpool` under synthetic tenant RLS, including physical session reuse, rollback and cancellation; these are implemented as part of the runtime-pool PR and must show actual CI PASS before a completion claim.
+| Scope | Disposable evidence | Remaining evidence |
+|---|---|---|
+| Platform roles, runtime pool, and migrations | Actual role and `FORCE ROW LEVEL SECURITY` checks, physical session reuse, rollback, cancellation, and migration fingerprint and dirty-state checks. See the [Foundation proposal](proposals/postgresql-foundation.md). | Deployment grants and secrets, tenant authorization through the owning capability, and database-aware readiness. [Effective DEC-01](open-decisions.md#foundation-and-access) still uses golang-migrate. Actual fault and supported upgrade evidence for the proposed native executor is pending. |
+| Identity and Platform recovery | Selected Identity persistence/role tests, the PITR lab, and bounded RH-03 recovered-state reconciliation. See the [recovery evidence](current-state.md#evidence-at-the-inspected-main-commit). | RH-03 remains **PARTIAL**. Integrated RF-01–08 evidence is **NOT RUN**, and E2 remains **BLOCKED**. Full authority coverage, accepted recovery objectives, and deployed access and delivery remain open. |
+| Ledger isolated persistence | K2a covers the initial schema, fixed USD definition, scoped grants, and disposable storage/restore. See the [K2a scope and evidence](proposals/ledger-k2a-isolated-persistence.md). | Full account lifecycle, atomic authorized posting, idempotency under contention, reversal, outbox, and whole-Ledger restore acceptance. |
 
-**Still NOT RUN:** full production schema upgrade/restore and secret provisioning, tenant authorization by Identity/usecase, a real module repository, HTTP database readiness, ledger locks/idempotency/reversal, outbox, backup restore and deterministic concurrent financial SQL execution. A green RLS/pgxpool test is **not** a financial or user-authorization guarantee.
-
-Next, after DEC-01 is accepted:
-1. Choose the supported PostgreSQL version, Go driver and migration tool, with explicit immutable migration evidence and scoped owner/runtime credentials.
-2. Test production migrations from an empty database and a supported prior version. Verify actual role ownership and grants, including the tenant table's `FORCE ROW LEVEL SECURITY`.
-3. Add direct connection-pool tenant reuse tests, not only `psql` sequential connection tests. Exercise deterministic contention and rollback against the first actual ledger schema.
-4. Add failed-startup, ambiguous commit, crash/restart and fresh restore tests before claiming financial or recovery gates.
-5. Keep the integration CI job non-optional, and fail it on missing database, failed migrations, zero required tests or any invariant failure. A test-file presence check is insufficient.
-
-Dependency and release choices remain DEC-01 in the [decision register](open-decisions.md).
+Before claiming a database or recovery gate, verify the applicable upgrade paths, actual roles, durable effects under failure, and restore results against the owning contract. The required integration job must fail on a missing fixture, failed migration, missing named case, or invariant failure.
 
 ## Test evidence for AI changes
 
