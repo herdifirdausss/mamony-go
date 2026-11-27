@@ -7,6 +7,8 @@
 | Understand what Mamony Go does | [Product scope](product.md) → [current state](current-state.md) → [running packages](architecture.md#running-packages) |
 | Run the application or local checks | [Run locally](../README.md#run-locally) → [verification commands](engineering.md#verification) |
 | Plan or implement a change | Tracking issue → [change lifecycle](development-workflow.md#choose-a-change-path) → owning contract below → relevant ADR or proposal → [testing strategy](testing.md) |
+| Check a decision or prerequisite | [Decision lookup by capability](open-decisions.md#decision-lookup-by-capability) → linked decision or ADR for its status and scope |
+| Record review evidence or approval | [Verification commands](engineering.md#verification) → [PR template](../.github/pull_request_template.md) |
 | Review security or recovery evidence | [Trust boundaries](architecture.md#security-authority-and-trust-boundaries) → owning contract → [security verification](engineering.md#security-verification) → linked PR and test results |
 | Run a procedure | Choose a runbook below and check its scope and prerequisites first. |
 
@@ -30,7 +32,7 @@ For recovery design review, start with the Platform lab for database observation
 |---|---|
 | What should a capability do, and how do we accept it? | The applicable section of its owning contract under `contracts/`. Some sections describe proposed or future behavior. Read their status before using them. |
 | Why did we choose this design? | The applicable [ADR](adr/README.md), with its decision status and scope. |
-| What work is next, and what is unresolved? | The [roadmap](roadmap.md) for dependencies, the [decision register](open-decisions.md) for unresolved choices, and the tracking issue for live coordination. |
+| What work is next, and what is unresolved? | The [roadmap](roadmap.md) for dependencies, the [decision lookup](open-decisions.md#decision-lookup-by-capability) for unresolved choices, and the tracking issue for live coordination. |
 | What merged, what runs, and what was tested? | [Current state](current-state.md) for the dated baseline. Use the linked code, PR, and test results for exact evidence and scope. |
 | Where is the research, PRD, or technical design? | The linked proposal in `proposals/` for Critical work. Use the issue or PR for smaller changes. [Development history](history.md) links earlier research and verification records. |
 | How should contributors write and verify changes? | [Go conventions](conventions.md), [engineering practices](engineering.md), [testing strategy](testing.md), and [tooling](tooling.md). |

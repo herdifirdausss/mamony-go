@@ -1,6 +1,6 @@
 # Current state and active work
 
-Snapshot inspected on **2026-11-27 (WIB)** at [main `fcc22d36`](https://github.com/herdifirdausss/mamony-go/commit/fcc22d3611d122a0ad035a6abd24a42f0291e62a). For live status, see [open pull requests](https://github.com/herdifirdausss/mamony-go/pulls) and [open issues](https://github.com/herdifirdausss/mamony-go/issues). The [roadmap](roadmap.md) records delivery order. The owning contracts and ADRs record requirements and design decisions.
+Baseline inspected on **2026-11-27 (WIB)** at [main `fcc22d3`](https://github.com/herdifirdausss/mamony-go/commit/fcc22d3611d122a0ad035a6abd24a42f0291e62a). Use the [roadmap](roadmap.md) for delivery order, the owning contract for requirements, and the [decision lookup](open-decisions.md#decision-lookup-by-capability) for design status.
 
 ## What actually runs
 
@@ -25,15 +25,13 @@ Snapshot inspected on **2026-11-27 (WIB)** at [main `fcc22d36`](https://github.c
 
 ## Open pull requests
 
-At this snapshot, [#106 symbolic E1 experiment](https://github.com/herdifirdausss/mamony-go/pull/106) and [#117 observability foundation proposal](https://github.com/herdifirdausss/mamony-go/pull/117) were open Drafts. See the live list for changes after this snapshot.
-
-After the [state update in #114](https://github.com/herdifirdausss/mamony-go/pull/114), [#102 recovery-fence policy](https://github.com/herdifirdausss/mamony-go/pull/102) and [#109 recovery-session design](https://github.com/herdifirdausss/mamony-go/pull/109) merged as documentation-only records. Both proposals remain pending adoption and implementation authorization. E2 remains BLOCKED.
+Use the [live pull request list](https://github.com/herdifirdausss/mamony-go/pulls) for Draft, review, and merge status.
 
 <a name="open-issues-seven"></a>
 
 ## Open issues
 
-Use the [live issue list](https://github.com/herdifirdausss/mamony-go/issues). Follow the links in the baseline table for the open decisions that block each capability.
+Use the [live issue list](https://github.com/herdifirdausss/mamony-go/issues) to track active work. The baseline table links the issues that own each remaining gate.
 
 ## Evidence at the inspected main commit
 
@@ -43,8 +41,8 @@ GitHub reports successful push checks on the [historical RH-03 merge commit](htt
 
 #95 technical evidence does not establish independent complete history, full authority coverage, full ACL parity, production delivery or release. Renewed exact-pair authorization for d10a983b/8610d26a was not found in the inspected PR record; the earlier pair approval did not transfer. See [#13](https://github.com/herdifirdausss/mamony-go/issues/13) and [#95 checkpoint](https://github.com/herdifirdausss/mamony-go/pull/95#issuecomment-7197835537). Observed merge is not retroactive approval.
 
-RF-01–08 integrated evidence remains NOT RUN. The earlier RF-08 dependencies on #81 adoption and #95 fixture compatibility are closed. E2 remains BLOCKED. [#108](https://github.com/herdifirdausss/mamony-go/issues/108) and the [recovery-session proposal](proposals/identity-recovery-session-capability.md#post-merge-platform-dependency-reassessment--2026-11-26-wib) track four unchanged blockers: independent currentness and affected scope, integration and durable consistency, audit and notice applicability and evidence custody and retention, and exact impact, containment and qualified review. E1 remains symbolic.
+[Recovery-fence policy #102](https://github.com/herdifirdausss/mamony-go/pull/102) and [recovery-session design #109](https://github.com/herdifirdausss/mamony-go/pull/109) merged as documentation records. E1 remains symbolic. Integrated RF-01–08 evidence is **NOT RUN**. The #81 adoption and #95 fixture compatibility prerequisites for RF-08 are resolved within their respective scopes. E2 remains **BLOCKED** on independent currentness and affected scope, integration and durable consistency, audit/notice and evidence custody/retention, and exact impact, containment and qualified review. See [Issue #108](https://github.com/herdifirdausss/mamony-go/issues/108) and the [blocker disposition](proposals/identity-recovery-session-capability.md#changed-blocker-disposition).
 
 ## Work sequencing
 
-Follow the [roadmap](roadmap.md) and [change lifecycle](development-workflow.md) for prerequisites, acceptance and authorization. Refresh this snapshot when a material milestone merges or acceptance changes. Keep detailed evidence in the owning issue or PR and stable requirements in contracts.
+Follow the [roadmap](roadmap.md) and [change lifecycle](development-workflow.md) for prerequisites, acceptance, and authorization. Refresh the baseline when a material milestone merges or acceptance changes. Keep detailed evidence in the owning issue or PR and stable requirements in contracts.
