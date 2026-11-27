@@ -99,147 +99,24 @@ Use [IAM-08, IAM-09, IAM-11, and IAM-13](#security-state-and-recovery-threat-con
 
 Use the [release decision register](../open-decisions.md#identity-password-change-release-decisions) for open approval and evidence requirements. See the [password-change history](../history/identity-password-change.md) for the original limits, checks, and candidate status in each slice.
 
-## Password recovery proof foundation — stacked Draft #58
+## Account recovery and saved codes
 
-Forgot-password recovery is **not** the already implemented authenticated password-change operation. A caller without a valid session and old-password proof must never be granted the existing v15 `PASSWORD_CHANGE` capability. A new isolated `PasswordRecoveryProof` primitive generates 32 CSPRNG bytes (43-character canonical base64url) and a purpose-specific SHA-256 digest with domain `mamony:identity:password-recovery-proof:v1\0`. Strict parsing rejects malformed, padded and noncanonical values; regular formatting and serialization conceal or reject proof material. A proof digest alone never authenticates, identifies an account, or permits a password reset.
+Read [IAM-10, IAM-11, and IAM-13](#security-state-and-recovery-threat-controls) for recovery authority, current security state, and notice requirements. The merged paths below are internal synthetic building blocks. Public recovery remains pending.
 
-**Nothing issues or consumes this proof in production.** No recovery request handler, token email, recovery database role/table/SQL function, reset UI, update-password operation, or application route has been added. The future protocol needs independent distributed admission, generic anti-enumeration responses, current verified-contact epoch checks, durable encrypted outbox delivery, expiry/attempt limits, single-use transactional redemption, all-session epoch invalidation, a separately provenance-checked `PASSWORD_RECOVERED` event/notice and MFA/assurance policy. The existing v16 `PASSWORD_CHANGED` trigger must not be bypassed. See [ADR-0021](../adr/0021-password-recovery-authority-foundation.md).
+| Part of the flow | Source and scope |
+|---|---|
+| Recovery proof and redemption | The [proof issuer store](../../internal/modules/identity/internal/repository/postgres/password_recovery_issuance.go) and [redemption use case](../../internal/modules/identity/internal/usecase/redeem_password_recovery.go) keep proof delivery and redemption separate. Redemption requires a current challenge-bound assurance grant. The [PostgreSQL redemption test](../../internal/modules/identity/internal/integration/password_recovery_redemption_integration_test.go) covers the bounded transaction, including credential change, session invalidation, and the event-linked notice. |
+| Saved-code enrollment and rotation | The [code manager](../../internal/modules/identity/internal/usecase/recovery_code_manager.go) keeps first enrollment gated on separate approval and later rotation gated on an existing eligible code. The [factor revocation decision](../adr/0032-recovery-factor-revocation-fence.md) records the current-binding check. See the [disposable database test](../../internal/modules/identity/internal/integration/recovery_code_enrollment_integration_test.go). |
+| Security notices | Password recovery and saved-code changes have separate event and delivery obligations. See the [recovered-password notice design](../adr/0025-password-recovery-security-notice-worker.md), [saved-code notice design](../adr/0029-recovery-code-security-notice-worker.md), and [suppressed notice procedure](../runbooks/recovery.md#recover-a-suppressed-mandatory-security-notice). |
+| Recovery after a database restore | This scope uses the [operator recovery procedure](../runbooks/recovery.md#recover-compromised-identity-or-approval-state), [Identity recovery-fence proposal](../proposals/identity-recovery-fence.md), and [recovery-session proposal](../proposals/identity-recovery-session-capability.md). Account-recovery tests establish only their own evidence boundary. |
 
-## Internal password recovery issuance — stacked Draft #59 / Identity v19
+Use the [account-recovery release decisions](../open-decisions.md#identity-account-recovery-release-decisions) for open approval and evidence requirements. See the [account-recovery history](../history/identity-account-recovery.md) for the original limits, checks, and candidate status in each slice.
 
-The `RECOVERY` admission action uses purpose-isolated HMAC buckets (global 60/min; client 5/min and 40/hour; email 2/hour and 4/day), charged in PostgreSQL before proof generation or account lookup. For **every admitted canonical email, including unknown aliases**, `RecoveryRequest` generates a fresh 256-bit purpose-separated bearer and invokes a trusted *injected* recovery envelope sealer. The unmounted usecase never returns a subject, challenge ID, eligibility flag or token to an external caller. No application HTTP listener exposes recovery endpoints.
+## Passkey registration and possession
 
-The dedicated `mamony_identity_recovery_issuer_runtime` credential has only EXECUTE on v19's `issue_password_recovery` function (no direct table read/write). The function rechecks subject ACTIVE/current verified alias and its version/epoch under row locks, enforces per-subject DB-time cooldown and hourly/daily quotas, and atomically revokes the previous live challenge, stores only a digest with 15-minute expiry and enqueues its matching sealed recovery token. An absent/ineligible/quota-denied subject produces internal false without changing any challenge. Failed commits cannot leave partial queue writes or revoked old proofs.
+[Staging](../../internal/modules/identity/internal/usecase/passkey_registration_stage.go) records a pending credential after the registration checks. The [assertion verifier](../../internal/modules/identity/internal/usecase/passkey_activation_assertion.go) checks possession evidence. The [possession committer](../../internal/modules/identity/internal/usecase/passkey_activation_commit.go) hands that evidence to the separately authorized finisher for the one-use transition.
 
-The ciphertext queue deliberately has **no delivery worker, decrypt role, Mailgun adapter or live secret** yet. Test envelopes are mock bytes; actual production AEAD recovery-purpose AAD and key isolation remain unimplemented. Challenge redemption, Argon2id rotation, sessions invalidation, new `PASSWORD_RECOVERED` event and notification, MFA/assurance and anonymous uniform HTTP status/timing are future work. See [ADR-0022](../adr/0022-password-recovery-issuance-outbox.md).
-
-## Recovery-purpose AEAD delivery — stacked Draft #60 / Identity v20
-
-Recovery issuance from Identity v19 now has an explicitly constructed, **unlaunched** recovery delivery path. `RecoveryKeyring` supports a distinct active recovery key plus bounded read-old keys, sealing the canonical alias, `rcv_` challenge and purpose in AES-256-GCM AAD; it is not the EMAIL_VERIFY envelope. `RecoveryMailSender` accepts a pinned HTTPS `/account/recover-password` destination and sends only a text multipart message containing the recovery bearer in a URL fragment; disabled tracking, no redirects, no Host-derived reset URL, and sanitized provider errors. The reset page path is not mounted: this candidate **cannot be used for live emails or user recovery** yet.
-
-Identity v20's `mamony_identity_recovery_delivery_runtime` holds only EXECUTE on `claim_password_recovery_delivery` and `finalize_password_recovery_delivery`, **no table access**. Claim locks and leases one due job, rechecks ACTIVE status, current verified email/version and subject epoch, remaining TTL, and unrevoked/unused proof; stale jobs become DEAD without revealing recipient or ciphertext to Go. Finalize fences by live 45-second lease with bounded retries 1/2/4/8 minutes and a five-attempt cap. Mailgun ACCEPTED is only provider acceptance, not delivery. Worker can never issue or redeem a proof or rotate password. Real PostgreSQL plus a local Mailgun HTTP mock validates 429 → 200 with one stable bearer; previous default routers remain 404.
-
-See [ADR-0023](../adr/0023-password-recovery-delivery-worker.md). **Unresolved:** account recovery assurance/MFA, production encryption secrets, a safe reset page and atomic one-use redemption, session revocation, token-free `PASSWORD_RECOVERED` alert, provider operations, contact-change race after claim, PII retention, and public anti-enumeration. Do not merge or activate.
-
-## Atomic account-recovery redemption — stacked Draft #61 / Identity v21
-
-`PasswordRecoveryRedemption` accepts only a strict canonical purpose-specific 256-bit bearer, a canonical email for both contextual new-password policy and SQL **equality binding**, and a new password approved by the injected breach/common-password rejector; it hashes using the bounded Argon2id v1 adapter. No subject ID is caller-selected and no public handler, login or new session exists. Unknown/used/revoked/stale/expired challenge or assurance failure yields internal denial, not an explanation of account existence. A missing or failed KDF and uncertain COMMIT yield generic unavailable, never automatic retry.
-
-Identity v21 introduces independent `mamony_identity_recovery_redeemer_runtime` with only EXECUTE on `redeem_password_recovery`. The owner-controlled SQL transaction locks current subject/verified alias, token, separate **default-DENY epoch-bound assurance grant** and verifier, revalidates DB-clock expiry and contact epoch, consumes challenge/grant exactly once, rotates salt+digest, invokes the existing v14 session epoch invalidator and records `PASSWORD_RECOVERED` audit plus token-free notice in one atomic commit. A separate trigger requires the original DB session user of the dedicated redeemer role for recovery notices; existing `PASSWORD_CHANGED` notice provenance stays restricted. Not-yet-sent proof deliveries are quarantined. All former sessions and grants are invalidated by epoch; fresh login and MFA/step-up rules remain mandatory.
-
-**There is no trusted production writer for the assurance grant**, which is inserted **only by disposable test admin fixtures**. There is no functional forgot-password flow, recovery event notice worker, provider activation, reset UI, token redemption HTTP endpoint, production MFA approval or anti-enumeration envelope. CI tests use disposable PostgreSQL and locally generated Argon2id; green test evidence does not authorize activating recovery. See [ADR-0024](../adr/0024-atomic-password-recovery-redemption.md).
-
-## PASSWORD_RECOVERED security alert — stacked Draft #62 / Identity v22
-
-The v21 atomic password recovery transaction enqueues a distinct `password_recovery_notices` row. Identity v22 adds independent `RecoverySecurityNoticeWorker`, a fixed text-only `SendPasswordRecovered` Mailgun adapter, and strictly scoped SQL role `mamony_identity_recovery_notice_runtime`. The sender can only EXECUTE the claim/finalize functions (45-second lease, verified recipient recheck, 24-hour event freshness, max 5 attempts with 1/2/4/8-minute backoff). Every notice is **token-free and link-free**, tracking is disabled, and Mailgun acceptance stores only a SHA-256 provider message-ID digest. The password-change and recovery-proof sender roles remain separate. Only the original v21 `session_user` of the recovery redeemer can create a `PASSWORD_RECOVERED` notification through the audited trigger.
-
-`mamony_identity_recovery_notice_monitor_runtime` is distinct and sees only five bounded counters: pending-due, dead, submitted-unconfirmed, retrying and expired-pending; never personal, account, bearer or provider-event details. A maintenance-only procedure purges up to 100 recipient-bearing notices older than seven days per invocation. Neither monitoring nor worker grants can modify account, verifier or challenge rows.
-
-**No public activation**: this PR provides only an explicitly constructed, unlaunched Go worker; the recovery assurance approval issuer is intentionally unavailable in production. Mailgun accepted means provider submission, NOT inbox delivery. Signed recovery-specific delivery callbacks, operational suppression/bounce monitoring, human-approved assurance policy and reset UI remain separate release gates. See [ADR-0025](../adr/0025-password-recovery-security-notice-worker.md).
-
-## Signed PASSWORD_RECOVERED Mailgun receipt reconciliation — stacked Draft #63 / Identity v23
-
-`MailgunRecoveryNoticeWebhook` is an explicit **unmounted** handler that reuses the HMAC-SHA256 authentication, configured-domain check, strict timestamp limits, bounded JSON parsing and delivery-state normalization of the previous Mailgun notice verifier, but calls a **different** `RecoveryNoticeWebhookStore` backed only by `mamony_identity_recovery_notice_webhook_runtime`. This role has EXECUTE solely on `record_mailgun_recovery_notice_receipt`, with an original-session-user fence. The old `PASSWORD_CHANGED` webhook cannot use that function, and the recovery webhook cannot use the old function, read an address, or write a verifier. Only SHA-256 digests of signed token, provider event and canonical Message-ID plus a bounded state/timestamp are committed; event body and PII are never stored.
-
-Receipt replay is deduplicated, including concurrent copies. The v23 revision to recovery-notice finalize reconciles early signed callback arrivals before a provider 200 acknowledgement, and later callbacks only advance the matching accepted recovery notice. Severity cannot regress: a late delivered callback never hides a permanent bounce or complaint. Unlike the v22 submitted-only state, `provider_state` can now be DELIVERED, TEMPORARY_FAILURE, PERMANENT_FAILURE, COMPLAINED or UNSUBSCRIBED. **These states are provider reports, not independent evidence of inbox access.** The legacy v17 queue/receipts are unchanged and remain inaccessible to the recovery-only callback.
-
-The count-only monitor retains its original five-field function but corrects submitted-unconfirmed to exclude confirmed or failed states. A second function adds delivered, provider-failures and unmatched-receipts counts without exposing addresses or event identifiers. Maintenance-only cleanup removes at most 100 receipt digests older than seven days per call and preserves identifier-only audit. No webhook route, real Mailgun account, recovery approval authority or public forgot-password endpoint is enabled. See [ADR-0026](../adr/0026-signed-recovery-notice-webhook.md).
-
-## Saved offline recovery codes and challenge-bound grant — Draft #64 / Identity v24
-
-A saved recovery code is 256 random bits, generated via OS CSPRNG and encoded as exactly 43 base64url characters, with only a domain-separated SHA-256 digest stored. It must have been saved *before* an email recovery challenge was issued, under a separately reviewed authenticated enrollment ceremony. **No real enrollment ceremony or enrollment runtime role exists yet**; only disposable privileged fixture tests write offline code digests. The Go primitive redacts formatting, JSON and logging. An emailed token is **not** the offline code.
-
-Identity v24 introduces an independent `mamony_identity_recovery_assurance_runtime` principal with only EXECUTE on `approve_password_recovery_offline_code(recovery_digest,offline_digest,audit_event)`; it may never read subject, token, offline-code, grant, notice or password tables. The SECURITY DEFINER function verifies original session_user and locks subject/alias, currently valid challenge and matching **already-enrolled, single-use, subject+contact+epoch-bound offline code**. Approval consumes the code, creates a five-minute (or challenge-expiry-bound, whichever is shorter) grant for the **exact challenge ID**, and writes `RECOVERY_ASSURANCE_APPROVED` identifier-only audit in one transaction. All denials are generic. A DB error/lost COMMIT response does not cause automatic retry.
-
-The v21 password-recovery redemption function retains its existing arguments but now refuses grants whose `challenge_id` is not the exact locked recovery proof. This removes the ability to approve one challenge and redeem another on the same subject/epoch. Existing v21 privileged test grant fixtures now supply challenge_id explicitly. A migrated DB with old **unbound** grants must be reviewed before upgrade: v24 intentionally fails the NOT NULL FK migration instead of guessing or silently binding them.
-
-No production code generation/enrollment, MFA ceremony, reissuance UX, strong-authenticated code rotation, public recovery route, risk-based AAL decision, HTTP rate/admission envelope, production notification delivery or independently protected DB owner exists. **Do not interpret this as AAL2/AAL3 compliance or permission to activate forgot-password.** See [ADR-0027](../adr/0027-offline-recovery-code-assurance.md).
-
-## Saved recovery-code enrollment and rotation — stacked Draft #65 / Identity v25
-
-Identity v25 adds **unmounted** `AuthenticatedRecoveryCodeManager` and a five-code (`5 × 256-bit`) generator. Before staging any grant, it checks an active opaque session and runs the existing admission-limited Argon2id reauthentication for the exact same current subject and epoch. The restricted `mamony_identity_auth_grant_runtime` stages a distinct **30-second one-use `RECOVERY_CODE_ROTATION`** grant, which neither creates sessions nor changes password verifiers. The isolated `mamony_identity_recovery_code_manager_runtime` has only EXECUTE on one owner-controlled code-set replacement transaction, no direct table privileges. Raw recovery codes are never persisted or logged; returned `RecoveryCodeSet` prevents accidental serialization and is exposed only through explicit trusted display following known commit.
-
-**Bootstrap is default-DENY:** session plus current password are NOT independent MFA. The SQL transaction also requires a separate five-minute `password_recovery_code_enrollment_approvals` proof, subject/epoch bound, issued through an independent authority. **No production approval issuer, INSERT grant, or live secure browser flow exists.** Only disposable ADMIN fixtures insert synthetic approvals. Later rotation requires a still-unconsumed saved offline recovery code of the current subject/contact/epoch, plus the same valid session/password and purpose-specific grant. Replacing codes deletes the former set atomically, inserts exactly five unique digests, invalidates outstanding email recovery challenges, quarantines pending proof delivery, consumes pending recovery approvals and emits an immutable `RECOVERY_CODES_ENROLLED` or `RECOVERY_CODES_ROTATED` security event.
-
-A dedicated `password_recovery_code_notices` outbox stores a **token-free** alert obligation for the current verified email in the same transaction, but **has no live worker or provider sender**. This is NOT proof of delivered account-security notice. An ambiguous commit withholds raw codes; there is no automatic retry or public enrollment/reset route. The policy for strong factor enrollment, lost-all-codes users, authenticated recovery-code reissue, secure one-time display and notice delivery still requires explicit owner approval. See [ADR-0028](../adr/0028-recovery-code-enrollment-rotation.md).
-
-## Isolated offline recovery-code security notice worker — Draft #66 / Identity v26
-
-Recovery-code enrollment and rotation produce immutable `RECOVERY_CODES_ENROLLED` and `RECOVERY_CODES_ROTATED` events under the v25 recovery-code manager transaction, plus a separate `password_recovery_code_notices` obligation. Identity v26 provides a **separately credentialed**, explicitly unmounted `RecoveryCodeSecurityNoticeWorker` that selects only those two provenance-checked event types; neither v17 `PASSWORD_CHANGED` nor v22 `PASSWORD_RECOVERED` notification worker can claim it. Its `mamony_identity_recovery_code_notice_runtime` has schema USAGE and EXECUTE only on `claim_recovery_code_security_notice` and `finalize_recovery_code_security_notice`, with `session_user` original-login check, **no direct SELECT/UPDATE on subject, account, code, session or notification tables**. A distinct `mamony_identity_recovery_code_notice_monitor_runtime` reads only `recovery_code_security_notice_health()` (five aggregate counts).
-
-Claim rechecks current verified address, event provenance and a 24-hour freshness bound before sending. Workers use lease fencing, `SKIP LOCKED`, 45-second leases, 10-second bounded provider sends, five attempts and 1/2/4/8-minute retries. The Mailgun HTTP sender accepts only the two fixed event kinds and sends **text-only, code-free, link-free** created/replaced alerts via allowlisted region+domain, TLS, disabled redirects and tracking, fixed sender and sanitized errors. Provider 200 must include a valid Mailgun message-id; its canonical SHA-256 digest is stored, not the raw ID. **ACCEPTED/SUBMITTED_UNCONFIRMED is not proof of delivered mail**; signed delivery, bounce, complaint and unsubscribe receipts have not yet been wired for this queue. An ambiguous response could result in a duplicate token-free notice.
-
-The independent monitor exposes only `pending_due`, `dead`, `submitted_unconfirmed`, `retrying` and `expired_pending`. Maintenance-only cleanup removes up to 100 notices older than seven days per call, erasing recipients while preserving identifier-only audit. This worker **does not start automatically** and has no live provider, public endpoint, approval issuer, factor enrollment ceremony or delivery webhook. See [ADR-0029](../adr/0029-recovery-code-security-notice-worker.md).
-
-## Signed recovery-code security notice webhook and provider reconciliation — stacked Draft #67 / Identity v27
-
-Identity v27 adds a separate **unmounted** `MailgunRecoveryCodeNoticeWebhook` built on the previously reviewed bounded HMAC-SHA256, timestamp, domain and event-kind validator. It handles **only recovery-code ENROLLED/ROTATED notification provider receipts**, not password-change, `PASSWORD_RECOVERED`, password reset, initial enrollment approval or authentication. A distinct `mamony_identity_recovery_code_notice_webhook_runtime` SQL role has only EXECUTE on `record_mailgun_recovery_code_notice_receipt` and does **not** read or update any table directly. The original `session_user` check rejects SET ROLE origin confusion; the worker's send role and count-only monitor cannot invoke this recorder. No webhook is mounted to ingress, and no live signing keys or provider configuration are activated.
-
-Signed events are reduced to SHA-256 **token/event/Message-ID digests**, normalized delivery state and provider event time, stored in `recovery_code_notice_mailgun_receipts` with token/event replay uniqueness. Valid callbacks may arrive **before** the v26 sender receives a Mailgun ACK: the owner-controlled sender finalize correlates a pre-ACK digest with the accepted Message-ID. Later callbacks can update **only matching accepted recovery-code notices**; delivery ranks are monotonic `SUBMITTED → TEMPORARY_FAILURE → DELIVERED → PERMANENT_FAILURE → COMPLAINED → UNSUBSCRIBED`. Out-of-order lower-rank events never mask a bounce or complaint. A provider 200 response alone is `SUBMITTED` and is **not inbox delivery**.
-
-The v26 five-field `recovery_code_security_notice_health()` ABI remains unchanged; submitted_unconfirmed excludes fully reconciled notices. Separate `recovery_code_security_notice_delivery_health()` yields **delivered/provider_failures/unmatched_events** as aggregates only. Maintenance alone can purge up to 100 digest-only receipts older than seven days while preserving immutable security events. This feature is not launched and has no independent AAL/MFA issuer, safe user-facing backup code enrollment, delivery process/ingress wiring, suppression operations or production risk signoff. See [ADR-0030](../adr/0030-recovery-code-notice-signed-webhook.md).
-
-## Independently pre-provisioned cryptographic factor — stacked Draft #68 / Identity v28
-
-Identity v28 creates an **unmounted**, purpose-bound **Ed25519 signed challenge** whose only function is authorizing the **first** enrollment of five saved offline recovery codes. Unlike v25's synthetic admin-approved fixture, the v28 normal path can create a five-minute, one-use independent approval **only after proof of possession of a separately pre-provisioned Ed25519 private key**, together with an active subject-bound session, a fresh admission-limited Argon2id password verification and a dedicated v25 `RECOVERY_CODE_ROTATION` one-use grant. The isolated `mamony_identity_recovery_factor_issuer_runtime` consumes the grant under DB locks and creates a random 256-bit nonce challenge (three minutes). The separate `mamony_identity_recovery_factor_verifier_runtime` reads only current challenge+key through an owner-controlled function, checks Ed25519 signature **in trusted Go**, charges invalid attempts (five max), then commits a one-use approval digest and identifier-only `RECOVERY_FACTOR_APPROVED` audit atomically. v25 still independently rechecks session, password, subject, verified contact and epoch before consuming the approval to generate exactly five recovery codes. Standard formatting and JSON cannot reveal raw approval proofs.
-
-**The independent public key MUST already be bound by a separate trusted process.** No production role can INSERT or change `recovery_code_factor_keys`; no key-binding ceremony, passkey/WebAuthn RP ID/origin, real hardware/user-verification assurance, external device management, browser or live endpoint is implemented. This means recovery-code first enrollment **still defaults to DENY for ordinary unprovisioned accounts**. Current tests use an intentionally privileged disposable ADMIN to provision a synthetic Ed25519 test key; this is **not** a user production registration authority or certified MFA/AAL2/AAL3 claim. The verifier credential itself is a sensitive trust root capable of approving an issued challenge if compromised; SQL grants do not substitute for isolating trusted Go signature verification. Signature payload binds purpose, challenge ID, subject ID, epoch and nonce, and cannot authorize other actions. Replay, expired and epoch-stale challenges fail. See [ADR-0031](../adr/0031-independent-factor-signed-enrollment.md).
-
-## Initial recovery-code factor revocation fence — stacked Draft #69 / Identity v29
-
-The one-use Ed25519 v28 approval is **not enough** at the later v25 recovery-code bootstrap commit: a key may have been revoked or rebound after signing. Identity v29 records the verified public key in the pending approval (never a private key/signature), and the existing v25 transactional code manager locks and verifies the **currently active, unrevoked, same subject/epoch/contact public key** before consuming the approval. Historical approvals without this binding fail closed; no password-only repair. The existing offline-code rotation path is unchanged. See [ADR-0032](../adr/0032-recovery-factor-revocation-fence.md). A signed approval must not be treated as a perpetual authenticator grant.
-
-No production authenticator registration/revocation ceremony, key custody, WebAuthn RP/origin/user verification, HTTP path, approval-device UX or operational incident policy exists. Revocation **after** committed code enrollment does not automatically invalidate saved codes. All work is Draft/unmerged and default-deny for ordinary unprovisioned users.
-
-## WebAuthn RP configuration candidate — stacked Draft #70 / ADR-0033
-
-A new immutable internal `PasskeyRelyingParty` candidate rejects all RP/origin configurations except a canonical lower-case ASCII DNS name and its **exact** `https://<rp-id>` origin. This conservative first-party profile does not support broader parent RP scope, subdomains, related origins, HTTP, IP/localhost, arbitrary ports or dynamic origin selection. `httpedge` regression tests ensure hypothetical registration/login endpoints remain 404 on both listeners. See [ADR-0033](../adr/0033-webauthn-relying-party-pre-enrollment.md).
-
-This is **only configuration validation**: there is NO WebAuthn library verifier, attestation/assertion, challenge store, credential owner/UV state, trusted prior-key enrollment, HTTP endpoint, runtime enrollment permission, passkey authentication, notification, AAL or phishing-resistance claim. In particular, v28's custom Ed25519 signature is not WebAuthn and is not automatically a trusted passkey registration source. A session/password/email-only registration, even if chosen for ordinary AAL1 use later, must never be silently promoted to the independent factor required by saved recovery-code bootstrap. Ordinary factor loss and suspected full-account compromise need distinct recovery-code incident policies.
-
-## Passkey registration Begin-only candidate — Identity v30 / stacked Draft #71
-
-Identity v30 adds **durable** `passkey_registration_intents` (one current challenge per subject; random 32-byte nonce, exact digest-only session binding, epoch/contact, immutable RP ID/origin, fixed config generation/purpose, DB-clock three-minute TTL). The role `mamony_identity_passkey_registration_issuer_runtime` can only invoke a narrowly fenced challenge issuer; it cannot read the table, approve/consume a challenge, create passkey credentials, prebind recovery factor keys or bypass a preexisting authentic independent factor. Current HTTP routes stay unmounted. See [ADR-0034](../adr/0034-webauthn-registration-intent.md).
-
-**SECURITY:** Begin only establishes public ceremony material; possession of a valid login session can request a challenge but **cannot register a passkey** in this PR. There is **no** WebAuthn library verifier, attestation, credential table, trusted independent binding, registered/passkey login, mandatory registration notice or NIST assurance claim. SQL does not treat the caller's RP ID as an ownership proof; future finish must revalidate trusted runtime origin/RP/policy. Enrollment of offline recovery-code independent factors remains blocked without previously trusted provisioning.
-
-## WebAuthn registration evidence reader — Identity v31 / stacked Draft #72
-
-Identity v31 permits a **distinct internal EXECUTE-only reader role** to retrieve server-expected registration challenge and RP policy generation only when the same original live session, subject epoch, verified contact, purpose and unexpired/nonconsumed pending intent still match. The Go reader independently checks session identity and the **current exact** configured RP ID/origin; a stale policy or mismatched RP denies. See [ADR-0035](../adr/0035-webauthn-registration-evidence-reader.md).
-
-This is **expected context, not proof**. Read does not verify clientDataJSON, authenticator data, signature, UV, attestation or credential uniqueness, consume the challenge, create a credential or authorize trusted independent recovery enrollment. The candidate go-webauthn v0.18.2 library has been evaluated, **not imported**. A separately controlled transaction must consume+bind only after full maintained-library protocol verification and independent binding policy approval. All public routes remain 404; migration/role remains stacked Draft/unmerged.
-
-## WebAuthn protocol verification candidate — stacked Draft #73
-
-The Identity protocol adapter `internal/modules/identity/internal/repository/webauthn` uses **pinned go-webauthn v0.18.2** to parse a bounded registration response (max 128 KiB) and verify the original **server-owned v31 expected challenge**, exact RP ID/origin, `webauthn.create` ceremony, user presence + **required user verification**, attested credential ID and supported COSE algorithms. The usecase `PasskeyRegistrationProofVerifier.VerifyOnly` first resolves the original live session/intent/subject via v31, then delegates to this adapter. Synthetic ES256/`fmt:none` tests reject wrong nonce, wrong origin/RP hash, cross-origin, wrong ceremony, missing UP/UV, mismatched ID and malformed/oversized payload. See [ADR-0036](../adr/0036-webauthn-registration-protocol-verifier.md).
-
-**IMPORTANT: successful protocol validation is not registration authorization.** The adapter exposes only an in-memory candidate and has **no** DB credential-writing capability, finish/consume function, audit, role privilege or HTTP route. An attestation format `none` provides no proof of trusted device provenance or independent account-binding permission; session/password-only registration MUST NOT become a trusted offline recovery factor. The future Begin options must match the verifier's explicit ES256/EdDSA/RS256, UV and extension-free session contract (or persist full library SessionData). A separate atomic finish must recheck challenge/epoch/RP policy under locks and write credential + mandatory notices only after independently approved binding admission. CI success is not a production enrollment claim.
-
-## Passkey registration password admission — Identity v32 / stacked Draft #74
-
-A **separate, unmounted, EXECUTE-only admission role** may mark one v30 passkey registration intent as password-reauthenticated only after Go rechecks the live bearer subject against a **fresh, pre-KDF-budgeted Argon2id current-password verification**. A 30-second, single-purpose `PASSKEY_REGISTRATION_REAUTH` grant is staged by the existing trusted auth-grant role and consumed in one PostgreSQL function under subject/alias/session/intent row locks and the DB clock. The resulting record binds the exact intent ID, session digest, subject epoch, verified contact, expiry (no later than the original three-minute nonce), and fixed **`PASSWORD_REAUTH_ONLY` provenance**. A different session of the same subject, wrong password, cross-purpose login/change grant, replay, expired challenge, stale epoch or already approved intent is denied. See [ADR-0037](../adr/0037-passkey-registration-password-reauth-admission.md).
-
-**No passkey has been registered.** V32 does not consume the WebAuthn challenge, create any credential, passkey login, independent recovery-factor approval, MFA guarantee, security notice or public endpoint. Reauth admission is not sufficient for a financial high-assurance enrollment or a recovery-factor bootstrap. A separately reviewed and transactionally fenced `finish` must recheck both v30/v31 nonce and v32 admission alongside WebAuthn protocol evidence, global credential ID uniqueness and atomic security audit/mandatory notice before any account binding. All four PRs remain stacked Draft/unmerged.
-
-## Atomic passkey registration staging — Identity v33 / stacked Draft #75
-
-The internal **unmounted** `PasskeyRegistrationStager` receives exact v31 evidence and a complete verified go-webauthn registration response in the same call. A dedicated EXECUTE-only v33 role then transactionally rechecks the original nonce, session/epoch, exact RP origin, and a valid **PASSWORD_REAUTH_ONLY** v32 admission under subject/alias → session → intent → admission locks. A successful commit consumes both challenge and admission, stores a globally unique credential ID and COSE public key with fixed **PENDING_ASSERTION** status, writes an identifier-only `PASSKEY_REGISTRATION_STAGED` audit event, and enqueues **one PENDING security notice** through an origin-gated trigger. Collision or notice failure rolls back the entire commit. See [ADR-0038](../adr/0038-webauthn-atomic-provisional-registration.md).
-
-**No usable passkey exists.** A `fmt:none` registration response does not independently prove ownership of the private key or high-assurance device provenance. V33 exposes no credential activation, login assertion, registration HTTP route, independent recovery factor, or security email sender. `PENDING` is a durable notification obligation, **not a delivered notice**. Before production, a second authenticator assertion must establish possession and appropriate admission, Begin creation-options congruence must be implemented, and a separate notice worker and browser/operations controls require review. All stacked PRs remain Draft/unmerged.
-
-## Passkey activation challenge and expected evidence — Identity v34 / stacked Draft #76
-
-V34 introduces an **unmounted, EXECUTE-only, one-challenge-per-subject** `PASSKEY_ACTIVATION_ASSERTION` nonce issuer and a **separate EXECUTE-only reader** for its expected authenticator assertion context. The nonce is unique, tied to the exact original live session, subject epoch, contact version, v33 `PENDING_ASSERTION` credential, its previously consumed v30 registration intent and v32 `PASSWORD_REAUTH_ONLY` admission, and its queued notice/audit event. It expires within **3 minutes** and at most **10 minutes after staging**. While unexpired, a second issue cannot silently supersede it. The reader exposes only matching server-owned nonce, credential ID, public COSE key, AAGUID, counter and backup flags with pinned RP ID/origin. A newer v30 registration intent invalidates the older pending credential's activation eligibility instead of reusing stale approval. See [ADR-0039](../adr/0039-passkey-activation-challenge-evidence.md).
-
-**No assertion signature has been verified and no passkey is activated.** The new issuer/reader cannot consume this challenge or change the v33 state `PENDING_ASSERTION`; there is no public route or login/recovery entitlement. A separate maintained WebAuthn assertion verifier and separately reviewed atomic activation transaction are required, with browser options, rechecked session/state/nonce, mandatory notice and independently controlled trust policy. `PENDING` security notices remain queued, not delivered.
-
-## Signed passkey activation assertion verifier — Identity v35 / stacked Draft #77
-
-The internal **unmounted** `PasskeyActivationAssertionVerifier` retrieves the still-live v34 expected challenge and pending credential via the already isolated EXECUTE-only reader; it validates a bounded `webauthn.get` response using the pinned **go-webauthn v0.18.2** library `ParseCredentialRequestResponseBytes` and `ValidateLogin`. It reconstructs the exact expected DB challenge, RP ID/origin, subject/user handle and only allowed credential ID with the original COSE public key. Verification checks real P-256/ES256 signature (and other library-supported keys), UP, **required UV**, challenge/type/origin/RP hash, credential ID/user handle, BE/BS consistency, and explicit counter clone-warning denial. Zero/zero counters remain permissible but offer no clone detection. The verified result is a defensive copy, not a credential or authentication grant. See [ADR-0040](../adr/0040-passkey-activation-signed-assertion-verifier.md).
-
-**No nonce consumption or passkey activation exists in v35.** `VerifyOnly` may accept replayed valid signatures while v34 challenge remains available; v36 must atomically consume the same challenge with the state/counter transition and mandatory audit/notice under fresh locks. The v33 credential remains `PENDING_ASSERTION`; there is no passkey login, independent factor or browser endpoint. A real security-notice worker remains a separate production gate.
-
-<a name="bounded-synthetic-passkey-possession--identity-v36-unmerged-candidate-81"></a>
+The [bounded possession requirements](#bounded-synthetic-passkey-possession) define the accepted scope. The transition records possession. Login, new sessions, independent recovery, and financial authorization each require their own approval and evidence. See the [passkey decision record](../open-decisions.md#identity-passkey-release-decisions) and [registration history](../history/identity-passkey.md).
 
 ## Bounded synthetic passkey possession
 
@@ -383,3 +260,91 @@ The original anchors below lead to the corresponding archived sections.
 ### Candidate one-shot browser password-change experience — stacked Draft #57
 
 [Read the original slice record](../history/identity-password-change.md#candidate-one-shot-browser-password-change-experience--stacked-draft-57).
+
+## Account-recovery history links
+
+The original anchors below lead to the corresponding archived sections.
+
+### Password recovery proof foundation — stacked Draft #58
+
+[Read the original slice record](../history/identity-account-recovery.md#password-recovery-proof-foundation--stacked-draft-58).
+
+### Internal password recovery issuance — stacked Draft #59 / Identity v19
+
+[Read the original slice record](../history/identity-account-recovery.md#internal-password-recovery-issuance--stacked-draft-59--identity-v19).
+
+### Recovery-purpose AEAD delivery — stacked Draft #60 / Identity v20
+
+[Read the original slice record](../history/identity-account-recovery.md#recovery-purpose-aead-delivery--stacked-draft-60--identity-v20).
+
+### Atomic account-recovery redemption — stacked Draft #61 / Identity v21
+
+[Read the original slice record](../history/identity-account-recovery.md#atomic-account-recovery-redemption--stacked-draft-61--identity-v21).
+
+### PASSWORD_RECOVERED security alert — stacked Draft #62 / Identity v22
+
+[Read the original slice record](../history/identity-account-recovery.md#password_recovered-security-alert--stacked-draft-62--identity-v22).
+
+### Signed PASSWORD_RECOVERED Mailgun receipt reconciliation — stacked Draft #63 / Identity v23
+
+[Read the original slice record](../history/identity-account-recovery.md#signed-password_recovered-mailgun-receipt-reconciliation--stacked-draft-63--identity-v23).
+
+### Saved offline recovery codes and challenge-bound grant — Draft #64 / Identity v24
+
+[Read the original slice record](../history/identity-account-recovery.md#saved-offline-recovery-codes-and-challenge-bound-grant--draft-64--identity-v24).
+
+### Saved recovery-code enrollment and rotation — stacked Draft #65 / Identity v25
+
+[Read the original slice record](../history/identity-account-recovery.md#saved-recovery-code-enrollment-and-rotation--stacked-draft-65--identity-v25).
+
+### Isolated offline recovery-code security notice worker — Draft #66 / Identity v26
+
+[Read the original slice record](../history/identity-account-recovery.md#isolated-offline-recovery-code-security-notice-worker--draft-66--identity-v26).
+
+### Signed recovery-code security notice webhook and provider reconciliation — stacked Draft #67 / Identity v27
+
+[Read the original slice record](../history/identity-account-recovery.md#signed-recovery-code-security-notice-webhook-and-provider-reconciliation--stacked-draft-67--identity-v27).
+
+### Independently pre-provisioned cryptographic factor — stacked Draft #68 / Identity v28
+
+[Read the original slice record](../history/identity-account-recovery.md#independently-pre-provisioned-cryptographic-factor--stacked-draft-68--identity-v28).
+
+### Initial recovery-code factor revocation fence — stacked Draft #69 / Identity v29
+
+[Read the original slice record](../history/identity-account-recovery.md#initial-recovery-code-factor-revocation-fence--stacked-draft-69--identity-v29).
+
+## Passkey registration history links
+
+The original anchors below lead to the corresponding archived sections.
+
+### WebAuthn RP configuration candidate — stacked Draft #70 / ADR-0033
+
+[Read the original slice record](../history/identity-passkey.md#webauthn-rp-configuration-candidate--stacked-draft-70--adr-0033).
+
+### Passkey registration Begin-only candidate — Identity v30 / stacked Draft #71
+
+[Read the original slice record](../history/identity-passkey.md#passkey-registration-begin-only-candidate--identity-v30--stacked-draft-71).
+
+### WebAuthn registration evidence reader — Identity v31 / stacked Draft #72
+
+[Read the original slice record](../history/identity-passkey.md#webauthn-registration-evidence-reader--identity-v31--stacked-draft-72).
+
+### WebAuthn protocol verification candidate — stacked Draft #73
+
+[Read the original slice record](../history/identity-passkey.md#webauthn-protocol-verification-candidate--stacked-draft-73).
+
+### Passkey registration password admission — Identity v32 / stacked Draft #74
+
+[Read the original slice record](../history/identity-passkey.md#passkey-registration-password-admission--identity-v32--stacked-draft-74).
+
+### Atomic passkey registration staging — Identity v33 / stacked Draft #75
+
+[Read the original slice record](../history/identity-passkey.md#atomic-passkey-registration-staging--identity-v33--stacked-draft-75).
+
+### Passkey activation challenge and expected evidence — Identity v34 / stacked Draft #76
+
+[Read the original slice record](../history/identity-passkey.md#passkey-activation-challenge-and-expected-evidence--identity-v34--stacked-draft-76).
+
+### Signed passkey activation assertion verifier — Identity v35 / stacked Draft #77
+
+[Read the original slice record](../history/identity-passkey.md#signed-passkey-activation-assertion-verifier--identity-v35--stacked-draft-77).
