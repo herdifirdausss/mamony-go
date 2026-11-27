@@ -68,4 +68,3 @@ func (s *Store) CreatePendingWithObligation(ctx context.Context, r usecase.Pendi
 	}
 	return nil
 }
-
