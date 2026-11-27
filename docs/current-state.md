@@ -1,6 +1,6 @@
 # Current state and active work
 
-Snapshot inspected on **2026-11-27 (WIB)** at [main `53e1552d`](https://github.com/herdifirdausss/mamony-go/commit/53e1552df1b9b8872f0187dc57fc27f0d5e0b01b). For live status, see [open pull requests](https://github.com/herdifirdausss/mamony-go/pulls) and [open issues](https://github.com/herdifirdausss/mamony-go/issues). The [roadmap](roadmap.md) records delivery order. The owning contracts and ADRs record requirements and design decisions.
+Snapshot inspected on **2026-11-27 (WIB)** at [main `fcc22d36`](https://github.com/herdifirdausss/mamony-go/commit/fcc22d3611d122a0ad035a6abd24a42f0291e62a). For live status, see [open pull requests](https://github.com/herdifirdausss/mamony-go/pulls) and [open issues](https://github.com/herdifirdausss/mamony-go/issues). The [roadmap](roadmap.md) records delivery order. The owning contracts and ADRs record requirements and design decisions.
 
 ## What actually runs
 
@@ -25,7 +25,9 @@ Snapshot inspected on **2026-11-27 (WIB)** at [main `53e1552d`](https://github.c
 
 ## Open pull requests
 
-At this snapshot, [#102 recovery-fence policy](https://github.com/herdifirdausss/mamony-go/pull/102), [#106 symbolic E1 experiment](https://github.com/herdifirdausss/mamony-go/pull/106), and [#109 recovery-session design](https://github.com/herdifirdausss/mamony-go/pull/109) were Draft. #95, #113, #115, and #116 are merged. #102 and #109 carry the post-merge dependency reassessment; E2 remains blocked. This snapshot does not count its own subsequent documentation PR.
+At this snapshot, [#106 symbolic E1 experiment](https://github.com/herdifirdausss/mamony-go/pull/106) and [#117 observability foundation proposal](https://github.com/herdifirdausss/mamony-go/pull/117) were open Drafts. See the live list for changes after this snapshot.
+
+After the [state update in #114](https://github.com/herdifirdausss/mamony-go/pull/114), [#102 recovery-fence policy](https://github.com/herdifirdausss/mamony-go/pull/102) and [#109 recovery-session design](https://github.com/herdifirdausss/mamony-go/pull/109) merged as documentation-only records. Both proposals remain pending adoption and implementation authorization. E2 remains BLOCKED.
 
 <a name="open-issues-seven"></a>
 
@@ -41,7 +43,7 @@ GitHub reports successful push checks on the [historical RH-03 merge commit](htt
 
 #95 technical evidence does not establish independent complete history, full authority coverage, full ACL parity, production delivery or release. Renewed exact-pair authorization for d10a983b/8610d26a was not found in the inspected PR record; the earlier pair approval did not transfer. See [#13](https://github.com/herdifirdausss/mamony-go/issues/13) and [#95 checkpoint](https://github.com/herdifirdausss/mamony-go/pull/95#issuecomment-7197835537). Observed merge is not retroactive approval.
 
-RF-01–08 integrated evidence remains NOT RUN; RF-08 is no longer blocked on #81 adoption or #95 fixture compatibility. E2 remains BLOCKED. [#108](https://github.com/herdifirdausss/mamony-go/issues/108) and [#109](https://github.com/herdifirdausss/mamony-go/pull/109) track four unchanged blockers: independent currentness and affected scope; integration and durable consistency; audit/notice applicability and evidence custody/retention; exact impact, containment and qualified review. E1 remains symbolic. No new implementation or release authorization follows.
+RF-01–08 integrated evidence remains NOT RUN. The earlier RF-08 dependencies on #81 adoption and #95 fixture compatibility are closed. E2 remains BLOCKED. [#108](https://github.com/herdifirdausss/mamony-go/issues/108) and the [recovery-session proposal](proposals/identity-recovery-session-capability.md#post-merge-platform-dependency-reassessment--2026-11-26-wib) track four unchanged blockers: independent currentness and affected scope, integration and durable consistency, audit and notice applicability and evidence custody and retention, and exact impact, containment and qualified review. E1 remains symbolic.
 
 ## Work sequencing
 
