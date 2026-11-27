@@ -16,6 +16,17 @@ import (
 func testID(n int) string     { return fmt.Sprintf("%032x", n) }
 func testDigest(n int) string { return fmt.Sprintf("%064x", n) }
 func hd(p uint32) string      { return testDigest(100 + int(p)) }
+
+// fixtureRevision bounds the conversion and leaves room for negative requests
+// that select the first revision beyond the valid journal limit.
+func fixtureRevision(t *testing.T, revision uint64) int {
+	t.Helper()
+	if revision > MaxRevision+1 {
+		t.Fatalf("fixture revision %d exceeds the bounded test range", revision)
+		return 0
+	}
+	return int(revision)
+}
 func ver(n uint32) *uint32    { return &n }
 func str(s string) *string    { return &s }
 func mustRaw(t *testing.T, v any) json.RawMessage {
@@ -169,13 +180,13 @@ func openReq(t *testing.T, b []byte, opID string, x MigrationOpening) Request {
 }
 func begin(t *testing.T, b []byte, slot int, start, target uint32) ([]byte, string) {
 	t.Helper()
-	opID := testID(500 + int(payload(t, b).Revision))
+	opID := testID(500 + fixtureRevision(t, payload(t, b).Revision))
 	return accept(t, b, openReq(t, b, opID, opening(t, b, slot, start, target))), opID
 }
 func observation(t *testing.T, b []byte, kind, phase string, p uint32, a *uint32, effect, opEffect, cause, verification, cleanup string) MigrationObservation {
 	t.Helper()
 	r := payload(t, b).Revision + 1
-	return MigrationObservation{r, kind, phase, a, effect, p, hd(p), opEffect, cause, verification, cleanup, testDigest(800 + int(r)), testDigest(900 + int(r))}
+	return MigrationObservation{r, kind, phase, a, effect, p, hd(p), opEffect, cause, verification, cleanup, testDigest(800 + fixtureRevision(t, r)), testDigest(900 + fixtureRevision(t, r))}
 }
 func appendReq(t *testing.T, b []byte, opID, kind string, x MigrationObservation) Request {
 	m := state(t, b)
@@ -238,12 +249,12 @@ func restoreOpenReq(t *testing.T, b []byte, opID string, x RestoreOpening) Reque
 	return request(t, b, kind, "OPEN_RESTORE", opID, x.AffectedSlots, x.AuthorizationDigest, restoreOpenBody{opID, x})
 }
 func beginRestore(t *testing.T, b []byte, parent *string) ([]byte, string) {
-	opID := testID(1500 + int(payload(t, b).Revision))
+	opID := testID(1500 + fixtureRevision(t, payload(t, b).Revision))
 	return accept(t, b, restoreOpenReq(t, b, opID, restoreOpening(t, b, parent))), opID
 }
 func restoreObs(t *testing.T, b []byte, phase, mutation, settlement string) RestoreObservation {
 	r := payload(t, b).Revision + 1
-	return RestoreObservation{r, phase, mutation, settlement, testDigest(5000 + int(r)), testDigest(6000 + int(r))}
+	return RestoreObservation{r, phase, mutation, settlement, testDigest(5000 + fixtureRevision(t, r)), testDigest(6000 + fixtureRevision(t, r))}
 }
 func restoreAppendReq(t *testing.T, b []byte, opID, kind string, x RestoreObservation) Request {
 	return request(t, b, kind, "APPEND_RESTORE", opID, state(t, b).ops[opID].restore.AffectedSlots, x.AuthorizationDigest, restoreAppendBody{opID, x})
@@ -251,7 +262,7 @@ func restoreAppendReq(t *testing.T, b []byte, opID, kind string, x RestoreObserv
 func restoreFinal(t *testing.T, b []byte, opID string, abort bool, p uint32) RestoreResolution {
 	m := state(t, b)
 	r := m.p.Revision + 1
-	x := RestoreResolution{r, "REBOUND", []BoundAnchor{}, "CHANGED", "VERIFIED", "SETTLED", testDigest(7000 + int(r)), testDigest(8000 + int(r))}
+	x := RestoreResolution{r, "REBOUND", []BoundAnchor{}, "CHANGED", "VERIFIED", "SETTLED", testDigest(7000 + fixtureRevision(t, r)), testDigest(8000 + fixtureRevision(t, r))}
 	if abort {
 		x.Disposition = "ABORTED_NO_MUTATION"
 		x.NewBindings = nil
@@ -263,7 +274,7 @@ func restoreFinal(t *testing.T, b []byte, opID string, abort bool, p uint32) Res
 		d := dbOf(k)
 		inc, ok := dbs[d]
 		if !ok {
-			inc = testID(10000 + int(r)*10 + i)
+			inc = testID(10000 + fixtureRevision(t, r)*10 + i)
 			dbs[d] = inc
 		}
 		x.NewBindings = append(x.NewBindings, BoundAnchor{k, Binding{inc, testDigest(700 + i)}, &Anchor{p, hd(p)}})
