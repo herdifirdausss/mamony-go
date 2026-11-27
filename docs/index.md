@@ -1,22 +1,44 @@
 # Documentation
 
-Start with [current state and active work](current-state.md) to see what runs, what has merged, and which gates remain open. Use GitHub issues and PRs for live status, approvals, and execution evidence.
+## Start by task
 
-| What you need | Where to start |
+| Task | Read in this order |
 |---|---|
-| Triage an idea or bug, or plan a new feature | [Choose a change path](development-workflow.md#choose-a-change-path). For Critical work, use the [proposal template](templates/feature-proposal.md) for research, PRD, technical design, and the implementation plan. |
-| Understand the product and capability ownership | [Product scope](product.md) |
-| Find the delivery order or a requirement and its acceptance checks | [Roadmap](roadmap.md), then the owning capability contract linked there |
-| Look up a Ledger stage or its prerequisites | [Ledger implementation sequence](roadmap.md#ledger-implementation-sequence) |
-| Change Go packages, listeners, or cross-module interfaces | [Architecture](architecture.md) and [architecture decisions](adr/README.md) |
-| Check an active decision or prerequisite before implementing it | [Decision lookup by capability](open-decisions.md#decision-lookup-by-capability). Follow the linked section or ADR for status and scope. |
-| Follow Go conventions and capability package patterns | [Go conventions](conventions.md) |
-| Plan unit, integration, concurrency and recovery tests | [Testing strategy](testing.md) and [test-plan checklist](templates/test-plan.md) |
-| Run checks and record PR evidence or approvals | [Engineering practices](engineering.md#verification) and the [PR template](../.github/pull_request_template.md) |
-| Review security authority, threat scope and tests | [Security boundaries](architecture.md#security-authority-and-trust-boundaries), [security verification](engineering.md#security-verification) and [open security decisions](open-decisions.md#security-architecture-decisions) |
+| Understand what Mamony Go does | [Product scope](product.md) → [current state](current-state.md) → [running packages](architecture.md#running-packages) |
+| Run the application or local checks | [Run locally](../README.md#run-locally) → [verification commands](engineering.md#verification) |
+| Plan or implement a change | Tracking issue → [change lifecycle](development-workflow.md#choose-a-change-path) → owning contract below → relevant ADR or proposal → [testing strategy](testing.md) |
+| Check a decision or prerequisite | [Decision lookup by capability](open-decisions.md#decision-lookup-by-capability) → linked decision or ADR for its status and scope |
+| Record review evidence or approval | [Verification commands](engineering.md#verification) → [PR template](../.github/pull_request_template.md) |
+| Review security or recovery evidence | [Trust boundaries](architecture.md#security-authority-and-trust-boundaries) → owning contract → [security verification](engineering.md#security-verification) → linked PR and test results |
+| Run a procedure | Choose a runbook below and check its scope and prerequisites first. |
 
-Use the [PostgreSQL contract](contracts/postgresql.md) for schema grants and tenant isolation. Use the [public HTTP decision](adr/0003-public-http-contract.md) for routes and amount formats. The [recovery runbook](runbooks/recovery.md) covers restore and stalled workflows.
+## Read by capability
 
-For an AI handoff, start with the issue and use the [context pack](../.agents/skills/mamony-context-pack/SKILL.md) to link the base commit, accepted requirements, applicable decisions, checks, and blockers.
+| Scope | Requirements and decisions | Design, evidence, or procedure |
+|---|---|---|
+| Platform and PostgreSQL | [Platform contract](contracts/platform.md), [PostgreSQL contract](contracts/postgresql.md), [DEC-01](open-decisions.md#foundation-and-access) | [Migration runbook](runbooks/platform-migrations.md), [proposed native executor](proposals/native-pgx-migration-executor.md), [ADR-0042](adr/0042-context-aware-migration-executor.md) |
+| Identity enrollment, login, and sessions | [Identity contract](contracts/identity.md), [authentication and lifecycle](contracts/identity.md#authentication-and-lifecycle), [Identity ADRs](adr/README.md) | [Phase 1 design record](proposals/identity-enrollment-auth.md), [first enrollment slice](proposals/identity-enrollment-first-slice.md), [email delivery](runbooks/identity-delivery.md), [enrollment reconciliation](runbooks/identity-reconciliation.md), [browser verification](runbooks/identity-browser-e2e.md), [login benchmark](runbooks/identity-login-performance.md) |
+| Identity passkey possession | [Bounded possession contract](contracts/identity.md#bounded-synthetic-passkey-possession), [ADR-0041](adr/0041-passkey-atomic-activation.md) | [Synthetic possession design and evidence](proposals/identity-passkey-atomic-activation.md) |
+| Platform and Identity recovery | [Platform recovery requirements](contracts/platform.md#edge-and-recovery), [Identity recovery controls](contracts/identity.md#security-state-and-recovery-threat-controls) | [Recovery runbook](runbooks/recovery.md), [native PITR lab](proposals/platform-native-pitr-lab.md), [RH-03 reconciliation lab](proposals/platform-identity-reconciliation-lab.md), [Profile A fencing design](proposals/identity-restore-fencing.md), [recovery-fence proposal](proposals/identity-recovery-fence.md), [recovery-session proposal](proposals/identity-recovery-session-capability.md) |
+| Ledger and money movement | [Ledger contract](contracts/ledger.md), [ADR-0002](adr/0002-ledger-and-data-ownership.md), [payments and payouts](contracts/payments-and-payouts.md), [FX](contracts/fx.md) | [Ledger stages](roadmap.md#ledger-implementation-sequence), [K2a persistence record](proposals/ledger-k2a-isolated-persistence.md), [broader financial design proposal](proposals/ledger-cross-border-payments.md) |
+| Pilot and later capabilities | [Simulated pilot](roadmap.md#simulated-pilot) and [operations and expansion](roadmap.md#operations-and-expansion) link each owning contract. | Use the roadmap for ordering and the [decision register](open-decisions.md) for unresolved choices. |
+| Public HTTP | [Public HTTP decision](adr/0003-public-http-contract.md), [running packages](architecture.md#running-packages) | [Current state](current-state.md) records the default listener behavior. |
 
-For tool changes, see [Tooling](tooling.md). [Development history](history.md) records the earlier research and verification.
+For recovery design review, start with the Platform lab for database observations, then read the Identity fence proposal for temporary-authority policy, and the recovery-session proposal for the session-specific design. Use each proposal's current disposition for blocker status.
+
+## Find the source for each claim
+
+| Question | Source |
+|---|---|
+| What should a capability do, and how do we accept it? | The applicable section of its owning contract under `contracts/`. Some sections describe proposed or future behavior. Read their status before using them. |
+| Why did we choose this design? | The applicable [ADR](adr/README.md), with its decision status and scope. |
+| What work is next, and what is unresolved? | The [roadmap](roadmap.md) for dependencies, the [decision lookup](open-decisions.md#decision-lookup-by-capability) for unresolved choices, and the tracking issue for live coordination. |
+| What merged, what runs, and what was tested? | [Current state](current-state.md) for the dated baseline. Use the linked code, PR, and test results for exact evidence and scope. |
+| Where is the research, PRD, or technical design? | The linked proposal in `proposals/` for Critical work. Use the issue or PR for smaller changes. [Development history](history.md) links earlier research and verification records. |
+| How should contributors write and verify changes? | [Go conventions](conventions.md), [engineering practices](engineering.md), [testing strategy](testing.md), and [tooling](tooling.md). |
+
+## Follow a change
+
+Use the [lifecycle gates](development-workflow.md#lifecycle-and-quality-gates) for the applicable change path. Start with the issue and research the uncertain claims. Record the required behavior and acceptance IDs in the owning contract. Link the accepted plan, proposal or ADR when the path requires one. In the implementation PR, map acceptance IDs to tests and record the executed checks. Update the dated baseline when a material milestone or acceptance status changes.
+
+Use the [proposal template](templates/feature-proposal.md), [test-plan checklist](templates/test-plan.md), and [PR template](../.github/pull_request_template.md) at the corresponding gates. For AI-assisted work, follow [AGENTS.md](../AGENTS.md) and prepare a small [task context](../.agents/skills/mamony-context-pack/SKILL.md) with the relevant headings, accepted IDs, code paths, tests, and blockers.
