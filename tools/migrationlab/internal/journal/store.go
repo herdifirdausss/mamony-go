@@ -362,7 +362,16 @@ func parseDevice(s string) (storageDevice, bool) {
 	}
 	x, xok := canonicalNumber(a, 32)
 	y, yok := canonicalNumber(b, 32)
-	return storageDevice{uint32(x), uint32(y)}, xok && yok
+	if !xok || !yok {
+		return storageDevice{}, false
+	}
+	if x > 0xffffffff {
+		return storageDevice{}, false
+	}
+	if y > 0xffffffff {
+		return storageDevice{}, false
+	}
+	return storageDevice{uint32(x), uint32(y)}, true
 }
 func fdIdentity(b []byte, complete bool) (uint64, uint64, bool) {
 	lines, ok := boundedLines(b, complete, fdInfoLimit, 64, 1024)

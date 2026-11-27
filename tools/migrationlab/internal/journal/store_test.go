@@ -636,6 +636,26 @@ func TestJournalPublication(t *testing.T) {
 		}
 	})
 	t.Run("InvalidMountObservation", func(t *testing.T) {
+		for _, tc := range []struct {
+			input string
+			want  storageDevice
+		}{
+			{"0:0", storageDevice{0, 0}},
+			{"4294967295:7", storageDevice{4294967295, 7}},
+			{"8:4294967295", storageDevice{8, 4294967295}},
+			{"4294967295:4294967295", storageDevice{4294967295, 4294967295}},
+		} {
+			if got, ok := parseDevice(tc.input); !ok || got != tc.want {
+				t.Fatalf("valid device %q: got %v, %t; want %v", tc.input, got, ok, tc.want)
+			}
+		}
+		for _, component := range []string{"4294967296", "18446744073709551616", "01", "+1", "-1", "", " 1", "1 ", "1a"} {
+			for _, input := range []string{component + ":7", "8:" + component} {
+				if got, ok := parseDevice(input); ok || got != (storageDevice{}) {
+					t.Fatalf("invalid device %q: got %v, %t; want zero, false", input, got, ok)
+				}
+			}
+		}
 		h := harness(t, fixture(t, 1))
 		p := h.p.Mount
 		valid := []byte("41 1 8:7 / /control rw - ext4 /dev/synthetic rw,data=ordered,barrier=1\n")
