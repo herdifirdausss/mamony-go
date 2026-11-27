@@ -2,11 +2,11 @@
 
 - **Title / owning capability:** Cross-cutting observability foundation / Platform
 - **Issue / decision owner / technical reviewer:** No issue opened for this proposal. Repository owner owns product decisions. Independent technical review is pending.
-- **Status:** PROPOSED
+- **Status:** PROPOSED; owner accepted the detailed Option B design candidate on 2026-11-27; independent technical review pending; implementation BLOCKED
 - **Risk path and rationale:** Critical. Request and worker correlation crosses trust boundaries, and telemetry may disclose identity or financial information or leave the application through an exporter.
 - **Affected contracts and requirement IDs:** Platform FND-04, FND-10, FND-11 and FND-12; HTTP contract in ADR-0003; package boundaries in architecture and conventions.
 - **Last evidence review date:** 2026-11-27 (WIB)
-- **Related ADR or open decision:** On 2026-11-27, the repository owner selected Option B as the direction for detailed design: persist an internally generated `traceparent` in the Identity proof-delivery outbox. Schema, grant, retention, recovery and deployment details remain proposed and require technical review. FND-04 remains the owning requirement.
+- **Related ADR or open decision:** On 2026-11-27, the repository owner accepted the detailed Option B design candidate: persist an internally generated `traceparent` in the Identity proof-delivery outbox. This acceptance does not amend FND-04, adopt effective platform policy, or authorize implementation. Independent technical review remains pending; deployment decisions remain open.
 
 ## G1 — Research and problem validation
 
@@ -68,9 +68,9 @@ The table proposes test obligations. It does not amend FND-04 or create accepted
 
 **Candidate direction:** Retain JSON `slog` and add OTel trace/metric SDKs at the application composition root. Use OTLP as the export protocol. Consider `otelhttp` for server spans after explicitly selecting an ingress-propagation policy. Keep domain and use-case packages unaware of exporters and vendors. The first lab can use an OTel Collector and Jaeger v2 for traces. Metric routing to Prometheus may be a separate slice, since the current contract does not define metric names, SLOs or alert thresholds. Emit JSON logs to stdout for the platform log agent. Configure each process once in its command/composition root. Do not add redundant HTTP client, pgx, SQL or provider auto-instrumentation until its attributes and overhead have been reviewed.
 
-**Owner-selected direction:** On 2026-11-27, the owner selected Option B for detailed design. This records a direction only; no schema change, implementation or runtime activation is authorized.
+**Owner-approved design candidate:** On 2026-11-27, the owner approved the corrected Option B detailed design candidate. This is design approval for continued review only. It does not amend the owning contract, adopt effective policy, or authorize code, dependency changes, migration, runtime wiring or production activation. Independent technical review is still pending.
 
-**Option B detailed design candidate — pending technical review:**
+**Option B detailed design candidate — owner approved; independent technical review pending:**
 
 | Concern | Proposed contract |
 |---|---|
@@ -122,13 +122,13 @@ The synthetic path is identified in `TestIdentityZBrowserVerificationE2E` and `T
 
 **Compatibility, observability and rollout:** Keep telemetry export disabled unless endpoint and credentials are explicitly configured. Never configure a production endpoint by default. Do not add a public scrape route. Start with local disposable lab services. Check host, port and receiver reachability restrictions. A candidate migration is described for review only; no migration is implemented. No production rollout is approved. A later deployment design must set sampling, retention, redaction, budgets, access policy, alert ownership and rollback.
 
-**Decision status:** Option B direction selected by the owner; detailed G3 design remains proposed and pending technical review. Before implementation, resolve: (1) migration and capability-version inventory; (2) least-privilege grants and effective privilege review; (3) retention, purge scheduling and recovery; (4) public trace-parent policy; (5) the explicit message-creation span and parent/link policy; (6) no-op/no-exporter fallback through internal `job_id`; (7) telemetry endpoints, credentials and network boundary; (8) log/trace retention and access; and (9) exact AC and verification scope. Metrics and mock generation remain independent decisions. No code, dependency addition, runtime wiring, route activation, merge or production activation is authorized by this document.
+**Decision status:** The owner approved the detailed G3 design candidate on 2026-11-27. Independent technical acceptance remains pending, and the design is not adopted as effective policy. Before implementation, resolve: (1) migration and capability-version inventory; (2) least-privilege grants and effective privilege review; (3) retention, purge scheduling and recovery; (4) public trace-parent policy; (5) the explicit message-creation span and parent/link policy; (6) no-op/no-exporter fallback through internal `job_id`; (7) telemetry endpoints, credentials and network boundary; (8) log/trace retention and access; and (9) exact AC and verification scope. Metrics and mock generation remain independent decisions. No code, dependency addition, runtime wiring, route activation, merge or production activation is authorized by this document.
 
 ## G4 — Implementation slices
 
 | PR / slice | Owner module | AC IDs | Tests and negative cases | Dependencies | Status |
 |---|---|---|---|---|---|
-| S0 — accept correlation and telemetry boundary | Platform / Identity | FND-04-A–D, FND-10-A, FND-11-A | Review Option B schema, role grants, purge lifecycle, recovery, ingress trust and exact acceptance cases; retain Option A as comparison | Owner selected Option B; technical review and design acceptance | BLOCKED; documentation only |
+| S0 — accept correlation and telemetry boundary | Platform / Identity | FND-04-A–D, FND-10-A, FND-11-A | Review Option B schema, role grants, purge lifecycle, recovery, ingress trust and exact acceptance cases; retain Option A as comparison | Owner accepted design candidate; independent technical review and effective-policy decision remain pending | BLOCKED; documentation only |
 | S1 — logging correlation and traces in a synthetic fixture | `internal/app` and selected adapters | Accepted subset of FND-04 and FND-10 | Trace/log correlation, hostile headers, retries, no outbound provider propagation, sentinel leak checks, exporter outage and overhead | S0 accepted; OTel SDK and Collector lab approved | NOT AUTHORIZED |
 | S2 — bounded service metrics | `internal/app` and selected adapters | Accepted FND-04-E and FND-11 | Metric schema, route cardinality, histogram queries, backend outage | Separate metric schema/backend decision | NOT AUTHORIZED |
 | T1 — mock generation pilot (independent change) | Owning package test directory | DEV-TOOL-A | Clean generation, drift check, call assertions on one interface | Select interface; pin tool version | NOT AUTHORIZED |
@@ -144,4 +144,4 @@ Do not open implementation slices until the required G3 decisions are accepted a
 | Header trust, sensitive-data redaction, export outage, shutdown and overhead | Requires an accepted design and synthetic implementation | No implementation commit | NOT RUN |
 | Production retention, access, egress, sampling, alert ownership and deployment controls | Requires platform decisions and deployed evidence | No production configuration | NOT RUN |
 
-This proposal records a design candidate only. The synthetic test path is confirmed. The owner selected persisted `traceparent` as the design direction; schema, grants, retention/purge, recovery, ingress trust and telemetry data-boundary details remain proposed and require technical review and acceptance. Independent technical acceptance is pending. It does not establish production readiness or authorize implementation or merge.
+This proposal records an owner-approved design candidate only. The synthetic test path is confirmed. Independent technical acceptance remains pending. Effective-policy adoption, deployment boundary decisions and production readiness are not established. This document does not authorize implementation or merge.
