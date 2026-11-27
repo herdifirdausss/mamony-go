@@ -25,7 +25,7 @@ The [exact-candidate reconciliation](https://github.com/herdifirdausss/mamony-go
 | 08 | Repository checks and named integration groups | PASS on the reviewed candidate. |
 | 10 | Exact-candidate review and retained scope limits | Reconciled for bounded synthetic merge. |
 
-[#105](https://github.com/herdifirdausss/mamony-go/issues/105) tracks the remaining migration cancellation and outcome requirements before Ledger runtime or production use. The modeled dirty fixture demonstrates refusal of the modeled state. Actual crash behavior in that window remains unverified.
+[#105](https://github.com/herdifirdausss/mamony-go/issues/105) tracks the remaining migration cancellation and outcome requirements before Ledger runtime or production use. The modeled dirty fixture demonstrates refusal of the modeled state. Actual crash behavior in that window remains unverified. [PR #123](https://github.com/herdifirdausss/mamony-go/pull/123) merged the pure migration journal model for that follow-up. Its unit evidence covers model behavior. Actual native execution, storage, and fault-test evidence remain open.
 
 ## Limits
 
