@@ -19,7 +19,7 @@ type RecoveryCodeSecurityNoticeJob struct {
 
 type RecoveryCodeSecurityNoticeStore interface {
 	Claim(context.Context, string) (RecoveryCodeSecurityNoticeJob, bool, error)
-	Finalize(context.Context, string, string, ProofDeliveryOutcome, string) error
+	Finalize(context.Context, string, string, DeliveryOutcome, string) error
 }
 
 type RecoveryCodeSecurityNoticeSender interface {

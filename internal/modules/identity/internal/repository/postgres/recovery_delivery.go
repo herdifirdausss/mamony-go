@@ -54,7 +54,7 @@ func (s *RecoveryDeliveryStore) Claim(ctx context.Context, lease string) (usecas
 }
 
 func (s *RecoveryDeliveryStore) Finalize(ctx context.Context, challenge, lease string,
-	outcome usecase.ProofDeliveryOutcome) error {
+	outcome usecase.DeliveryOutcome) error {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
 		!recoveryChallengeID.MatchString(challenge) ||
 		!recoveryDeliveryLeaseID.MatchString(lease) ||
