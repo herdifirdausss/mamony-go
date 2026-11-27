@@ -1,52 +1,36 @@
 ## Outcome
 
-- Issue and requirement IDs
-- Changed behavior and owning capability
-- Applicable decision, trade-offs, or open choices
+- What changed and why
+- Change path (Routine / Feature / Critical) and owning capability
+- Issue, affected acceptance criteria, and relevant design links, as applicable
 
-## Change lifecycle and traceability
-
-- Path: Routine / Feature / Critical (explain uncertainty or escalation)
-- Intake issue and approved product decision (for Critical; otherwise issue/contract):
-- Research/PRD/technical design proposal (when required) and any accepted ADR:
-- Requirement IDs from the owning contract and relevant implementation changes:
-- If this PR introduces a milestone or experiment ID, link its definition. If it changes a milestone's status, list the affected status pages.
-- AC-to-test mapping; identify negative, concurrency, migration and recovery cases:
-- Any departure from accepted scope and its explicit acceptance:
-- If solo synthetic mode applies: implementation approval, containment evidence, independent acceptance status, production blockers, separate exact-head owner merge authorization (otherwise not applicable):
-
-A PR link or checkbox is **not** evidence of product approval, independent review or successful tests. For Critical changes, record explicit owner and technical acceptance **before coding**, or exact owner approval and containment/ACs for a bounded synthetic experiment under the adopted lifecycle. For any proposed solo synthetic merge, record containment evidence, actual review of code and tests, exact SHA owner merge authorization, deferred independent acceptance, and outstanding production blockers. The owner performs the merge. Otherwise pending independent technical acceptance is a Critical merge blocker; production-capable Critical release requires independent acceptance and separate activation approval. If a security hotfix used the expedited path, explain why and how the skipped evidence will be completed. See [change lifecycle](../docs/development-workflow.md).
+Link new milestone or experiment IDs to their definitions. If this PR changes a milestone's status, list the affected status pages.
 
 ## Evidence
 
-| Check | Command or test | Result |
+| AC or check | Command, scenario, or evidence link | Result |
 |---|---|---|
 | Repository checks | `make check` | NOT RUN |
-| Applicable contract and failure cases | Targeted tests | NOT RUN |
-| Relevant CI jobs | Link the run for this commit | NOT RUN |
+| Affected ACs and failure cases | Targeted tests | NOT RUN |
+| Applicable CI | Run for this commit | NOT RUN |
 
-Use `PASS`, `FAIL`, or `NOT RUN` for each check. See [engineering practices](../docs/engineering.md#verification) for commands. Record PostgreSQL contention, migration, or recovery evidence for affected changes.
+Identify the commit and fixture for the evidence. Use `PASS`, `FAIL`, `NOT RUN`, or justified `N/A-disabled` under the [testing strategy](../docs/testing.md#test-evidence-for-ai-changes). Map each affected accepted AC to a test or a recorded `NOT RUN`. Include applicable denial, replay, concurrency, migration, crash, and recovery cases. For database behavior, link real PostgreSQL checks with the relevant roles and durable effects.
 
-## Test integrity and evidence
+Record review of changed tests and any removed assertions, fixtures, or checks. Explain skipped cases. Preserve required checks and their assertions. Use the [test-plan checklist](../docs/templates/test-plan.md) to review coverage.
 
-- [ ] Every affected accepted AC maps to an executed test or an explicitly documented NOT RUN.
-- [ ] Positive/negative and failure cases cover the risk; changed tests and assertions were reviewed for weakened behavior.
-- [ ] Database changes use real PostgreSQL, runtime/migration roles, concurrency/rollback and migration tests, or are blocked as NOT RUN.
-- [ ] Money/access/recovery changes address replay, unauthorized action, unknown outcome and crash/restart where applicable.
-- [ ] No skipped/disabled test or CI gate was introduced to manufacture a green result.
+## Security, compatibility, and rollout (when applicable)
 
-See [testing strategy](../docs/testing.md) and the [test-plan checklist](../docs/templates/test-plan.md). A `make unit` PASS is not a PostgreSQL integration PASS.
+- Trust boundary, enforcement owner, caller and attacker capability, and authority that remains trusted
+- API, event, and schema compatibility, including migration, rollback, and recovery
+- Residual risks, blockers, and the applicable negative test evidence
 
-## Security impact
+See the [security verification matrix](../docs/engineering.md#security-verification). Use `NOT RUN` for a specified control that has no implemented check. Use `N/A-disabled` only with evidence that the affected capability and routes are absent or disabled.
 
-- Trust boundary, caller capability and owning resource:
-- Threat/attacker foothold; which authority remains trusted:
-- Money, identity, secrets, tenant, provider, audit or recovery impact:
-- Negative/replay/concurrency tests that exercise the boundary:
-- Residual risk and unresolved decisions (or state `not applicable`):
+## Critical review and authorization (when applicable)
 
-Use `N/A-disabled` only when the affected feature and routes are genuinely absent or disabled. Record `NOT RUN` for any security control that is specified but not implemented. See [security verification](../docs/engineering.md#security-verification).
+Follow the [change lifecycle](../docs/development-workflow.md) for the applicable gate.
 
-## Compatibility and rollout
-
-State API, event, or schema compatibility. Describe migration, recovery, and remaining risks where relevant.
+- Link pre-implementation product and technical design acceptance, accepted ACs, and any explicitly accepted scope departure. For a bounded synthetic Draft, link the owner authorization, allowed scope, and containment evidence.
+- Link review of the exact candidate code and tests, independent technical acceptance status, and unresolved risk or release blockers.
+- For a proposed solo synthetic merge, record separate owner authorization with the full head and reviewed target/base SHAs, accepted scope, and evidence link. Recheck the candidate and target before merge. The owner merges under the [solo synthetic rules](../docs/development-workflow.md#g6--synthetic-only-merge). Record independent technical acceptance as DEFERRED and production readiness as NOT ACCEPTED.
+- For a production-capable Critical release, record independent human technical acceptance and the separate activation decision. If the expedited security hotfix path applies, record skipped steps and the plan to complete the evidence review.
