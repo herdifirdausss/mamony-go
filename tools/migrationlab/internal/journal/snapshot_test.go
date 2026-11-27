@@ -27,8 +27,8 @@ func fixtureRevision(t *testing.T, revision uint64) int {
 	}
 	return int(revision)
 }
-func ver(n uint32) *uint32    { return &n }
-func str(s string) *string    { return &s }
+func ver(n uint32) *uint32 { return &n }
+func str(s string) *string { return &s }
 func mustRaw(t *testing.T, v any) json.RawMessage {
 	t.Helper()
 	b, e := raw(v)
