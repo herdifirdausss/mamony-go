@@ -47,6 +47,19 @@ Use durable jobs with claims, expiry, and bounded retry intervals. A restarted w
 Exercise a successful payment and payout on the chosen corridor. Exercise refusal before dispatch, a lost response after dispatch, a lost response after ledger commit, and duplicate provider results. Reconcile the resulting journal, usage, fee, and provider records.
 
 Use the [simulated pilot roadmap](../roadmap.md#simulated-pilot) for sequencing. Map each scenario to the owning contract and record the evidence from each affected owner.
+This is a reading map for the **planned synthetic pilot**. The roadmap gives dependency order. Each capability contract remains authoritative for its own states and requirements. This map does not claim that an end-to-end runtime or pilot gate has passed.
+
+| Stage | Payment | Payout |
+|---|---|---|
+| Prerequisites | Start from the [pilot roadmap](../roadmap.md#simulated-pilot), [Identity](identity.md), [screening and onboarding](screening-and-onboarding.md), and [fees, limits, and accounts](fees-limits-and-accounts.md). | Use the same capability prerequisites, then validate the immutable recipient under [Payouts](#payouts). |
+| Start and reserve | Follow [Payments steps 1–3](#payments): create the intent, reserve usage, screen parties, and obtain required quotes. | Follow [Payouts steps 1–3](#payouts): validate the recipient, screen, reserve usage, and commit the ledger hold before dispatch. |
+| Convert currency when required | Read [FX execution and recovery](fx.md#execution-and-recovery). Check the current sequential-leg behavior and the proposed FX-05/06 atomic-group alternative; do not assume the alternative is accepted. | Apply the same FX contract and decision status when the payout currencies differ. |
+| Dispatch and resolve the provider result | Follow [Payments steps 4–5](#payments) and the [provider operation lifecycle](provider.md#operation-lifecycle). An unknown result remains processing and uses inquiry against the original provider. | Follow [Payouts steps 4–6](#payouts). An unknown result keeps funds and usage reserved; use the original provider reference. |
+| Record and reconcile money movement | Follow [Payments step 6](#payments), the [Ledger gate](ledger.md#ledger-gate-evidence), and [reconciliation](reconciliation-and-events.md#reconciliation). K3 posting and full Ledger runtime integration remain planned. | Follow the payout settlement, release, and return steps, then trace the journal and provider references through [reconciliation](reconciliation-and-events.md#reconciliation). |
+| Check pilot recovery acceptance | Use the [pilot gate](../roadmap.md#simulated-pilot) and [recovery procedure](../runbooks/recovery.md#restore-a-database) for daily reconciliation, worker recovery, and restore evidence. | Apply the same pilot and restore gate to the payout flow. |
+
+Before implementation, resolve the [FEE-02 fee-consumption boundary](fees-limits-and-accounts.md#fee-quotes) and record the FX-05/06 decision. Read the existing payment and payout step lists for state transitions. The flow map links the contracts; it does not replace their requirements.
+
 
 | Scenario | Evidence to trace |
 |---|---|
