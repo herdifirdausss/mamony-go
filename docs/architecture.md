@@ -2,17 +2,37 @@
 
 ## Running packages
 
-Only `cmd/mamony` is started by the default HTTP run. Other commands and internal candidates are separately invoked or unmounted; their presence is not deployment evidence. See [current state](current-state.md).
+The default HTTP run starts only `cmd/mamony`. Each other command requires a separate invocation. See [current state](current-state.md#what-actually-runs) for deployment and capability status.
+
+### Command entry points
+
+| Command | Delegates to | PostgreSQL role | Observable effect | Evidence |
+|---|---|---|---|---|
+| [`mamony`](../cmd/mamony/main.go) | `app.Run` | None | Starts the public and private health listeners. Handles process signals. | [Listener startup, shutdown, and isolation](../internal/app/app_test.go) |
+| [`mamony-identity-mail-worker`](../cmd/mamony-identity-mail-worker/main.go) | `identity.RunDelivery` | `mamony_identity_delivery_runtime` | Polls the email proof outbox and submits eligible messages to Mailgun after explicit opt-in. | [Worker startup and secret handling](../cmd/mamony-identity-mail-worker/main_test.go) |
+| [`mamony-identity-maintain`](../cmd/mamony-identity-maintain/main.go) | `identity.PurgeRetention` | `mamony_identity_maintenance_runtime` | Runs one bounded retention purge batch after explicit opt-in. | [Maintenance opt-in and secret validation](../cmd/mamony-identity-maintain/main_test.go) |
+| [`mamony-identity-reconcile`](../cmd/mamony-identity-reconcile/main.go) | `identity.InspectEnrollmentBacklog` and `identity.ReconcileEnrollmentOnce` | `mamony_identity_verifier_runtime` | Reads the enrollment backlog. Approved repair issues missing first proofs in one bounded pass and reads the backlog again. | [Reconciliation CLI behavior](../cmd/mamony-identity-reconcile/main_test.go) · [Operator runbook](runbooks/identity-reconciliation.md) |
+| [`mamony-identity-notice-health`](../cmd/mamony-identity-notice-health/main.go) | `identity.ReadSecurityNoticeHealthAsMonitor` | `mamony_identity_notice_monitor_runtime` | Reads security-notice aggregates once and reports the threshold result. | [Notice-health call path](#identity-notice-health-call-path) |
+| [`mamony-identity-security-notice-worker`](../cmd/mamony-identity-security-notice-worker/main.go) | `identity.RunSecurityNoticeDelivery` | `mamony_identity_security_notice_runtime` | Polls the security-notice outbox and submits eligible messages to Mailgun after explicit opt-in. | [Worker opt-in and credential validation](../cmd/mamony-identity-security-notice-worker/main_test.go) |
+| [`mamony-migrate`](../cmd/mamony-migrate/main.go) | `migration.Run` | `mamony_platform_migrator` | Applies Platform migrations and verifies their fingerprints against the Platform history. | [Migration file checks](../internal/platform/migration/repository_test.go) |
+| [`mamony-identity-migrate`](../cmd/mamony-identity-migrate/main.go) | `migration.RunIdentity` | `mamony_identity_migrator` | Applies Identity migrations and verifies their fingerprints against the Identity history. | [Migration file checks](../internal/platform/migration/repository_test.go) |
+
+```mermaid
+flowchart TD
+    HTTP["cmd/mamony"] --> App["app.Run"]
+    App --> Edge["HTTP edge"]
+    Edge --> Public["Public health listener"]
+    Edge --> Private["Private health listener"]
+    IdentityCommands["Identity workers and operator commands"] --> Identity["Identity facade"]
+    Identity --> Pool["Role-specific PostgreSQL pool"]
+    Identity --> Mailgun["Mailgun adapter for delivery workers"]
+    Migrations["Platform and Identity migration commands"] --> Runner["Migration runner"]
+```
+
+### Internal packages
 
 | Package | Responsibility |
 |---|---|
-| `cmd/mamony` | Read listener addresses and handle process signals. |
-| `cmd/mamony-identity-mail-worker` | Independently launched, double-opt-in Mailgun delivery worker; strict private-file secrets, no public routes. |
-| `cmd/mamony-identity-maintain` | Separately opt-in, single-batch retention erasure; not deployed or scheduled. |
-| `cmd/mamony-identity-reconcile` | Separately invoked Identity reconciliation operations. |
-| `cmd/mamony-identity-notice-health` | Separate Identity notice health inspection. |
-| `cmd/mamony-identity-security-notice-worker` | Separate opt-in security-notice worker; no claim of deployment or real delivery. |
-| `cmd/mamony-migrate`, `cmd/mamony-identity-migrate` | Separate migration entrypoints, not invoked by HTTP startup. |
 | `internal/app` | Start and stop the two HTTP listeners; contains an unmounted Ledger reference composition helper, not called by `Run`. |
 | `internal/platform/httpedge` | Serve liveness and readiness. |
 | `internal/platform/migration` | Standalone versioned platform and Identity migration verification, with separate schema roles and migration histories; never invoked by HTTP startup. |
@@ -27,6 +47,15 @@ Only `cmd/mamony` is started by the default HTTP run. Other commands and interna
 | Private | `127.0.0.1:8081` | `GET /livez`, `GET /readyz` |
 
 Set `MAMONY_PUBLIC_ADDR` and `MAMONY_PRIVATE_ADDR` to override the addresses. The private listener accepts `127.0.0.1` and `::1`. It maps `localhost` to `127.0.0.1`. Readiness reports only HTTP process readiness.
+
+### Identity notice-health call path
+
+1. The CLI parses `--check-security-notices` and the thresholds, reads a private DSN file, and calls the Identity facade with an eight-second deadline. [CLI entry point](../cmd/mamony-identity-notice-health/main.go)
+2. `identity.ReadSecurityNoticeHealthAsMonitor` opens a one-connection pool configured for `mamony_identity_notice_monitor_runtime`. The Platform pool checks the actual PostgreSQL role before use. [Identity facade](../internal/modules/identity/security_notice_health.go) · [Pool role check](../internal/platform/postgres/pool.go)
+3. `SecurityNoticeHealthStore.Read` calls `mamony_identity.security_notice_health()` in a transaction. The facade returns aggregate counts to the CLI. [Repository query](../internal/modules/identity/internal/repository/postgres/security_notice_health.go) · [Monitor grant](../db/migrations/identity/000018_notice-health-readonly-runtime.up.sql)
+4. The CLI writes a redacted JSON report. Exit code `0` means all monitored counts were within their thresholds, `2` means at least one threshold was exceeded, and `1` means the probe failed. [Probe behavior and operating limits](adr/0017-read-only-notice-health-probe.md)
+
+The [CLI unit tests](../cmd/mamony-identity-notice-health/main_test.go) cover threshold classification, configuration rejection, and error redaction. The [monitor-role integration test](../internal/modules/identity/internal/integration/security_notice_health_integration_test.go) exercises the aggregate read and checks that the role cannot run purge functions on disposable PostgreSQL.
 
 ## Capability packages
 
