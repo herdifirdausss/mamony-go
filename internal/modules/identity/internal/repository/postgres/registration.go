@@ -1,24 +1,13 @@
-// Package postgres persists Identity registration state through one limited
-// PostgreSQL transaction; it never authenticates or authorizes HTTP requests.
 package postgres
 
 import (
 	"context"
 	"errors"
 
-	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
-
-var ErrStorageUnavailable = errors.New("identity registration storage unavailable")
-
-// Transactor is deliberately consumer-side and accepts only operations
-// implemented by a credential-limited runtime connection pool.
-type Transactor interface {
-	WithTx(context.Context, func(pgx.Tx) error) error
-}
 
 type Store struct {
 	db Transactor
@@ -80,12 +69,3 @@ func (s *Store) CreatePendingWithObligation(ctx context.Context, r usecase.Pendi
 	return nil
 }
 
-func validVerifier(v domain.PasswordVerifier) bool {
-	return v.Version == 1 && v.MemoryKiB == 65536 && v.Iterations == 3 &&
-		v.Parallelism == 1 && len(v.Salt) == 16 && len(v.Digest) == 32
-}
-
-func isCanonicalEmail(email string) bool {
-	canonical, err := domain.CanonicalEmail(email)
-	return err == nil && canonical == email
-}
