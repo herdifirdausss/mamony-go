@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io"
 	"net/url"
 	"strings"
 	"time"
@@ -64,16 +63,8 @@ func readRuntimeConfig(getenv func(string) string, args []string) (identity.Secu
 }
 
 func readPrivateFile(path string, limit int64) ([]byte, error) {
-	if limit < 1 {
-		return nil, errStartup
-	}
-	f, err := secretfile.OpenPrivate(path)
+	raw, err := secretfile.ReadPrivateLimited(path, limit)
 	if err != nil {
-		return nil, errStartup
-	}
-	defer func() { _ = f.Close() }()
-	raw, err := io.ReadAll(io.LimitReader(f, limit+1))
-	if err != nil || len(raw) == 0 || int64(len(raw)) > limit {
 		return nil, errStartup
 	}
 	return raw, nil

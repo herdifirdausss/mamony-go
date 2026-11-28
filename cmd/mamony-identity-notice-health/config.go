@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io"
 	"net/url"
 	"strconv"
 	"strings"
@@ -69,17 +68,8 @@ func readProbeConfig(getenv func(string) string, args []string) (probeConfig, er
 }
 
 func readPrivateMonitorDSN(path string) (string, error) {
-	file, err := secretfile.OpenPrivate(path)
+	contents, err := secretfile.ReadPrivateLimited(path, 2048)
 	if err != nil {
-		return "", errNoticeProbeConfig
-	}
-	defer func() { _ = file.Close() }()
-	after, err := file.Stat()
-	if err != nil || after.Size() < 1 || after.Size() > 2048 {
-		return "", errNoticeProbeConfig
-	}
-	contents, err := io.ReadAll(io.LimitReader(file, 2049))
-	if err != nil || len(contents) == 0 || len(contents) > 2048 {
 		return "", errNoticeProbeConfig
 	}
 	dsn := strings.TrimSuffix(string(contents), "\n")

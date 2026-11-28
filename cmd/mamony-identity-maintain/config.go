@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io"
 	"net/url"
 	"strings"
 
@@ -23,18 +22,8 @@ func readConfig(getenv func(string) string, args []string) (identity.RetentionCo
 		getenv("CI") != "" {
 		return empty, errMaintenanceApproval
 	}
-	path := getenv("MAMONY_IDENTITY_MAINTENANCE_DSN_FILE")
-	f, err := secretfile.OpenPrivate(path)
+	b, err := secretfile.ReadPrivateLimited(getenv("MAMONY_IDENTITY_MAINTENANCE_DSN_FILE"), 2048)
 	if err != nil {
-		return empty, errMaintenanceApproval
-	}
-	defer func() { _ = f.Close() }()
-	after, err := f.Stat()
-	if err != nil || after.Size() < 1 || after.Size() > 2048 {
-		return empty, errMaintenanceApproval
-	}
-	b := make([]byte, after.Size())
-	if n, err := io.ReadFull(f, b); err != nil || int64(n) != after.Size() {
 		return empty, errMaintenanceApproval
 	}
 	dsn := strings.TrimSuffix(string(b), "\n")
