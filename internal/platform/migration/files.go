@@ -37,6 +37,18 @@ func LoadIdentity(dir string) ([]File, error) { return loadForSchema(dir, "mamon
 // LoadLedger verifies the dedicated Ledger migration manifest.
 func LoadLedger(dir string) ([]File, error) { return loadForSchema(dir, "mamony_ledger") }
 
+func sameFiles(a, b []File) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func loadForSchema(dir, schema string) ([]File, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
