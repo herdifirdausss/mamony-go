@@ -106,19 +106,10 @@ func validProductionVerifierDSN(raw string) bool {
 	return err == nil && p > 0 && p <= 65535
 }
 
-// Refuses symlinks, group/world-readable files, oversized data and file
-// replacement while opening. Never log secret path contents or error chains.
+// Never expose private file paths, contents, or filesystem error details.
 func readPrivateFile(path string, maxBytes int64) ([]byte, error) {
-	if maxBytes < 1 {
-		return nil, errUnsafeReconcileConfig
-	}
-	f, err := secretfile.OpenPrivate(path)
+	b, err := secretfile.ReadPrivateLimited(path, maxBytes)
 	if err != nil {
-		return nil, errUnsafeReconcileConfig
-	}
-	defer func() { _ = f.Close() }()
-	b, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
-	if err != nil || len(b) == 0 || int64(len(b)) > maxBytes {
 		return nil, errUnsafeReconcileConfig
 	}
 	return b, nil
