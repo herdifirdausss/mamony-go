@@ -1,4 +1,4 @@
-package handler
+package verifyemailpage
 
 import (
 	"crypto/sha256"
@@ -8,43 +8,45 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler/internal/browserpage"
 )
 
 // Page assets are embedded at build time, never fetched from a CDN.
 // The only script and stylesheet are pinned to their own response CSP hashes.
 //
-//go:embed email_verification_page.js email_verification_page.css
+//go:embed page.js page.css
 var verificationPageAssets embed.FS
 
 const verificationPagePath = "/verify-email"
 
-var ErrVerificationPageConfig = errors.New("identity verification page unavailable")
+var ErrConfig = errors.New("identity verification page unavailable")
 
-// EmailVerificationPage renders an unmounted, static, first-party fragment
+// Handler renders an unmounted, static, first-party fragment
 // consumer. It has NO verifier, registration or database authority and does
 // not accept a bearer in an HTTP request URL, cookie, or request body.
 // An email client navigation must never consume a proof automatically.
-type EmailVerificationPage struct {
+type Handler struct {
 	host string
 }
 
-// NewEmailVerificationPage requires exactly the approved direct-TLS origin
+// New requires exactly the approved direct-TLS origin
 // used by the candidate confirmation API and Mailgun's verification link.
 // Reverse-proxy TLS offload remains a separate, unresolved deployment policy.
-func NewEmailVerificationPage(origin string) (*EmailVerificationPage, error) {
+func New(origin string) (*Handler, error) {
 	u, err := url.Parse(origin)
 	if err != nil || u == nil || u.Scheme != "https" || u.Host == "" ||
 		u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
 		u.Path != "" || u.RawPath != "" || u.Opaque != "" ||
 		u.Host != u.Hostname() || strings.HasSuffix(u.Host, ".") ||
 		u.String() != origin {
-		return nil, ErrVerificationPageConfig
+		return nil, ErrConfig
 	}
-	return &EmailVerificationPage{host: u.Host}, nil
+	return &Handler{host: u.Host}, nil
 }
 
-func (h *EmailVerificationPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	setVerificationPageHeaders(w)
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	browserpage.SetSecurityHeaders(w)
 	if h == nil || r == nil || r.URL == nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -70,12 +72,12 @@ func (h *EmailVerificationPage) ServeHTTP(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
-	script, err := verificationPageAssets.ReadFile("email_verification_page.js")
+	script, err := verificationPageAssets.ReadFile("page.js")
 	if err != nil || len(script) == 0 {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
-	css, err := verificationPageAssets.ReadFile("email_verification_page.css")
+	css, err := verificationPageAssets.ReadFile("page.css")
 	if err != nil || len(css) == 0 {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -110,15 +112,4 @@ func (h *EmailVerificationPage) ServeHTTP(w http.ResponseWriter, r *http.Request
 		"<button id=\"confirm\" type=\"button\" hidden>Verify my email</button>" +
 		"<p class=\"footnote\">We never ask for your password on this page. " +
 		"Verification does not sign you in.</p></main></body></html>"))
-}
-
-func setVerificationPageHeaders(w http.ResponseWriter) {
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Referrer-Policy", "no-referrer")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Frame-Options", "DENY")
-	w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
-	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
 }
