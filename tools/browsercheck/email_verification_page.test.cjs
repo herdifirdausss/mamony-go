@@ -10,7 +10,7 @@ const vm = require("node:vm");
 // JavaScript embedded by the Go handler in a minimal deterministic DOM/Fetch
 // sandbox. This tests behavior, not just static source-string assertions.
 const pageJS = fs.readFileSync(
-  path.join(__dirname, "../../internal/modules/identity/internal/handler/email_verification_page.js"),
+  path.join(__dirname, "../../internal/modules/identity/internal/handler/verifyemailpage/page.js"),
   "utf8"
 );
 const token = Buffer.alloc(32, 0x3c).toString("base64url");
@@ -67,7 +67,7 @@ function startPage(fragment, options = {}) {
   };
   vm.runInNewContext(pageJS, { window: browser, document, fetch: mockFetch }, {
     timeout: 1000,
-    filename: "email_verification_page.js",
+    filename: "verifyemailpage/page.js",
   });
   return {
     browser, button, status, calls,

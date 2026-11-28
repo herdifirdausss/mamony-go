@@ -43,6 +43,8 @@ components:
     in: app/**
   platform:
     in: platform/**
+  identity_browser_page_headers:
+    in: modules/identity/internal/handler/internal/browserpage
   identity_handler:
     in: modules/identity/internal/handler/**
   identity_domain:
@@ -111,8 +113,12 @@ deps:
   # tools/archcheck additionally blocks cross-capability and forbidden imports.
   identity_handler:
     mayDependOn:
+      - identity_browser_page_headers
       - identity_usecase
       - identity_domain
+  identity_browser_page_headers:
+    mayDependOn:
+      - identity_browser_page_headers
   identity_domain:
     mayDependOn:
       - identity_domain

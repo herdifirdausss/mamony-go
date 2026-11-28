@@ -1,4 +1,4 @@
-package handler
+package mailgunwebhook
 
 import (
 	"net/http"
@@ -6,25 +6,25 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 )
 
-// MailgunRecoveryNoticeWebhook uses exactly the established bounded
+// PasswordRecoveryNotice uses exactly the established bounded
 // HMAC-SHA256 validation, timestamp/domain normalization, event classifier,
 // key-rotation and anti-replay identity reduction of the existing verifier.
 // It is a DIFFERENT unmounted HTTP handler whose recorder must use the v23
 // recovery-specific SQL credential and recipient-free receipt table.
-type MailgunRecoveryNoticeWebhook struct {
-	verified *MailgunSecurityNoticeWebhook
+type PasswordRecoveryNotice struct {
+	verified *SecurityNotice
 }
 
-func NewMailgunRecoveryNoticeWebhook(keys [][]byte, domain string,
-	recorder usecase.SecurityNoticeWebhookRecorder) (*MailgunRecoveryNoticeWebhook, error) {
-	v, err := NewMailgunSecurityNoticeWebhook(keys, domain, recorder)
+func NewPasswordRecoveryNotice(keys [][]byte, domain string,
+	recorder usecase.SecurityNoticeWebhookRecorder) (*PasswordRecoveryNotice, error) {
+	v, err := NewSecurityNotice(keys, domain, recorder)
 	if err != nil {
 		return nil, usecase.ErrDeliveryUnavailable
 	}
-	return &MailgunRecoveryNoticeWebhook{verified: v}, nil
+	return &PasswordRecoveryNotice{verified: v}, nil
 }
 
-func (h *MailgunRecoveryNoticeWebhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *PasswordRecoveryNotice) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h == nil || h.verified == nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -32,4 +32,4 @@ func (h *MailgunRecoveryNoticeWebhook) ServeHTTP(w http.ResponseWriter, r *http.
 	h.verified.ServeHTTP(w, r)
 }
 
-var _ http.Handler = (*MailgunRecoveryNoticeWebhook)(nil)
+var _ http.Handler = (*PasswordRecoveryNotice)(nil)
