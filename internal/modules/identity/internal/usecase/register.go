@@ -4,7 +4,6 @@ package usecase
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"io"
 	"time"
@@ -52,14 +51,6 @@ func NewRegistration(store RegistrationStore, hasher PasswordHasher, policy doma
 		return nil, ErrRegistrationUnavailable
 	}
 	return &Registration{store: store, hasher: hasher, policy: policy, random: rand.Reader, clock: time.Now}, nil
-}
-
-func newOpaqueID(r io.Reader, prefix string) (string, error) {
-	b := make([]byte, 16)
-	if _, err := io.ReadFull(r, b); err != nil {
-		return "", ErrRegistrationUnavailable
-	}
-	return prefix + base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // RegisterPending is not an HTTP handler. It does not send email or expose
