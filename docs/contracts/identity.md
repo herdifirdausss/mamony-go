@@ -25,7 +25,7 @@ See the [Identity delivery runbook](../runbooks/identity-delivery.md) for operat
 | Part of enrollment | Where to read |
 |---|---|
 | Pending registration and first proof | [Enrollment flow](../../internal/modules/identity/internal/usecase/enrollment_flow.go) and [first implementation slice](../proposals/identity-enrollment-first-slice.md) |
-| Proof issuance, resend, and activation | [Email verification use case](../../internal/modules/identity/internal/usecase/verify_email.go) and [PostgreSQL proof store](../../internal/modules/identity/internal/repository/postgres/verification.go) |
+| Proof issuance, resend, and activation | [Email verification use case](../../internal/modules/identity/internal/usecase/verify_email.go) and [PostgreSQL proof store](../../internal/modules/identity/internal/repository/postgres/email_proof_store.go) |
 | Delivery, retention, and missing first proofs | [Email delivery runbook](../runbooks/identity-delivery.md) and [reconciliation runbook](../runbooks/identity-reconciliation.md) |
 | Browser confirmation and evidence | [Browser test chain and evidence limits](../runbooks/identity-browser-e2e.md#tested-transaction-chain) |
 | Decisions before public activation | [Enrollment release decisions](../open-decisions.md#identity-enrollment-release-decisions) |
