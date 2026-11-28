@@ -25,4 +25,6 @@ The design candidate uses a signed 64-bit positive mantissa and a scale up to 18
 
 **FX-06.** If the second leg cannot post, keep the execution open and alert an operator. Resolve it by completing the leg or by approved corrective journals. Test that no limit breach or duplicate journal appears during concurrent recovery.
 
+**Open design decision.** FX-05 and FX-06 describe recovery with a committed first leg. The [candidate atomic group](../proposals/ledger-cross-border-payments.md#conflict-and-amendment-register) would change that local failure state. Review and explicitly accept any amendment to the FX contract and [Ledger ownership decision](../adr/0002-ledger-and-data-ownership.md) before implementation.
+
 Direct pair support serves the first pilot. Advanced pricing and FX reporting belong to later work. The [decision register](../open-decisions.md#money-and-recovery) covers slow payment methods that outlive a quote.
