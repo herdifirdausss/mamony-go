@@ -7,11 +7,10 @@ import (
 	"errors"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/herdifirdausss/mamony-go/cmd/internal/secretfile"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity"
 )
 
@@ -110,28 +109,14 @@ func validProductionVerifierDSN(raw string) bool {
 // Refuses symlinks, group/world-readable files, oversized data and file
 // replacement while opening. Never log secret path contents or error chains.
 func readPrivateFile(path string, maxBytes int64) ([]byte, error) {
-	if path == "" || !filepath.IsAbs(path) || maxBytes < 1 {
+	if maxBytes < 1 {
 		return nil, errUnsafeReconcileConfig
 	}
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() ||
-		before.Mode().Perm()&0077 != 0 || before.Mode().Perm()&0400 == 0 {
-		return nil, errUnsafeReconcileConfig
-	}
-	root, err := os.OpenRoot(filepath.Dir(path))
-	if err != nil {
-		return nil, errUnsafeReconcileConfig
-	}
-	defer func() { _ = root.Close() }()
-	f, err := root.Open(filepath.Base(path))
+	f, err := secretfile.OpenPrivate(path)
 	if err != nil {
 		return nil, errUnsafeReconcileConfig
 	}
 	defer func() { _ = f.Close() }()
-	after, err := f.Stat()
-	if err != nil || !os.SameFile(before, after) {
-		return nil, errUnsafeReconcileConfig
-	}
 	b, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
 	if err != nil || len(b) == 0 || int64(len(b)) > maxBytes {
 		return nil, errUnsafeReconcileConfig

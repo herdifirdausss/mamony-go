@@ -4,10 +4,9 @@ import (
 	"errors"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/herdifirdausss/mamony-go/cmd/internal/secretfile"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity"
 )
 
@@ -25,26 +24,13 @@ func readConfig(getenv func(string) string, args []string) (identity.RetentionCo
 		return empty, errMaintenanceApproval
 	}
 	path := getenv("MAMONY_IDENTITY_MAINTENANCE_DSN_FILE")
-	if path == "" || !filepath.IsAbs(path) {
-		return empty, errMaintenanceApproval
-	}
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm()&0077 != 0 ||
-		before.Mode().Perm()&0400 == 0 {
-		return empty, errMaintenanceApproval
-	}
-	root, err := os.OpenRoot(filepath.Dir(path))
-	if err != nil {
-		return empty, errMaintenanceApproval
-	}
-	defer func() { _ = root.Close() }()
-	f, err := root.Open(filepath.Base(path))
+	f, err := secretfile.OpenPrivate(path)
 	if err != nil {
 		return empty, errMaintenanceApproval
 	}
 	defer func() { _ = f.Close() }()
 	after, err := f.Stat()
-	if err != nil || !os.SameFile(before, after) || after.Size() < 1 || after.Size() > 2048 {
+	if err != nil || after.Size() < 1 || after.Size() > 2048 {
 		return empty, errMaintenanceApproval
 	}
 	b := make([]byte, after.Size())
