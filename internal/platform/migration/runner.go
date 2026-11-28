@@ -145,4 +145,3 @@ func checkMigrationTarget(ctx context.Context, conn *pgx.Conn, target migrationT
 	}
 	return nil
 }
-
