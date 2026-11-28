@@ -23,23 +23,25 @@ Use the [security verification matrix](engineering.md#security-verification) and
 | 2 | [Identity Phase 1](contracts/identity.md) | Internal enrollment, sessions, recovery and one-use passkey possession verification are merged for synthetic use. Public activation requires resource authorization, recovery and operational acceptance. |
 | 3 | [Ledger](contracts/ledger.md) | Monetary domain, reference admission and isolated persistence are merged for bounded synthetic use. See the [Ledger implementation sequence](#ledger-implementation-sequence) for the remaining stages. |
 
-K1 and the reference experiments preceded full Foundation and Identity acceptance. The owner separately approved a one-time sequencing exception for K2a. The existing capability delivery order and Ledger gate still apply. Pass the Ledger gate before building pilot money flows. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
+K1 and the reference experiments preceded full Foundation and Identity acceptance. The owner separately approved a one-time sequencing exception for K2a. The existing capability delivery order and Ledger gate still apply. Extend the catalog and operator controls under [reconciliation and events](contracts/reconciliation-and-events.md).
 
 ### Ledger implementation sequence
 
 | Stage | Scope | Status at the documented baseline |
 |---|---|---|
 | K1 | Monetary domain and exact journal invariants | Merged as a [bounded domain experiment](contracts/ledger.md#k1-isolated-monetary-domain-synthetic-experiment). |
-| K2 | Ledger-owned schema, role separation and account lifecycle | Full stage remains planned. |
+| K2 | Ledger-owned schema, role separation and [account lifecycle](contracts/ledger.md#account-lifecycle-and-reads) | Isolated storage is covered by K2a. The full account lifecycle and runtime wiring remain planned. |
 | K2a | Isolated persistence foundation within K2 | Merged as a [bounded synthetic exception](proposals/ledger-k2a-isolated-persistence.md). It covers the initial schema, fixed USD definition and disposable storage and restore fixtures. Account lifecycle and runtime wiring remain outside this slice. |
-| K3 | Atomic authorized journal posting, replay and outbox creation | Planned after K2 and accepted posting authority. |
+| K3 | [Atomic authorized journal posting](contracts/ledger.md#posting-and-replay), replay and outbox creation | Planned after K2 and accepted [posting authority](contracts/ledger.md#financial-authority-before-posting). |
 | K4 | Full reversal and authorized statement reads | Planned after K3. |
 | K5 | Per-account outbox delivery and consumer replay | Planned after K3 and verified relay prerequisites. |
 | K6 | Independent Ledger verification and restore acceptance | Planned after posting, reversal and delivery evidence. |
 
-Older K2a records use `K2b` to refer to follow-on work outside the synthetic exception. Its scope requires a separate design and approval. The [detailed design proposal](proposals/ledger-cross-border-payments.md#ledger-implementation-plan-stage-k) records dependencies and candidate acceptance checks. See [current state](current-state.md) for merge and activation status.
+Older K2a records use `K2b` to refer to follow-on work outside the synthetic exception. Its scope requires a separate design and approval. Issue [#105](https://github.com/herdifirdausss/mamony-go/issues/105) tracks migration cancellation and outcome evidence needed before Ledger runtime or production use. The [detailed design proposal](proposals/ledger-cross-border-payments.md#ledger-implementation-plan-stage-k) records dependencies and candidate acceptance checks. See [current state](current-state.md) for merge and activation status.
 
 ## Simulated pilot
+
+Pass the [Ledger gate](contracts/ledger.md#ledger-gate-evidence) before building pilot money flows. Use the prerequisites below to identify earlier support work and the contracts each flow depends on.
 
 | Order | Contract | Prerequisites and outcome |
 |---:|---|---|
@@ -50,7 +52,7 @@ Older K2a records use `K2b` to refer to follow-on work outside the synthetic exc
 | 8 | [Payments and payouts](contracts/payments-and-payouts.md) | Use the preceding pilot contracts. Build one end-to-end flow at a time. |
 | 9 | [Reconciliation and events](contracts/reconciliation-and-events.md) | Build audit and catalog interfaces earlier. Reconcile the completed flows before the pilot. |
 
-Pass the pilot gate on one simulated corridor. Exercise both money flows, screening, unknown provider outcomes, reversals or returns, daily reconciliation, worker recovery, and restore. Use the [open decisions](open-decisions.md) to set the corridor, observation window, and performance targets.
+Pass the pilot gate on one simulated corridor. Exercise both money flows, screening, unknown provider outcomes, reversals or returns, daily reconciliation, worker recovery, and restore. Use the [money and recovery decisions](open-decisions.md#money-and-recovery) to set the corridor, observation window, and performance targets.
 
 ## Operations and expansion
 

@@ -1,4 +1,4 @@
-package handler
+package mailgunwebhook
 
 import (
 	"bytes"
@@ -70,7 +70,7 @@ func runSyntheticNoticeWebhook(t *testing.T, h http.Handler, body []byte) int {
 func TestMailgunNoticeWebhookAuthenticatesAndRedacts(t *testing.T) {
 	key := []byte("synthetic-webhook-signing-key-not-mailgun-sending-key")
 	recorder := &fakeNoticeWebhookRecorder{}
-	handler, err := NewMailgunSecurityNoticeWebhook([][]byte{key}, "mg.example.test", recorder)
+	handler, err := NewSecurityNotice([][]byte{key}, "mg.example.test", recorder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestMailgunNoticeWebhookDeniesForgedOrMalformedRequestsBeforeStorage(t *tes
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := &fakeNoticeWebhookRecorder{}
-			h, err := NewMailgunSecurityNoticeWebhook([][]byte{key}, "mg.example.test", rec)
+			h, err := NewSecurityNotice([][]byte{key}, "mg.example.test", rec)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -142,7 +142,7 @@ func TestMailgunNoticeWebhookDeniesForgedOrMalformedRequestsBeforeStorage(t *tes
 
 func TestMailgunNoticeWebhookStrictEnvelopeAndStorageFailures(t *testing.T) {
 	key := []byte("synthetic-webhook-signing-key-not-mailgun-sending-key")
-	h, err := NewMailgunSecurityNoticeWebhook([][]byte{key}, "mg.example.test",
+	h, err := NewSecurityNotice([][]byte{key}, "mg.example.test",
 		&fakeNoticeWebhookRecorder{err: errors.New("secret in SQL DSN")})
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +179,7 @@ func TestMailgunNoticeWebhookSupportsExplicitSigningKeyRotation(t *testing.T) {
 	primary := []byte("primary-webhook-signing-key-long-enough")
 	previous := []byte("previous-webhook-signing-key-long-enough")
 	rec := &fakeNoticeWebhookRecorder{}
-	h, err := NewMailgunSecurityNoticeWebhook([][]byte{primary, previous},
+	h, err := NewSecurityNotice([][]byte{primary, previous},
 		"mg.example.test", rec)
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +195,7 @@ func TestMailgunNoticeWebhookSupportsExplicitSigningKeyRotation(t *testing.T) {
 	if rec.calls != 2 {
 		t.Fatal("signing-key rotation validation lost verified events")
 	}
-	if _, err := NewMailgunSecurityNoticeWebhook([][]byte{[]byte("short")},
+	if _, err := NewSecurityNotice([][]byte{[]byte("short")},
 		"mg.example.test", rec); err == nil {
 		t.Fatal("insufficient signing key accepted")
 	}

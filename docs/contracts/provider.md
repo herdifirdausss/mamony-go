@@ -22,7 +22,7 @@ Represent provider capabilities as explicit ports where callers need them. Charg
 
 **PRV-05.** Test wrong signatures, invalid timestamps, duplicate delivery, out-of-order messages, a refused update to a final status, and a worker that stops after acknowledging the message.
 
-The simulator must support per-reference success, refusal, pending result, timeout after acceptance, and delayed or duplicate result messages. Use these fixtures in the [money flows](payments-and-payouts.md) and [reconciliation](reconciliation-and-events.md).
+The simulator must support per-reference success, refusal, pending result, timeout after acceptance, and delayed or duplicate result messages. Use these fixtures in the [pilot evidence scenarios](payments-and-payouts.md#pilot-evidence) and [reconciliation](reconciliation-and-events.md#reconciliation).
 
 ## Provider trust and outbound network boundary
 

@@ -49,7 +49,7 @@ func (s *SecurityNoticeStore) Claim(ctx context.Context, lease string) (usecase.
 	return job, true, nil
 }
 
-func (s *SecurityNoticeStore) Finalize(ctx context.Context, event, lease string, outcome usecase.ProofDeliveryOutcome, providerID string) error {
+func (s *SecurityNoticeStore) Finalize(ctx context.Context, event, lease string, outcome usecase.DeliveryOutcome, providerID string) error {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
 		len(event) != 26 || len(lease) != 26 ||
 		(outcome != usecase.DeliveryAccepted && outcome != usecase.DeliveryTemporary && outcome != usecase.DeliveryPermanent) {

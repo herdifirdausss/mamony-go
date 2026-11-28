@@ -1,4 +1,4 @@
-package handler
+package verifyemailpage
 
 import (
 	"crypto/sha256"
@@ -18,7 +18,7 @@ func testVerificationPageRequest(path string) *http.Request {
 }
 
 func TestEmailVerificationPageHasStrictCSPAndScrubsFragmentBeforeInteraction(t *testing.T) {
-	h, err := NewEmailVerificationPage("https://app.example.test")
+	h, err := New("https://app.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,11 +33,11 @@ func TestEmailVerificationPageHasStrictCSPAndScrubsFragmentBeforeInteraction(t *
 		t.Fatal("browser page missing mandatory private response headers")
 	}
 
-	script, err := verificationPageAssets.ReadFile("email_verification_page.js")
+	script, err := verificationPageAssets.ReadFile("page.js")
 	if err != nil {
 		t.Fatal(err)
 	}
-	css, err := verificationPageAssets.ReadFile("email_verification_page.css")
+	css, err := verificationPageAssets.ReadFile("page.css")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestEmailVerificationPageHasStrictCSPAndScrubsFragmentBeforeInteraction(t *
 }
 
 func TestEmailVerificationPageRejectsUnsafeNavigationWithoutRenderingSecrets(t *testing.T) {
-	h, err := NewEmailVerificationPage("https://app.example.test")
+	h, err := New("https://app.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestEmailVerificationPageRejectsUnsafeNavigationWithoutRenderingSecrets(t *
 			}
 		})
 	}
-	if _, err := NewEmailVerificationPage(""); err == nil {
+	if _, err := New(""); err == nil {
 		t.Fatal("empty verification page origin accepted")
 	}
 	for _, badOrigin := range []string{
@@ -140,11 +140,11 @@ func TestEmailVerificationPageRejectsUnsafeNavigationWithoutRenderingSecrets(t *
 		"https://app.example.test.",
 		"https://app.example.test#fragment",
 	} {
-		if _, err := NewEmailVerificationPage(badOrigin); err == nil {
+		if _, err := New(badOrigin); err == nil {
 			t.Fatalf("unsafe trusted origin accepted: %q", badOrigin)
 		}
 	}
-	var absent *EmailVerificationPage
+	var absent *Handler
 	w := httptest.NewRecorder()
 	absent.ServeHTTP(w, testVerificationPageRequest("/verify-email"))
 	if w.Code != http.StatusServiceUnavailable || w.Body.Len() != 0 {
