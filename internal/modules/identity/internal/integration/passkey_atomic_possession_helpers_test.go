@@ -218,4 +218,3 @@ func (s resolveThenGateActivationReader) Read(ctx context.Context,
 	}
 	return s.delegate.Read(ctx, sessionDigest, challengeID)
 }
-
