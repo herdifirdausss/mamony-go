@@ -13,7 +13,7 @@ type fakeRecoveryNoticeStore struct {
 	finalErr error
 	claims   int
 	finals   int
-	outcome  ProofDeliveryOutcome
+	outcome  DeliveryOutcome
 	provider string
 }
 
@@ -23,7 +23,7 @@ func (s *fakeRecoveryNoticeStore) Claim(_ context.Context, lease string) (Recove
 	job.LeaseID = lease
 	return job, s.found, s.claimErr
 }
-func (s *fakeRecoveryNoticeStore) Finalize(_ context.Context, _, _ string, outcome ProofDeliveryOutcome, provider string) error {
+func (s *fakeRecoveryNoticeStore) Finalize(_ context.Context, _, _ string, outcome DeliveryOutcome, provider string) error {
 	s.finals++
 	s.outcome, s.provider = outcome, provider
 	return s.finalErr
@@ -45,7 +45,7 @@ func TestRecoverySecurityNoticeWorkerOutcomes(t *testing.T) {
 		name     string
 		sendErr  error
 		provider string
-		want     ProofDeliveryOutcome
+		want     DeliveryOutcome
 		wantID   string
 	}{
 		{"accepted", nil, "<synthetic@mailgun.test>", DeliveryAccepted, "synthetic@mailgun.test"},

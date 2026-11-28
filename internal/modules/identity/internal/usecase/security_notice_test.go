@@ -13,7 +13,7 @@ type fakeNoticeStore struct {
 	finalErr error
 	claims   int
 	finals   int
-	outcome  ProofDeliveryOutcome
+	outcome  DeliveryOutcome
 }
 
 func (f *fakeNoticeStore) Claim(_ context.Context, lease string) (SecurityNoticeJob, bool, error) {
@@ -26,7 +26,7 @@ func (f *fakeNoticeStore) Claim(_ context.Context, lease string) (SecurityNotice
 	return job, true, nil
 }
 
-func (f *fakeNoticeStore) Finalize(_ context.Context, event, lease string, result ProofDeliveryOutcome, providerID string) error {
+func (f *fakeNoticeStore) Finalize(_ context.Context, event, lease string, result DeliveryOutcome, providerID string) error {
 	f.finals++
 	if f.finalErr != nil {
 		return f.finalErr
@@ -63,7 +63,7 @@ func TestSecurityNoticeWorkerBoundedDeliveryOutcomes(t *testing.T) {
 	for _, tc := range []struct {
 		label   string
 		sendErr error
-		want    ProofDeliveryOutcome
+		want    DeliveryOutcome
 	}{
 		{label: "accepted only at provider boundary", sendErr: nil, want: DeliveryAccepted},
 		{label: "transient error redacted", sendErr: errors.New("secret provider URL"), want: DeliveryTemporary},

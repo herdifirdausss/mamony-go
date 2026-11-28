@@ -47,7 +47,7 @@ func (s *RecoveryCodeSecurityNoticeStore) Claim(ctx context.Context, lease strin
 }
 
 func (s *RecoveryCodeSecurityNoticeStore) Finalize(ctx context.Context, event, lease string,
-	outcome usecase.ProofDeliveryOutcome, providerID string) error {
+	outcome usecase.DeliveryOutcome, providerID string) error {
 	if s == nil || s.db == nil || ctx == nil || ctx.Err() != nil ||
 		len(event) != 26 || event[:4] != "evt_" ||
 		!recoveryDeliveryLeaseID.MatchString(lease) ||

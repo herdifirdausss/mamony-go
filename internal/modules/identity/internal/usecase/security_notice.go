@@ -20,7 +20,7 @@ type SecurityNoticeJob struct {
 
 type SecurityNoticeStore interface {
 	Claim(context.Context, string) (SecurityNoticeJob, bool, error)
-	Finalize(context.Context, string, string, ProofDeliveryOutcome, string) error
+	Finalize(context.Context, string, string, DeliveryOutcome, string) error
 }
 
 // SecurityNoticeSender must submit a fixed, token-free password-changed
