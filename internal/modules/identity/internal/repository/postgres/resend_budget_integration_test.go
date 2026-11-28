@@ -50,7 +50,7 @@ func TestIdentityResendAdmission(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer verifyPool.Close()
-	reg, err := NewStore(regPool)
+	reg, err := NewRegistrationStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}

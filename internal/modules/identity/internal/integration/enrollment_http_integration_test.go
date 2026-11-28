@@ -57,7 +57,7 @@ func TestIdentityHTTPEnrollmentDB(t *testing.T) {
 	}
 	regPool := open(regDSN, "mamony_identity_runtime")
 	verifyPool := open(verifyDSN, "mamony_identity_verifier_runtime")
-	regStore, err := identitypg.NewStore(regPool)
+	regStore, err := identitypg.NewRegistrationStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}

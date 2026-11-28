@@ -49,7 +49,7 @@ func TestIdentityEmailVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer verifierPool.Close()
-	reg, err := NewStore(regPool)
+	reg, err := NewRegistrationStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}

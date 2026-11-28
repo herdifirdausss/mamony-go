@@ -49,7 +49,7 @@ func TestIdentityRetentionPurge(t *testing.T) {
 		t.Cleanup(p.Close)
 		return p
 	}
-	reg, err := NewStore(open(regDSN, "mamony_identity_runtime"))
+	reg, err := NewRegistrationStore(open(regDSN, "mamony_identity_runtime"))
 	if err != nil {
 		t.Fatal(err)
 	}
