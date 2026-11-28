@@ -6,44 +6,44 @@ The identity module owns tenants, users, sessions, API credentials, roles, and c
 
 The sections below record successive implementation slices. Earlier statements describe the scope at that slice, not the latest cumulative capability; later sections supersede earlier limitations where explicitly demonstrated. Historical Draft headings are retained to preserve existing deep links; all referenced PRs #22–#77 are merged.
 
-## Internal email-proof admission — Draft PR #28
+## Enrollment and contact verification
 
-**All first-party proof issuance, including the initial proof and every resend, uses one durable PostgreSQL admission policy** while the existing verifier transaction holds the subject and current alias row locks. A new request may be issued only if no proof was issued during the prior **60 seconds**, fewer than **3 proofs** were issued during the prior **hour**, and fewer than **5 proofs** were issued during the prior **24 hours**. All windows use one sampled PostgreSQL clock, not client time. Revoked and expired proofs count until their windows lapse; a denied attempt **does not rotate a valid token** and does not create a challenge, encrypted delivery row or security event. These are initial hard-coded, internal-only bounds for a synthetic first-party profile, subject to product/security review.
+Read the [narrow Phase 1 owner approval](../open-decisions.md#owner-approval-record--narrow-identity-phase-1-direction) for the accepted synthetic scope. The [Phase 1 proposal](../proposals/identity-enrollment-auth.md) records the original candidate requirements, including items awaiting separate acceptance.
 
-The internal `Resend(ctx, subjectID)` creates a **new** proof and durable encrypted delivery obligation, but returns only an error; it never returns the bearer to a request layer. Its `ErrEmailProofThrottled` is for already-authorized internal operations only; a future public handler must normalize the existence/eligibility/limit response to prevent account enumeration, and must not blindly trust a client-supplied subject identifier. The existing `Prepare` remains a restricted issuer, not an HTTP handler.
+### Internal contact verification — accepted narrow Phase 1 scope (IDF-02)
 
-**Not solved by this guard:** unauthenticated/nonexistent-account requests, requests from multiple forged identities, per-IP / network / device quotas, trusted proxy rules, global provider quotas, credential stuffing, automated account creation, CSRF/Origin and uniform public response timing. Those must be designed and verified at a trustworthy ingress before public registration or resend is enabled. A rate-limited subject is **not** an authenticated subject.
+For synthetic first-party users only: the email alias is tied to one stable subject and contact version. The verification record stores a SHA-256 domain-separated digest of the 32-byte CSPRNG-generated, URL-safe secret with subject, exact canonical email, version, purpose `EMAIL_VERIFY`, and a database-enforced expiry of 20 minutes. Issuing a new secret atomically revokes the earlier live proof. Confirmation succeeds once only: it checks the **current** unverified subject and contact/version, marks the challenge consumed, verifies the contact, changes subject status to `ACTIVE` and writes an identifier-only security event in **one PostgreSQL transaction**. Failed outbox insert rolls back activation. Confirming email **does not mint a session**.
 
-
-## Anonymous pre-registration/resend admission — stacked Draft PR #29
-
-**This is deliberately not wired to a public handler.** The internal Identity usecase `AnonymousAdmission.Admit` runs *before* user/account lookup or password hashing, using the same `CanonicalEmail` parsing policy as enrollment. This means even an email address not present in the Identity database must first consume the same account-independent budget. It requires an externally injected 32-byte HMAC key (no default); both client-network identity and canonical email are domain-separated HMAC-SHA256 digests before PostgreSQL persistence. Raw email and IP are **not stored in the admission bucket table**.
-
-Initial **fixed UTC-aligned window** bounds are deliberately independent for `REGISTER` and `RESEND`: 8 requests per client IP/IPv6 /64 per minute, 80 per client prefix per hour, 3 per canonical email per hour, and 5 per canonical email per day. All four upserts occur atomically using a single PostgreSQL clock sample, static lock order and conflict-safe increments in an Identity-runtime transaction. A denied attempt rolls back the other increments. **Fixed windows allow boundary bursts; NAT/shared IPv6 prefixes can throttle legitimate neighbors.** These values are draft testable defaults, not approved production policy. A separately reviewed global budget, credential-stuffing defense and bot/WAF protection remain required.
-
-HTTP trust primitive `handler.ClientIPResolver`: ignore ALL forwarding headers when the direct TCP peer is not in an explicit trusted proxy prefix; optionally accept only **one sanitized IP** from `X-Forwarded-For` if the immediate peer matches a narrowly scoped **private/loopback** trusted proxy. Refuse missing, multi-valued, comma-chain, conflicting forwarding headers, hostnames, IP zones, multicast and unspecified addresses in that mode. The proxy must strip client-supplied forwarding headers and overwrite a single canonical value; **the application network must prevent direct bypass**, and deploying a trusted proxy/IP policy is a separate decision. No trusted proxy is configured by default.
-
-`WriteOpaqueAdmissionReceipt` produces an identical HTTP 202 JSON body with no account existence signal for allowed or throttled, known or unknown contact. The `AnonymousBoundary` is **not an `http.Handler`**; it does not parse/accept a POST, create accounts, resend challenges, send email, or mount a route. A future route must separately provide bounded JSON/HTTP validation, TLS, CSRF/Origin where applicable, abuse-evidence logging without PII, **uniform response timing** and durable account-independent async work handling. A database outage must fail closed; an untrusted proxy failure must not be converted into authorization.
-
-Migration v5 adds `anonymous_admission_buckets` with immutable fingerprint, narrow INSERT/SELECT/UPDATE(hits) grants to the existing nonprivileged `mamony_identity_runtime` role and NO DELETE; verifier/delivery/platform roles cannot read this table. Admission rows are not yet pruned: **retention cleanup is a mandatory release gate** to prevent unbounded storage. The HMAC secret must come from an independently approved secret manager and retain compatible read keys during rotations as needed; no live secret wiring exists. The rate limiter does not create a session, authorize an action, verify email or protect payments. Separate trusted-internal issuance limits from #28 remain enforced even after anonymous admission.
-
-Required proof: `TestIdentityAnonymousAdmission` with 12 concurrent unregistered-email attempts admitting only 3 per email, separate 8/min client cap across many unique addresses, v5 migration role denial tests, and strict direct-peer vs trusted-proxy HTTP boundary unit tests.
-
-## Internal contact verification — accepted narrow Phase 1 scope (IDF-02)
-
-For synthetic first-party users only: the email alias is tied to one stable subject and contact version. A 32-byte CSPRNG random, URL-safe secret is persisted **only as a SHA-256 domain-separated digest** with subject, exact canonical email, version, purpose `EMAIL_VERIFY`, and database-enforced expiry of 20 minutes. Issuing a new secret atomically revokes the earlier live proof. Confirmation succeeds once only: it checks the **current** unverified subject and contact/version, marks the challenge consumed, verifies the contact, changes subject status to `ACTIVE` and writes an identifier-only security event in **one PostgreSQL transaction**. Failed outbox insert rolls back activation. Confirming email **does not mint a session**.
-
-Separate registration and verification runtime credentials are intentionally used; the verifier may select its owning contact and update only the columns required for activation. The verifier database authority is trusted under Profile A and cannot claim arbitrary DB-writer containment. Verification tokens must never enter logs, HTTP responses or persistent plaintext storage. The internal implementation returns a short-lived in-memory delivery instruction. The stacked v3 draft also atomically persists a purpose/subject/challenge-bound AES-256-GCM **encrypted delivery envelope** with the challenge; the DB still keeps only the token's hash for verification. A separate worker role and lease/fencing/retry state can recover the envelope after a process crash **when its external key source remains available**. No real provider, worker process wiring, public HTTP flow or global abuse admission is implemented; the event identifier alone never proves provider acceptance or delivery. Do not enable a public registration/verification route until reliable dispatch and security admission are separately verified.
+Separate registration and verification runtime credentials are intentionally used; the verifier may select its owning contact and update only the columns required for activation. The verifier database authority is trusted under Profile A and cannot claim arbitrary DB-writer containment. Verification tokens must never enter logs, HTTP responses or persistent plaintext storage. The internal implementation returns a short-lived in-memory delivery instruction. The merged internal implementation also atomically persists a purpose/subject/challenge-bound AES-256-GCM **encrypted delivery envelope** with the challenge; the DB still keeps only the token's hash for verification. A separate worker role and lease/fencing/retry state can recover the envelope after a process crash **when its external key source remains available**. The synthetic implementation includes an opt-in worker command and unmounted browser handlers. Provider verification uses a local mock. A reviewed global abuse policy is still required before public activation. Use separate delivery evidence to establish provider acceptance or delivery. Do not enable a public registration/verification route until reliable dispatch and security admission are separately verified.
 
 Acceptance evidence must include real database expiry, wrong-contact/version, replay, concurrent consume (one winner), failed-outbox rollback, reissue revocation, encrypted delivery rollback, claim/lease fencing, retry ceiling, provider error redaction, and database role denials. A positive mail delivery claim requires separate delivery evidence.
 
 See the [Identity delivery runbook](../runbooks/identity-delivery.md) for operational constraints, encryption key rotation, retry semantics, and missing deployment gates.
 
-## Direct SQL session mint — identified boundary (Draft PR #45)
+### Find the implementation and verification
 
-The existing v10 `mamony_identity_session_runtime` role is itself a session-mint capability: direct `EXECUTE` can create a cookie-equivalent session for any known ACTIVE+verified subject even when no password-verifier row exists. The disposable-PostgreSQL threat fixture `TestIdentityZDirectSessionMintThreatFixture` demonstrates this **known weakness**, not a defense. Real Chromium browser tests (#44) do not change the SQL privilege.
+| Part of enrollment | Where to read |
+|---|---|
+| Pending registration and first proof | [Enrollment flow](../../internal/modules/identity/internal/usecase/enrollment_flow.go) and [first implementation slice](../proposals/identity-enrollment-first-slice.md) |
+| Proof issuance, resend, and activation | [Email verification use case](../../internal/modules/identity/internal/usecase/verify_email.go) and [PostgreSQL proof store](../../internal/modules/identity/internal/repository/postgres/verification.go) |
+| Delivery, retention, and missing first proofs | [Email delivery runbook](../runbooks/identity-delivery.md) and [reconciliation runbook](../runbooks/identity-reconciliation.md) |
+| Browser confirmation and evidence | [Browser test chain and evidence limits](../runbooks/identity-browser-e2e.md#tested-transaction-chain) |
+| Decisions before public activation | [Enrollment release decisions](../open-decisions.md#identity-enrollment-release-decisions) |
 
-[ADR-0009](../adr/0009-authentication-to-session-issuance-boundary.md) proposes a one-use, subject/purpose/epoch-bound grant protocol with separate grant-issuer and session-consumer database capabilities. **Draft PR #46 implements a candidate, but the owner/security decision and production workload boundaries remain unapproved.** A role separation that resides entirely in one compromised Identity process does not withstand that process's RCE. Candidate v11 removes the legacy direct-mint SQL function and tests role denials and atomic grant consumption. All five mandatory CI workflows and real Chromium must still PASS on the exact final SHA, with review of role provisioning and rollback semantics. **No public route activation.**
+The [enrollment history](../history/identity-enrollment.md) records the exact limits, tests, and qualifiers for the individual PRs.
+
+## Password login and browser sessions
+
+[Authentication and lifecycle](#authentication-and-lifecycle) and [security-state controls](#security-state-and-recovery-threat-controls) define IAM-03, IAM-08, IAM-09, and IAM-11. The scope below describes merged synthetic behavior. The default HTTP application serves health endpoints, and public Identity activation remains pending.
+
+| Part of the flow | Merged synthetic scope and source |
+|---|---|
+| Password admission and verification | [Password login flow](../../internal/modules/identity/internal/usecase/login_flow.go) checks admission before credential lookup and Argon2id. Read the [login performance runbook](../runbooks/identity-login-performance.md) for fixture assumptions and measured capacity. |
+| Session issuance and authority | [Session login and authority](../../internal/modules/identity/internal/usecase/opaque_session.go) and the [PostgreSQL session store](../../internal/modules/identity/internal/repository/postgres/opaque_session.go) use a one-use grant for issuance. Migration v11 removed the earlier subject-only issuer. [ADR-0009](../adr/0009-authentication-to-session-issuance-boundary.md) describes the proposed trust boundary and the limits of role separation in Profile A. |
+| Expiry, session cap, and revocation | The internal candidate applies a 30-minute idle limit, a 12-hour absolute limit, and a cap of five usable sessions per subject. Credential or contact changes invalidate prior sessions and stale grants. See [ADR-0010](../adr/0010-server-side-session-idle-expiry.md), [ADR-0011](../adr/0011-atomic-five-session-cap.md), and [ADR-0012](../adr/0012-auth-material-epoch-grant-fence.md) for exact semantics and scope. |
+| Browser session candidate and evidence | The [browser session handler](../../internal/modules/identity/internal/handler/browser_session_http.go) remains unmounted. See [Chromium and disposable PostgreSQL evidence](../runbooks/identity-browser-e2e.md#stacked-draft-pr-44--real-chromium-first-party-sessions), then follow the later fixture revisions for grant-bound issuance and lifecycle checks. |
+
+Use the [login and session release decisions](../open-decisions.md#identity-login-and-session-release-decisions) for approval and evidence gaps. Read the [slice history](../history/identity-login-and-sessions.md) for original limits, checks, and earlier behavior.
 
 ## Authentication and lifecycle
 
@@ -86,183 +86,18 @@ Test self-approval, an expired approval, payload changes after approval, concurr
 
 **Authority limit:** Profile A trusts its authoritative application database. It does not withstand arbitrary mutation of that same authority. Stronger compromise containment requires [an explicit decision](../open-decisions.md#security-architecture-decisions), independent admin/key/deployment boundaries and adversarial evidence. The initial modular monolith remains the default.
 
-## Bounded retention — stacked Draft PR #30
+## Authenticated password change and security notices
 
-The new maintenance role has EXECUTE-only rights to two fixed, server-clock and 100-record bounded security-definer purge functions. They clear encrypted proof bearer 24 hours after proof expiry without removing attempts/audit metadata, and delete anonymous HMAC accounting 48 hours after fixed-window start. An independently approved one-shot runner is not scheduled or deployed, and no public Identity endpoints are created. Physical backups/WAL deletion and broader contact/account retention remain unresolved.
+Use [IAM-08, IAM-09, IAM-11, and IAM-13](#security-state-and-recovery-threat-controls) for the applicable requirements. This scope describes the merged synthetic flow for a signed-in user with the current password. The default HTTP listeners serve health endpoints. Password recovery has a separate proof and authority.
 
-## Unmounted HTTP registration and resend — stacked Draft PR #31
+| Part of the flow | Implementation and evidence |
+|---|---|
+| Change the current password | The [password-change use case](../../internal/modules/identity/internal/usecase/change_password.go) checks the live session and current password. The [PostgreSQL store](../../internal/modules/identity/internal/repository/postgres/password_change.go) consumes the change grant and writes the verifier, epoch update, and audit event in the same transaction. See [the scoped design](../adr/0013-authenticated-password-change.md) and [database integration test](../../internal/modules/identity/internal/integration/authenticated_password_change_integration_test.go). |
+| Record and dispatch the security notice | The password-change transaction queues a token-free obligation linked to the audit event. The [notice store](../../internal/modules/identity/internal/repository/postgres/security_notice.go) and [standalone worker](../../cmd/mamony-identity-security-notice-worker/) handle dispatch. See [the durable notice design](../adr/0014-password-change-security-notices.md) and [delivery evidence](../runbooks/identity-delivery.md#password-change-notice-scope). |
+| Reconcile provider results and observe backlog | Use the [callback design](../adr/0016-mailgun-security-notice-webhook-reconciliation.md) and the [read-only health probe](../adr/0017-read-only-notice-health-probe.md) to understand local evidence, unconfirmed outcomes, and the role limits. The callback handler remains unmounted. |
+| Handle a lost browser response | The unmounted [password-change page](../../internal/modules/identity/internal/handler/password_change_page.go) reports an uncertain outcome and locks submission after one attempt. See [Chromium and disposable PostgreSQL evidence](../runbooks/identity-browser-e2e.md#password-change-browser-evidence). |
 
-**Not routed or deployable by default.** The candidate endpoints are `POST /v1/identity/register` with JSON `{"email":"...","password":"..."}` and `POST /v1/identity/resend-verification` with JSON `{"email":"..."}`. The running public/private routers remain **health-only**. A manually injected `NewEnrollmentHTTP` handler requires: directly verified TLS (`req.TLS`), operator-approved single HTTPS browser origin that exactly matches `Origin` and HTTP Host, no cookie/Authorization, same-origin Fetch Metadata if provided, no query parameters, `application/json` and <=2048 bytes. No custom forwarded scheme is trusted. A TLS-terminating proxy is **not supported by this candidate** until its authenticated transport identity and stripping policy are reviewed; absent `req.TLS` it denies closed.
-
-The decoder rejects duplicate JSON property names, unknown keys (including `subjectID`, `tenant`, `role`), nested/wrong-typed fields, non-ASCII/invalid email via `CanonicalEmail`, missing properties and trailing JSON documents. Invalid request responses follow `application/problem+json` with stable nonsensitive codes. Anonymous admission runs before any subject lookup or expensive KDF, using the exact privileged database-free `AnonymousBoundary` from #29. Accepted, quota-denied, known, missing, duplicate, ACTIVE and downstream internal failures all produce the same opaque `202 {"status":"accepted"}` receipt after syntactically valid admission. A gate/peer/DB outage **at the admission boundary** returns generic 503. Password validation returns 400 independently of alias existence.
-
-A newly persisted pending subject is returned **only to the internal orchestrator** by `RegisterPendingWithSubject`; it immediately issues its first proof through the independently role-scoped verifier transaction and encrypted outbox. Existing aliases return no subject, and registration never rotates their proof. For resend, the verifier's SELECT-only lookup resolves the current UNVERIFIED subject using canonical email, and only that server-owned subject may be issued a new proof. Unknown, ACTIVE or already verified contact is a no-op. Subject-level 60s/3h/5d budgets (PR #28) remain authoritative and cannot be bypassed. The browser never receives subject IDs, proof tokens, contact lookup results or raw SQL/provider errors.
-
-**Known transactional gap:** pending registration plus email-proof issuance are two transactions. A crash or verification-store error between commits can leave a pending subject without a delivered proof. The already durable `ENROLLMENT_PENDING` event and a separately admitted resend permit eventual recovery, but this is **not** an automatically executing reconciliation mechanism and must not be described as atomic registration+mail dispatch. Post-admission errors are deliberately normalized to 202 for non-enumeration; therefore a future production rollout **must implement privacy-safe failure metrics, durable reconciliation, operator alerting, reliable resend UX and explicit latency-obfuscation evidence**. Equal HTTP bodies/statuses do **not** prove equal response times. Global bot/quota protection, real breached-password blocklist and KDF capacity measurements, verified TLS ingress/proxy scheme, authenticated cookies/CSRF policy, frontend token handling, bounce/complaint suppression, live provider limits, deployment secrets, monitoring, contact retention and actual public activation all remain release blockers.
-
-Required checks: handler unit tests with invalid Origin, spoofed host/forwarded protocol, duplicate JSON, unknown keys, 2KB limit, cookies and authorization; database-backed `TestIdentityHTTPEnrollmentDB` using real PostgreSQL, HMAC admission and AES-GCM sealed proofs with synthetic hasher; public/private route inventory negative checks. No live Mailgun email is sent.
-
-## Bounded missing-first-proof reconciliation — stacked Draft PR #32
-
-A separately invoked, **unmounted and unscheduled** `ReconcileEnrollmentOnce` facade uses the existing restricted verifier PostgreSQL role and AES-GCM envelope keyring. A read-only, fixed-limit scan returns at most **25** server-owned subject IDs that are still `UNVERIFIED`, have an unverified current email contact, were created **2 minutes to 24 hours** ago, and have **never had any verification challenge** (including revoked/expired ones). No HTTP caller or business DB can choose those subjects. Each selected subject uses the dedicated `EmailVerification.FirstIfMissing` issuer, which **rechecks no historical challenge under the subject/contact-row locks** and enforces the existing 60s/3-per-hour/5-per-day limits; a successful issue atomically writes its digest, sealed outbox envelope and issuance event. The operation never directly calls Mailgun, issues a session, marks email verified or returns contact data.
-
-The finder is an advisory scan, **not a distributed lock or exactly-once proof**. Concurrent normal issuance or another reconciliation process may win; the first-only condition is checked again inside the actual issuance transaction. A resulting throttle is counted as skipped, while unexpected errors fail the batch with redacted errors; subsequent invocations rescan genuine missing-first-proof candidates. It deliberately **does not repair accounts that ever had a challenge** (including expired, rejected, lost-provider-mail cases), which still need a separately admitted resend. Nor does it solve delivery provider bounces or ensure the original 202 represented durable proof creation.
-
-The counters returned by the facade (`Candidates`, `Issued`, `Skipped`) contain no email/subject IDs. They provide an operator-observable primitive but **no deployed scheduler, backlog alarm, production secrets, global rate quota or response-latency equalization**. A future approved supervisor/alerting job is required before public activation. Real disposable PostgreSQL test `TestIdentityZEnrollmentReconciliationDB` checks crash-gap repair, encrypted outbox, repeat idempotency, stale-scan/old proof nonrotation and too-recent/too-old candidate exclusion. CI integration gate enforces the test. The historical Profile A DB-integrity assumption remains unchanged.
-
-## Operator-only first-proof backlog inspection — stacked Draft PR #33
-
-A count-only verifier-role read reports `EligibleSampled` (0–26, saturated at 26) and `StalePresent` for UNVERIFIED subjects without *any* historical challenge. It separates repair-eligible subjects created 2 minutes–24 hours ago from older-than-24-hour subjects requiring manual policy review. It cannot mutate, choose subject IDs, issue proofs or inspect password verifiers. An unscheduled private one-shot command `mamony-identity-reconcile` supports `--inspect` and a separately approved `--repair-once`; the latter calls PR #32's bounded reconciliation once with externally provided AES-GCM key material and reports count-only before/after state. Exit 0 = no observed backlog, 2 = unresolved eligible/stale gap for an external supervisor, 1 = configuration/runtime failure. No built-in pager, scheduler, real provider send, public route, operational secret provisioning or production approval exists. See [Identity reconciliation operator runbook](../runbooks/identity-reconciliation.md). This does not close provider delivery/recovery, 202-response timing, bot quota, frontend proof consumption, KDF capacity or Profile B trusted-authority release gates.
-
-## Unmounted HTTP email proof consumption — stacked Draft PR #34
-
-The Identity module now has a **manually constructed, unmounted** first-party `POST /v1/identity/verify-email` candidate with exactly `{"token":"<43-character base64url bearer>"}`. Its success response is **204 with no body**; invalid, expired, revoked, unknown or replayed proofs return the same generic **400** problem response. A denied peer admission attempt returns **429**, and an unavailable peer/limiter returns generic **503**. The candidate does **not** return a subject ID, contact data, email, authenticated session, or credential. The public/private running routers remain health-only.
-
-The handler requires direct Go TLS, one exactly matching HTTPS `Origin` and HTTP `Host`, optional same-origin Fetch Metadata, no cookies/Authorization, no query/URL fragment or forwarded transport headers, and a single UTF-8 JSON document of at most 256 bytes. Unknown/duplicate keys, nested values, invalid encoding, and a noncanonical bearer are refused before authorization or database lookup. Responses have `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and a restrictive CSP. An externally supplied `ConfirmationAdmission` for per-peer rate limiting is a **required constructor dependency**, deliberately not implemented or deployed in this draft; test fixtures use an always-allow fake and do **not** prove online anti-automation controls. Confirmation requires a trusted client IP resolver; a production reverse proxy/TLS policy remains unapproved.
-
-A valid request passes only the token to the existing `EmailVerification.Confirm` usecase. The verifier-role PostgreSQL transaction checks token digest, purpose, current contact/version, `UNVERIFIED` status, expiry, revocation and single-use consumption before atomically setting the contact verified, status `ACTIVE`, and a mandatory identifier-only `CONTACT_VERIFIED` event. A failed transaction never activates the user. Concurrent duplicate requests yield at most one success. Database/connection failure in the existing `Confirm` contract can currently be reported as generic invalid proof, not a reliable retryable server error. This and latency, rate limiter, browser frontend verification flow and client UX must be reviewed before real exposure.
-
-The Mailgun message already contains a URL fragment `#token=...`; this fragment is **not transmitted on an ordinary GET**. A **separate** first-party frontend must extract the fragment, remove it from browser history before analytics/third-party script load, then explicitly POST it in the JSON body to this candidate endpoint. No such frontend is implemented here. Avoid token in query parameters, Referer, analytics, redirect logs or support screenshots. This handler is **not wired into HTTP routing**, no real Mailgun mail is sent, and no session is minted. Disposable PostgreSQL test `TestIdentityZEmailConfirmationHTTPDB` checks valid/expired/unknown/replayed/concurrent proof outcomes and that the running routers still return 404; testgate requires the named test. This closes **only the candidate HTTP-to-verifier workflow**, not the go-live controls.
-
-## Independent HTTP confirmation admission — stacked Draft PR #35
-
-A **distinct CONFIRM action** is now supported by the existing Identity v5 anonymous HMAC accounting table (extended in **immutable fingerprinted Identity migration v7**). It is NOT authorization, a login grant, or a valid-proof assertion. The dedicated internal `ConfirmationAdmission` usecase accepts only a trusted `netip.Addr`, an externally supplied 32-byte HMAC key and the restricted registration/admission PostgreSQL store. It never receives a proof bearer, subject ID, email address, or IP stored in plaintext. IPv4 exact addresses and IPv6 /64 prefixes receive independent CONFIRM counters, separate from REGISTER/RESEND even if the same HMAC key and network are supplied. The initial **fixed UTC** limits are **8 confirmations per client per minute and 80 per client per hour**; changing these requires a policy review and tests. Distinct HMAC domain strings separate the keys, and the v6 bounded 48-hour bucket retention also covers CONFIRM rows.
-
-The existing `EmailConfirmationHTTP` required `ConfirmationAdmission` interface can now be satisfied by a real shared-database implementation rather than only a fake. The actual HTTP endpoint still is **not mounted**. The new limiter consumes an admission budget before any verifier-role proof lookup, uses deterministic database upsert/lock ordering, returns 429 on exhaustion, and fails closed with generic 503 on rate-store/peer outages. It never replaces the verifier's single-use, contact, expiry, or purpose checks. Database role boundaries remain separate: admission counters are writable only by the existing enrollment role; the verifier and delivery roles cannot read them. No migration changes to password/contact authority, token handling or public routes occur.
-
-Required evidence: `TestConfirmationAdmissionPrivacyAndNetworkBounds`, `TestConfirmationAdmissionDeniesInvalidInputAndRedactsStorageFailures`, real PostgreSQL `TestIdentityConfirmationAdmission` (many concurrent distributed requests, exact eight winners) and `TestIdentityZConfirmationAdmissionHTTPDB` (two handlers sharing the database, only eight calls reaching a synthetic verifier), plus v7 migration integrity/role tests. **Remaining release blockers:** external edge/global bot quotas (per-client fixed windows are insufficient alone), trusted reverse proxy and verified direct TLS, legitimate NAT/shared IPv6 behavior, secure and rotated HMAC key distribution, rate-load measurements, error-vs-invalid-proof classification, fragment-removal frontend, monitoring, and deployment approval. These defaults are a candidate for review, not a production SLO or a complete abuse solution.
-
-## Email confirmation failure classification — stacked Draft PR #36
-
-The **unmounted** email confirmation candidate now has a strict end-to-end two-class outcome for a syntactically valid bearer after anonymous admission: **400 `INVALID_OR_EXPIRED_PROOF`** only when the verifier authority reaches an explicit negative conclusion (unknown, expired, replayed/revoked proof, incompatible current contact or inactive subject); **503 `UNAVAILABLE`** for unknown errors, database access/connection failures, transaction begin/commit failures, canceled contexts, and outbox/row-update failures. Valid one-time consumption still returns 204 without a body, and failed database commits leave the proof and subject unchanged. Neither class contains the secret, subject/contact identifier, SQL statement, DSN, or driver error. A response 503 does **not** prove the token was unused; if the connection fails after a commit or a response is lost, a later retry can receive 400 because the earlier transaction already consumed it. Client UX and private operator metrics must account for that ambiguity.
-
-The PostgreSQL adapter now distinguishes `pgx.ErrNoRows` at its *authoritative* lookup / conditional challenge-consume steps from all other failures. A missing row after the already-locked subject/alias update is an inconsistent authority state and therefore unavailable, not proof-invalid. The `EmailVerification.Confirm` usecase preserves only its explicit invalid sentinel and maps every other port error to its generic unavailable sentinel. The HTTP handler maps the invalid sentinel to 400 and all other errors to 503; the admission gate's 429/503 handling remains separate. This is a failure-classification correction, **not** a new permission or routing decision.
-
-Unit tests cover unknown SQL error redaction, context cancellation, sentinel propagation, fail-closed unknown usecase errors and 400-vs-503 HTTP bodies. Real disposable PostgreSQL tests prove a registration-only role cannot read proof material (HTTP 503 without account activation), a forced late security-event collision returns unavailable and **rolls back** an attempted confirmation, a subsequent valid retry can succeed, and invalid/expired/replay tokens remain generic 400 with exactly one concurrent winner. Existing Identity migration v7, role boundaries, and health-only routers are unchanged.
-
-**Still not production-ready:** The handler is unmounted, the browser fragment-consuming page and approved proxy/TLS deployment are absent, and operational alerting, edge/global abuse defense, secret governance, and lost-response UX need separate design and tests. Error classification alone does not establish uniform timing, sender reliability, or inbox delivery.
-
-## Safe first-party email verification page — stacked Draft PR #37 (unmounted)
-
-A candidate first-party `GET /verify-email` browser landing page now matches the **existing** Mailgun verification URL contract `https://<approved-host>/verify-email#token=<32-byte-base64url>`. It is **not mounted** by `httpedge.PublicHandler` or `httpedge.PrivateHandler`. The Go page handler is an authority-free static asset renderer (no database, mail, credential, verifier or session capability), requiring direct TLS, the exact approved standard HTTPS host, GET, no query or request fragment, no cookies or Authorization, and no forwarded scheme declarations. Responses are non-cacheable and no-referrer, deny framing, and use CSP SHA-256 hashes of exactly the embedded inline JavaScript and CSS; all other script/style resources, images, fonts, frames, forms, workers, and external connections are forbidden. The only permitted outgoing browser connection is same-origin `fetch` to the existing unmounted `POST /v1/identity/verify-email` candidate.
-
-The browser bootstrap captures `location.hash` once and calls `history.replaceState(null, "", "/verify-email")` **before DOM-ready handlers, rendering of other resources, or any request**. Only an exact `#token=<43-character base64url>` fragment becomes an in-memory candidate. Failure to remove the fragment fails closed: no POST. It never stores the bearer in URL query, local/session storage, cookies, a log, analytics, form action, or an outbound referrer. Critically, **opening the email link does NOT consume the token**; only a deliberate button click may send a single JSON POST (credentials omitted, redirect blocked, same-origin mode, no-store, no-referrer) to the existing verification API. This avoids automatic consumption from passive GET-based mail previews/scanners; it is not proof that a bot cannot click.
-
-User messages: 204 means verified (without login); 400 means unknown/expired/already used or invalid **without asserting current account status**; 429 means client admission exhausted; 503, fetch/network errors and any unexpected status explicitly state that verification **may already have succeeded**. No automatic retry or proof rotation occurs; the in-memory token is cleared on click. The page intentionally has no sign-in link yet, because login is not built, and no third-party analytics or asset requests.
-
-Tests: Go handler tests verify CSP integrity hashes, no external elements, request/TLS/Host hardening, and unmounted router inventory. A pinned Node.js 22.16.0 workflow runs dependency-free DOM/fetch VM tests of the exact embedded JavaScript, covering fragment scrub order, preview without automatic POST, malformed fragments, one-click-only delivery, same-origin transport options, 204/400/429/503/network ambiguity and scrub failure. These are **simulated browser-behavior tests, not an actual Chrome/Firefox/real Mailgun end-to-end test**. Before go-live, review browser compatibility/CSP in real headless browsers, Mailgun click-tracking configuration, trusted production hosting/TLS, scanner interaction, operator observability, account-status UX after a lost response, and all previously documented Identity release gates. A server-side 404 from the default router remains expected.
-
-## Real Chromium + actual database browser verification gate — stacked Draft PR #38
-
-A **test-only**, unmounted end-to-end fixture now joins the existing Identity HTTPS registration handler, PostgreSQL restricted registration/proof/delivery roles, AES-GCM challenge+envelope, delivery worker, real Mailgun adapter with a **loopback-only provider mock**, and the candidate verification page/confirmation handler from PR #37/#36. Headless Chromium executes the actual hashed-CSP first-party page and `fetch`; a narrowly scoped test bridge preserves the `app.example.test` browser origin while forwarding *only* the page and confirmation requests over ephemeral loopback HTTPS. No production DNS, browser hosting or TLS reverse-proxy configuration is added. The actual running `httpedge` routers remain health-only.
-
-The browser gate proves: a GET preview does not consume a challenge; the fragment is removed before a manual click; one explicit click confirms a valid proof and commits exactly one `ACTIVE` status and `CONTACT_VERIFIED` event; a response intentionally lost **after database commit** displays conservative ambiguous guidance with no automatic retry and replay returning 400; an expired proof returns 400 without activating an account. Database assertions use only the synthetic disposable admin fixture. Registration uses a **synthetic test hasher**, not production Argon2id performance, and all Mailgun sends go to a local HTTP mock. No bearer is uploaded in CI screenshots/traces or emitted to test logs. Chromium CSP and DOM behavior is more concrete than the previous Node VM, but **Firefox/Safari, active-click mail scanners, production TLS termination, provider delivery, real-browser accessibility and signup policy performance are not covered**. See `docs/runbooks/identity-browser-e2e.md` for commands, exact test path and remaining release gates.
-
-## Internal password authentication foundation — stacked Draft PR #39
-
-The first credential-checking primitive is **internal only and NOT a login endpoint or session authority**. `PasswordAuthentication.Authenticate(ctx, email, password)` validates canonical alias/NFC password and calls a separate **read-only authenticator role** for one credential snapshot. Any syntactically valid account-lookup miss still incurs one full Argon2id v1 check with a fixed fake verifier; this prevents missing aliases from skipping expensive KDF work. A matched password returns a server-owned **subject candidate** only if the account status is `ACTIVE` and the current alias is verified; unknown/wrong/unverified/suspended/frozen/deleted accounts all receive one generic denied sentinel and **no subject**. Database outage, cancellation or KDF integrity/capacity failure use a different sanitized unavailable sentinel; raw SQL, salt, digest, account status and password are not returned.
-
-The forward-only fingerprinted Identity **migration v8** grants a newly provisioned `mamony_identity_authenticator_runtime` column-scoped SELECT over only the subject status, current email verified marker and Argon2id verifier material. It cannot read proof challenges, admission keys, mail envelopes, security events, history or write any account/verifier column. Existing registration and proof-verifier roles remain unable to read password verifiers. Only a **synthetic disposable test role** is provisioned in this repository; deployment must supply a separately reviewed real runtime credential. Tests require exact role denial and a real bounded Argon2id+PostgreSQL password acceptance after contact verification, plus unknown/inactive generic rejections.
-
-**Critical unresolved gates:** This is not a complete anti-enumeration solution (SQL timing still differs), and there is no pre-KDF global login throttling, public HTTP login response/timing contract, lock policy, MFA, session issuer/rotation/revocation, audit, live secure key management or financial authorization. Do not mount any login route or treat an internal subject candidate as an authenticated session. The status could change after the read; the future session authority must recheck account eligibility and write session state atomically. See `docs/adr/0004-password-authentication-foundation.md`.
-
-## Pre-Argon2id password login admission — stacked Draft PR #40
-
-A new **unmounted** `PasswordLoginFlow` makes a login admission call mandatory **before** any password-verifier SQL lookup or 64 MiB Argon2id work. The independent `LoginAdmission` charges every validly shaped email—**including unknown aliases**—against HMAC-SHA256 keys for a global action, exact IPv4/IPv6 /64 client network and canonical email. The bounded PostgreSQL accounting transaction uses five LOGIN-only fixed windows: 80/global minute; 8/client minute; 80/client hour; 5/email hour; 20/email day. The global limit is intentionally an **unapproved conservative candidate**; an actual production capacity model must change/approve it. No plaintext email, peer address, subject, password or bearer enters the counter store. On a denied, invalid or unavailable admission, no credential read or KDF can be invoked through this flow. There are **no login HTTP routes, cookies, sessions, or authorization changes**.
-
-Migration **v9** extends only the existing admission table's CHECK constraints for `LOGIN` and `GLOBAL_MINUTE`, preserving the registration runtime's existing column-limited counter-write grants, independent REGISTER/RESEND/CONFIRM quotas, 48-hour retention and denied-transaction rollback semantics. The login admission role is the existing restricted `mamony_identity_runtime`; only the separate `mamony_identity_authenticator_runtime` may SELECT password verifiers. Unit and disposable database tests exercise concurrent independent pools, global/per-network/per-alias budgets, HMAC and IPv6 privacy, unknown-account charge, and **real Argon2id** admitted/denied paths. A denied attempt rolls back earlier increments; an attacker flooding already denied aliases can still load the DB—**perimeter load shedding/WAF is a mandatory production blocker**. Details: `docs/adr/0005-login-admission-before-argon2id.md`.
-
-## Internal opaque sessions — stacked Draft PR #41
-
-An **internal-only** `SessionLogin` now composes the #40 durable pre-KDF admission/password authentication result with a **separately authorized, transactional session issuer**. A successful password check alone is insufficient: the SQL owner rechecks `ACTIVE` status and verified current contact under `FOR UPDATE` locks **before** storing the new opaque session digest and durable `SESSION_CREATED` event. The issuer creates a 256-bit CSPRNG bearer (43-character canonical base64url), transmits **only a domain-separated SHA-256 digest** to SQL, and releases the raw bearer only after definite transaction commit. Ambiguous DB commits discard the bearer; no automatic mint retry. Default session lifetime is **12 hours absolute** on the database clock, with no refresh/sliding renewal. Resolve checks expiry, revocation, current ACTIVE/verified state and `session_epoch` on every invocation. A database trigger increments the epoch on all account status transitions: **freeze then thaw cannot resurrect an old token**. Revoke is idempotent and produces one `SESSION_REVOKED` audit event for first revocation.
-
-Fingerprint-protected **Identity migration v10** creates `opaque_sessions`, the status-epoch trigger, and three narrowly scoped `SECURITY DEFINER` functions. The **new**, externally provisioned `mamony_identity_session_runtime` only has EXECUTE on these functions, no direct SELECT/INSERT/UPDATE/DELETE on Identity tables and no access to password digests, email challenges, or admission buckets. Session digest retention is bounded to 100 rows per maintenance call, after expiry +24h, with the maintenance role only. Existing registration/verifier/authenticator privileges stay unchanged. These APIs remain unmounted; `httpedge` still returns 404 for Identity login/session paths. No cookie, CSRF, MFA, refresh, recovery or tenant action authorization exists. The session role **can mint for any known eligible subject if directly compromised**, so it is a sensitive authority requiring network/credential isolation. Password change/contact reset must bump epoch in a future ADR; financial actions must revalidate authorization at action time. See `docs/adr/0006-opaque-session-authority.md`.
-
-## Session freeze/issuance concurrency and browser transport proposal — Draft PR #42
-
-PostgreSQL isolation is now tested in **both real commit orders** with a deliberately held row lock, using a disposable superuser `pg_stat_activity` observation barrier instead of timing guesses. If freeze commits first, pending issuance must deny without persisting a session digest or `SESSION_CREATED` outbox event. If the issuer locks and commits first, subsequent freeze must wait, advance the account epoch after issuance, and invalidate that token; subsequent thaw must **not resurrect** it. An aborted issue transaction must roll back both the digest and event. `TestIdentityZSessionFreezeIssueInterleavings` is a mandatory testgate requirement. This is not equivalent to authorization at the point of a financial action.
-
-A **proposed only, unmounted** same-origin browser session contract lives in `docs/adr/0007-first-party-browser-session-http-contract.md`. Candidate `POST /v1/identity/login` requires direct verified HTTPS Host+Origin, bounded strict JSON, trusted client peer and the concrete pre-KDF `SessionLogin`; it would send a `__Host-mamony_sid` Secure, HttpOnly, SameSite=Strict, Path=/, no-Domain 12h cookie only after confirmed issuance. Candidate `GET /v1/identity/session` resolves the cookie without sliding expiry; candidate `POST /v1/identity/logout` revokes it under exact-Origin and session-bound CSRF validation; candidate `GET /v1/identity/csrf` could supply a separate same-origin CSRF token. Cookie, CSRF, routes and public error semantics are **not implemented** and the default routers remain health-only. Login-CSRF, server-side session binding, CSRF key rotation, trusted proxy deployment, WAF, MFA and financial action authorization are still explicit gates.
-
-## Unmounted first-party session HTTP candidate — stacked Draft PR #43
-
-A new manually constructed `BrowserSessionHTTP` exists **inside** Identity's handler package, implementing the candidate login/session/csrf/logout flow outlined by [ADR-0007](../adr/0007-first-party-browser-session-http-contract.md). Constructor injection requires direct HTTPS canonical origin, a no-proxy `ClientIPResolver`, the concrete `*usecase.SessionLogin` (which itself requires the pre-KDF `*PasswordLoginFlow`), the opaque session resolver/revoker, and a separate 32-byte CSRF HMAC secret. No production/default key, route registration or environment enable switch exists; both `httpedge` listeners still return **404** for all four session paths and the router tests enforce this.
-
-Candidate POST login uses exact direct-TLS Host+Origin, bounded duplicate-key-rejecting JSON, HMAC login admission **before** Argon2id, and a confirmed atomic session commit before emitting `__Host-mamony_sid` as host-only Path=/ Secure HttpOnly SameSite=Strict max-age 12h; no Domain attribute or bearer JSON. GET session returns an authenticated boolean only and never refreshes the cookie. GET csrf returns a separate expiry+HMAC token bound to the current session and canonical origin, valid for 15 minutes; POST logout requires exact Origin and a valid `X-Mamony-CSRF`, resolves/revokes in the DB, and clears the cookie only on certain commit. Generic HTTP errors distinguish invalid credentials/session from infrastructure unavailability without leaking internal details. The CSRF key/issuance flow must be explicitly provisioned per environment; all current tests use synthetic credentials.
-
-**Not ready for production**: session role direct-mint authority has not been restricted by an independently attested password proof; HTTP guards cannot solve a compromised session database role. Network isolation/role credentials, real browser acceptance tests, key rotation and multi-instance CSRF consistency, upstream rate limiting/WAF, trusted ingress proxy, login-CSRF/federation, account recovery/credential-reset epoch revocation, idle/reauth/MFA, and per-resource financial authorization remain blockers. See [ADR-0008](../adr/0008-unmounted-browser-session-http-candidate.md).
-
-## Server-enforced session inactivity — Draft PR #47 (candidate)
-
-Following v11 grant-bound issuance, a new forward-only v12 migration adds DB-owned `last_seen_at` and changes only the restricted `resolve_opaque_session` function: after locking session, subject and current contact, PostgreSQL denies idle ≥ 30 minutes, absolute expiry ≥ 12 hours, revocation, changed epoch, frozen/inactive subject and unverified contact. On successful resolution, the PostgreSQL clock refreshes activity **without** changing `expires_at`; a bearer cannot reactivate itself after an idle timeout. The browser's 12-hour cookie expiry remains only an upper bound, not an authorization check. Existing session role direct table access is still forbidden. See [ADR-0010](../adr/0010-server-side-session-idle-expiry.md).
-
-The 30-minute value and write-on-resolve lock overhead are **unapproved design candidates**. Migration backfill deliberately treats issue time as last activity and may invalidate previously issued inactive cookies. Production rollout requires contention/load tests, multi-instance behavior, alerting, user-facing idle-expiry UX, actual secret and network isolation, safe reauthentication and MFA/step-up; all public session routes remain unmounted and financial authorization remains independent.
-
-## Atomic concurrent-session cap — stacked Draft PR #48
-
-Candidate v13 Identity authority enforces a **new issuance cap of five currently usable sessions per subject and current epoch**, counting only unrevoked records still within the fixed 12-hour absolute and 30-minute DB-clock idle windows. Once five slots are occupied, one real successful admission/Argon2id/grant login atomically revokes the oldest eligible digest and emits a `SESSION_REVOKED` outbox event while creating its new bearer and `SESSION_CREATED` event. Two concurrent distinct grants serialize behind the same subject row; session Resolve/Logout also use explicit subject-first/session-second locking to avoid lock inversion. No unrestricted SQL table privilege or caller-chosen-subject issuing API is introduced. See [ADR-0011](../adr/0011-atomic-five-session-cap.md).
-
-**Caveat:** this candidate does not retroactively bulk-revoke >5 live sessions already present before v13; in that state, further issuance is denied until old sessions expire/revoke or a separately reviewed remediation occurs. Session cap is not an authorization rule for finance. Operational throughput, production credential isolation, remote session list/revoke UX, MFA/step-up and password/contact epoch revocation remain launch blockers; all candidate browser endpoints stay unmounted.
-
-## Password/contact-change session invalidation — stacked Draft #49
-
-Candidate v14 triggers transactionally advance the Identity subject's `session_epoch` when password-verifier material or login contact really changes, or when the verifier/alias row is removed. Every previous session and previously staged grant is then stale and denied by the existing session/grant epoch checks. **Important TOCTOU fix:** the read-only authenticator now returns the epoch from the same credential SELECT as the Argon2id hash, before the CPU-bound comparison; the trusted `SessionLogin` must pass that epoch into the **three-argument** restricted grant-staging SQL function. A changed epoch blocks an old password result from creating a new-epoch session. The former two-argument function is removed by forward-only v14 migration. See [ADR-0012](../adr/0012-auth-material-epoch-grant-fence.md).
-
-This is infrastructure for a future reviewed password/contact change workflow, **not that workflow**: there is no public reset route, no sensitive-change reauthentication, no new mutation role, no account-change notification/audit policy, and no claims about compromised Identity Go runtime or a grant-role assertion oracle. Mutators must take subject lock first; existing Identity browser routes stay unmounted.
-
-## Internal authenticated password change — stacked Draft #50
-
-Candidate v15 adds `AuthenticatedPasswordChange.Change`, which requires a currently usable opaque session **and** fresh old-password verification through mandatory distributed pre-KDF login admission + Argon2id, bound to the same subject and epoch. The new secret is NFC-normalized, checked against the required configured password blocklist, denied if equal to the old normalized secret, and rehashed with a new 128-bit salt. A purpose-bound one-use `PASSWORD_CHANGE` grant (30s) cannot be consumed by the login session issuer. A new EXECUTE-only `mamony_identity_password_change_runtime` can rotate the verifier only with both session and change proof; mutation, v14 `session_epoch` increment and identifier-only `PASSWORD_CHANGED` security event commit atomically. No replacement bearer is issued. See [ADR-0013](../adr/0013-authenticated-password-change.md).
-
-No change-password public endpoint, session cookie/CSRF mutation handler, notification delivery or approved production blocklist is included. The grant stager remains a privileged assertion oracle under Profile A. Owner/security/UX approvals, MFA/step-up, trusted client network and workload secret isolation remain blockers.
-
-## Password-change notification obligation — stacked Draft #51
-
-The v15 trusted `PASSWORD_CHANGED` security outbox event now causes a **v16 same-transaction enqueue** in `password_change_notices`; a failed enqueue rolls back the password change. The identifier-only security outbox remains free of email addresses. Only events written under the original `mamony_identity_password_change_runtime` PostgreSQL login can trigger a notice; earlier verifier role outbox INSERT privileges cannot forge an alert. The separate queue captures the currently verified email at the time of mutation; it contains only event ID, subject, recipient and delivery metadata, never a bearer/password/reset URL.
-
-The isolated `mamony_identity_security_notice_runtime` may EXECUTE only claim/finalize functions (not read raw tables, alter Identity state, mint grants or issue sessions). Due notices are claimed with SKIP LOCKED and 45-second fences; retry is capped at five submissions with 1/2/4/8 minute backoff. A contact change or unverified/DELETED recipient before claim marks the notice DEAD to prevent sending to an unbound address. Provider ACCEPTED never means inbox delivered; duplicate sends may occur after worker crashes. Seven-day fixed retention deletes recipient rows while preserving the security event. Refer to [ADR-0014](../adr/0014-password-change-security-notices.md).
-
-No live sender/worker command is activated and no public password-change route exists. Sender is a mockable interface only in this candidate; no user notification can yet be claimed. Remaining policy includes operational delivery monitoring, a trusted provider sender, bounce handling and escalation when stale notices are suppressed.
-
-## Password-change Mailgun security notice sender — stacked Draft #52
-
-The internal `SecurityNoticeSender` abstraction from Draft #51 now has a real Mailgun Messages API implementation limited to the configured US/EU/AU region and verified sending domain. It submits a **fixed text-only password-changed warning**, not a verification token, session, grant, reset URL or user-selected text. No links or dynamic metadata; open/click tracking disabled and Mailgun recipient TLS required. HTTP response/error bodies are never exposed; a successful bounded 200 JSON response means **accepted by provider**, not delivered or read. HTTP 429/420/408/5xx and uncertain outcomes retry under the v16 PostgreSQL bounded lease/backoff; duplicates remain possible after an ambiguous acceptance.
-
-A new dedicated `RunSecurityNoticeDelivery` facade and standalone `cmd/mamony-identity-security-notice-worker` use **only** the `mamony_identity_security_notice_runtime` role; they do not reuse the verification email sender, token envelope keyring or worker DSN. Real email sending needs both `--send-live-security-mailgun` and the exact operator approval, external owner-only secret files, non-CI runtime and verified-full PostgreSQL TLS. **The command is not scheduled/deployed, no real credentials have been connected and no live email has been sent by this implementation.** See [ADR-0015](../adr/0015-mailgun-password-change-notice-worker.md).
-
-## Signed Mailgun notice callbacks and operator counts — stacked Draft #53
-
-Identity v17 extends the password-change notification queue with **SHA-256 of the normalized Mailgun Message-ID** returned only after a successful Mailgun send response. The sender no longer calls an uncorrelated three-argument SQL finalizer: the worker role may only execute the new four-argument `finalize_password_change_notice_v2`. `ACCEPTED` means submitted to provider; independent `provider_state` tracks `SUBMITTED`, `TEMPORARY_FAILURE`, `DELIVERED` (recipient SMTP server only), `PERMANENT_FAILURE`, `COMPLAINED`, and `UNSUBSCRIBED`.
-
-The **unmounted** HMAC-verifying Mailgun webhook candidate accepts only signed JSON event callbacks from the configured sending domain, fixed failure types and a verified Mailgun message-ID. It uses a signing key **different from the API sending key**. A separate `mamony_identity_notice_webhook_runtime` role may only EXECUTE a receipt function; it cannot read tables, access credentials, issue sessions, or alter password verifiers. Replay tokens and Mailgun event IDs are deduplicated in PostgreSQL using digests; receipt payloads store no email/PII. Out-of-order events are durably reconciled, and a later bounce/complaint cannot be hidden by an older delivery callback. A count-only health function is exposed to the isolated maintenance operator role, not the HTTP runtime.
-
-A signed callback cannot be treated as full-body cryptographic attestation: Mailgun signs `timestamp+token`, not the entire JSON. Transport/TLS, domain binding, role isolation and real provider-key ownership must be reviewed before enabling a live endpoint. **No route is registered, no webhook receiver is deployed, no real Mailgun callback is processed and no on-call alert is configured.** Prior uncorrelated ACCEPTED notices cannot be automatically backfilled; ambiguous sender timeouts may produce unmatched provider receipts and duplicate messages. See [ADR-0016](../adr/0016-mailgun-security-notice-webhook-reconciliation.md).
-
-## Read-only Mailgun notice health probe — stacked Draft #54
-
-Identity v18 introduces the isolated `mamony_identity_notice_monitor_runtime` PostgreSQL LOGIN role, with **only** schema USAGE and EXECUTE on the count-only `security_notice_health()` function. It has no retention purge, mail delivery, webhook receipt, contacts, session, password or table permissions. `ReadSecurityNoticeHealthAsMonitor` exclusively accepts this role; the earlier maintenance-only facade remains backwards-compatible.
-
-The unmounted, one-shot `mamony-identity-notice-health` command requires a private DSN file, strict full TLS verification, `--check-security-notices`, five mandatory numeric thresholds, and a non-CI operator environment. It writes only count-only JSON and exits 0 OK, 2 ALERT (configured threshold exceeded), or 1 ERROR (misconfiguration/DB unavailable). No default production thresholds, on-call routing, scheduler or public HTTP health endpoint exist. Counts can report suspected problems, not verify human inbox receipt. See [ADR-0017](../adr/0017-read-only-notice-health-probe.md).
-
-## Unmounted browser password-change boundary — stacked Draft #55
-
-The candidate `BrowserPasswordChangeHTTP` provides a separately constructed but **unmounted** `POST /v1/identity/change-password`. It reuses the existing concrete browser-session handler's exact HTTPS Origin/Host, direct-TLS, no-forwarded-identity, trusted peer, host-only cookie and 15-minute session-bound CSRF requirements. Bounded, duplicate-key-rejecting JSON has exactly `email`, `currentPassword`, `nextPassword`; the email must be canonical, but is **not** trusted as the account authority. A concrete `AuthenticatedPasswordChange` usecase independently verifies the old secret against the session's subject and epoch before the SQL atomic rotation.
-
-On certain success, the response is 204 with the old cookie cleared; v14 SQL epoch invalidation has already revoked all previous sessions, and there is **no replacement session**. Wrong secret, account mismatch, throttle or new-secret policy denial collapse to a generic 401. Unknown commit outcome returns 503 and never claims success or clears the cookie, even if PostgreSQL might have committed. Response headers use no-store and no password or session material is emitted.
-
-This is **not an enabled public or private route**: application routers and `main` remain unchanged, and no real-browser + PostgreSQL test of this new operation has yet passed. MFA/step-up, production password blocklist, live email sender/webhook, trusted ingress, account recovery, user-facing UX and finance authorization remain open. See [ADR-0018](../adr/0018-first-party-password-change-http-candidate.md).
-
-## Actual Chromium password-change proof — stacked Draft #56
-
-The previously unmounted `BrowserPasswordChangeHTTP` candidate is now exercised with real Chromium cookie handling, actual Argon2id, isolated PostgreSQL runtime roles and v15–v18 transactional state in `TestIdentityZBrowserPasswordChangeE2E` (tags `integration,browser_e2e`). Two independent browser sessions on the same account prove a successful password change invalidates both, while the initiator's host-only cookie is cleared and only the new credential can create a fresh session. Denied CSRF, oversized/duplicate JSON, sibling/cross-site requests, and a different account's valid password do not authorize the rotation.
-
-A second scenario deliberately drops the HTTP response **after** PostgreSQL commit: Chromium retains the old cookie but server-side session resolution rejects it; a fresh login needs the new password. The test also proves one epoch increment and exactly one `PASSWORD_CHANGED` event plus pending notice per account. It does not retry ambiguous credential changes or send email. The test-only TLS bridge does not establish deployed ingress or CORS proof. The actual production application routers still return 404 on `POST /v1/identity/change-password`; public deployment, real browser UX and MFA/recovery approvals are open. See [ADR-0019](../adr/0019-browser-password-change-postgres-e2e.md).
-
-## Candidate one-shot browser password-change experience — stacked Draft #57
-
-An explicitly unmounted `PasswordChangePage` now renders static first-party `GET /account/change-password` using the **same** direct-TLS origin and browser session boundary as `BrowserPasswordChangeHTTP`. Its script/style are embedded with exact CSP hashes, no third-party resources or persistent storage. A real active session and session-bound CSRF must be fetched before the form becomes visible; the confirmation password remains client-only. A single deliberate click or keyboard form submit sends the existing strict `email`/`currentPassword`/`nextPassword` JSON request, clears all password input elements and locks the UI against automatic resend.
-
-The page distinguishes confirmed `204` (successful; all sessions invalidated, sign in again), generic `401` (denied, reason undisclosed), and **any uncertain response or network exception** (might have committed; do not repeat the password change; use established trusted sign-in or recovery). No new login/recovery URL is invented or exposed. Real Chromium + PostgreSQL tests cover signed-out state, matching confirmation, certain commit, denial, and HTTP response lost **after** commit. Default production listeners still return 404 for both the candidate page and mutation. See [ADR-0020](../adr/0020-unmounted-password-change-recovery-page.md).
+Use the [release decision register](../open-decisions.md#identity-password-change-release-decisions) for open approval and evidence requirements. See the [password-change history](../history/identity-password-change.md) for the original limits, checks, and candidate status in each slice.
 
 ## Password recovery proof foundation — stacked Draft #58
 
@@ -424,3 +259,127 @@ The permitted state transition establishes possession evidence only. It confers 
 | PKA-08 | Fail closed on unexpected storage or uncertain commit outcomes; sanitize errors and do not automatically retry. | Unit and integration error-handling evidence. |
 
 The [detailed proposal](../proposals/identity-passkey-atomic-activation.md) retains the complete accepted requirement definitions and test matrix. These summaries do not relax that matrix, establish blanket PASS, or certify recovery after stale restore. Platform #14 owns shared recovery foundation; Identity #78 owns credential semantics and security obligations. Production notification delivery, recovery continuity, role custody, ingress, independent review and separate release approval remain blockers. No automatic cleanup or recovery release is authorized by this slice.
+
+## Enrollment history links
+
+The original anchors below lead to the corresponding archived sections.
+
+### Internal email-proof admission — Draft PR #28
+
+[Read the original slice record](../history/identity-enrollment.md#internal-email-proof-admission--draft-pr-28).
+
+### Anonymous pre-registration/resend admission — stacked Draft PR #29
+
+[Read the original slice record](../history/identity-enrollment.md#anonymous-pre-registrationresend-admission--stacked-draft-pr-29).
+
+### Bounded retention — stacked Draft PR #30
+
+[Read the original slice record](../history/identity-enrollment.md#bounded-retention--stacked-draft-pr-30).
+
+### Unmounted HTTP registration and resend — stacked Draft PR #31
+
+[Read the original slice record](../history/identity-enrollment.md#unmounted-http-registration-and-resend--stacked-draft-pr-31).
+
+### Bounded missing-first-proof reconciliation — stacked Draft PR #32
+
+[Read the original slice record](../history/identity-enrollment.md#bounded-missing-first-proof-reconciliation--stacked-draft-pr-32).
+
+### Operator-only first-proof backlog inspection — stacked Draft PR #33
+
+[Read the original slice record](../history/identity-enrollment.md#operator-only-first-proof-backlog-inspection--stacked-draft-pr-33).
+
+### Unmounted HTTP email proof consumption — stacked Draft PR #34
+
+[Read the original slice record](../history/identity-enrollment.md#unmounted-http-email-proof-consumption--stacked-draft-pr-34).
+
+### Independent HTTP confirmation admission — stacked Draft PR #35
+
+[Read the original slice record](../history/identity-enrollment.md#independent-http-confirmation-admission--stacked-draft-pr-35).
+
+### Email confirmation failure classification — stacked Draft PR #36
+
+[Read the original slice record](../history/identity-enrollment.md#email-confirmation-failure-classification--stacked-draft-pr-36).
+
+### Safe first-party email verification page — stacked Draft PR #37 (unmounted)
+
+[Read the original slice record](../history/identity-enrollment.md#safe-first-party-email-verification-page--stacked-draft-pr-37-unmounted).
+
+### Real Chromium + actual database browser verification gate — stacked Draft PR #38
+
+[Read the original slice record](../history/identity-enrollment.md#real-chromium--actual-database-browser-verification-gate--stacked-draft-pr-38).
+
+## Login and session history links
+
+The original anchors below lead to the corresponding archived sections.
+
+### Internal password authentication foundation — stacked Draft PR #39
+
+[Read the original slice record](../history/identity-login-and-sessions.md#internal-password-authentication-foundation--stacked-draft-pr-39).
+
+### Pre-Argon2id password login admission — stacked Draft PR #40
+
+[Read the original slice record](../history/identity-login-and-sessions.md#pre-argon2id-password-login-admission--stacked-draft-pr-40).
+
+### Internal opaque sessions — stacked Draft PR #41
+
+[Read the original slice record](../history/identity-login-and-sessions.md#internal-opaque-sessions--stacked-draft-pr-41).
+
+### Session freeze/issuance concurrency and browser transport proposal — Draft PR #42
+
+[Read the original slice record](../history/identity-login-and-sessions.md#session-freezeissuance-concurrency-and-browser-transport-proposal--draft-pr-42).
+
+### Unmounted first-party session HTTP candidate — stacked Draft PR #43
+
+[Read the original slice record](../history/identity-login-and-sessions.md#unmounted-first-party-session-http-candidate--stacked-draft-pr-43).
+
+### Direct SQL session mint — identified boundary (Draft PR #45)
+
+[Read the original slice record](../history/identity-login-and-sessions.md#direct-sql-session-mint--identified-boundary-draft-pr-45).
+
+### Server-enforced session inactivity — Draft PR #47 (candidate)
+
+[Read the original slice record](../history/identity-login-and-sessions.md#server-enforced-session-inactivity--draft-pr-47-candidate).
+
+### Atomic concurrent-session cap — stacked Draft PR #48
+
+[Read the original slice record](../history/identity-login-and-sessions.md#atomic-concurrent-session-cap--stacked-draft-pr-48).
+
+### Password/contact-change session invalidation — stacked Draft #49
+
+[Read the original slice record](../history/identity-login-and-sessions.md#passwordcontact-change-session-invalidation--stacked-draft-49).
+
+## Password-change history links
+
+The original anchors below lead to the corresponding archived sections.
+
+### Internal authenticated password change — stacked Draft #50
+
+[Read the original slice record](../history/identity-password-change.md#internal-authenticated-password-change--stacked-draft-50).
+
+### Password-change notification obligation — stacked Draft #51
+
+[Read the original slice record](../history/identity-password-change.md#password-change-notification-obligation--stacked-draft-51).
+
+### Password-change Mailgun security notice sender — stacked Draft #52
+
+[Read the original slice record](../history/identity-password-change.md#password-change-mailgun-security-notice-sender--stacked-draft-52).
+
+### Signed Mailgun notice callbacks and operator counts — stacked Draft #53
+
+[Read the original slice record](../history/identity-password-change.md#signed-mailgun-notice-callbacks-and-operator-counts--stacked-draft-53).
+
+### Read-only Mailgun notice health probe — stacked Draft #54
+
+[Read the original slice record](../history/identity-password-change.md#read-only-mailgun-notice-health-probe--stacked-draft-54).
+
+### Unmounted browser password-change boundary — stacked Draft #55
+
+[Read the original slice record](../history/identity-password-change.md#unmounted-browser-password-change-boundary--stacked-draft-55).
+
+### Actual Chromium password-change proof — stacked Draft #56
+
+[Read the original slice record](../history/identity-password-change.md#actual-chromium-password-change-proof--stacked-draft-56).
+
+### Candidate one-shot browser password-change experience — stacked Draft #57
+
+[Read the original slice record](../history/identity-password-change.md#candidate-one-shot-browser-password-change-experience--stacked-draft-57).
