@@ -17,8 +17,8 @@ type SecurityNoticeHealth struct {
 	UnmatchedEvents  int64
 }
 
-// SecurityNoticeHealthStore must use mamony_identity_maintenance_runtime,
-// never the send-worker or webhook-receiver credential.
+// SecurityNoticeHealthStore reads aggregate counts through the monitor or
+// maintenance runtime pool. The facade selects the role when it opens the pool.
 type SecurityNoticeHealthStore struct {
 	db Transactor
 }
