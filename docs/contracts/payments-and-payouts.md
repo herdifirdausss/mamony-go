@@ -13,6 +13,8 @@ The intent or payout owns business state. The provider connector owns the provid
 5. If the provider outcome is unknown, keep the attempt processing. Schedule inquiry to the same provider. Process later results once.
 6. After provider success, make the required ledger postings with stable keys. Consume the fee quote in the posting transaction. Record the ledger result. Only then mark the intent succeeded.
 
+The [fee-quote boundary](fees-limits-and-accounts.md#fee-quotes) links the open FEE-02 conflict with Ledger-local ownership. Resolve that decision before implementing fee consumption in step 6.
+
 | ID | Requirement | Acceptance check |
 |---|---|---|
 | PAY-01 | Enforce valid transitions and at most one active attempt. An intent can require action, enter a hold, process, or end in success, failure, cancellation, or expiry. | Race two confirmations. Race cancellation with a result. Check one accepted transition and one durable attempt. |
@@ -43,6 +45,29 @@ Use durable jobs with claims, expiry, and bounded retry intervals. A restarted w
 ## Pilot evidence
 
 Exercise a successful payment and payout on the chosen corridor. Exercise refusal before dispatch, a lost response after dispatch, a lost response after ledger commit, and duplicate provider results. Reconcile the resulting journal, usage, fee, and provider records.
+
+Use the [simulated pilot roadmap](../roadmap.md#simulated-pilot) for sequencing. Map each scenario to the owning contract and record the evidence from each affected owner.
+This is a reading map for the **planned synthetic pilot**. The roadmap gives dependency order. Each capability contract remains authoritative for its own states and requirements. This map does not claim that an end-to-end runtime or pilot gate has passed.
+
+| Stage | Payment | Payout |
+|---|---|---|
+| Prerequisites | Start from the [pilot roadmap](../roadmap.md#simulated-pilot), [Identity](identity.md), [screening and onboarding](screening-and-onboarding.md), and [fees, limits, and accounts](fees-limits-and-accounts.md). | Use the same capability prerequisites, then validate the immutable recipient under [Payouts](#payouts). |
+| Start and reserve | Follow [Payments steps 1–3](#payments): create the intent, reserve usage, screen parties, and obtain required quotes. | Follow [Payouts steps 1–3](#payouts): validate the recipient, screen, reserve usage, and commit the ledger hold before dispatch. |
+| Convert currency when required | Read [FX execution and recovery](fx.md#execution-and-recovery). Check the current sequential-leg behavior and the proposed FX-05/06 atomic-group alternative; do not assume the alternative is accepted. | Apply the same FX contract and decision status when the payout currencies differ. |
+| Dispatch and resolve the provider result | Follow [Payments steps 4–5](#payments) and the [provider operation lifecycle](provider.md#operation-lifecycle). An unknown result remains processing and uses inquiry against the original provider. | Follow [Payouts steps 4–6](#payouts). An unknown result keeps funds and usage reserved; use the original provider reference. |
+| Record and reconcile money movement | Follow [Payments step 6](#payments), the [Ledger gate](ledger.md#ledger-gate-evidence), and [reconciliation](reconciliation-and-events.md#reconciliation). K3 posting and full Ledger runtime integration remain planned. | Follow the payout settlement, release, and return steps, then trace the journal and provider references through [reconciliation](reconciliation-and-events.md#reconciliation). |
+| Check pilot recovery acceptance | Use the [pilot gate](../roadmap.md#simulated-pilot) for daily reconciliation and worker recovery, and the [database restore procedure](../runbooks/recovery.md#restore-a-database) for restore evidence. | Apply the same pilot and restore gate to the payout flow. |
+
+Before implementation, resolve the [FEE-02 fee-consumption boundary](fees-limits-and-accounts.md#fee-quotes) and record the FX-05/06 decision. Read the existing payment and payout step lists for state transitions. The flow map links the contracts; it does not replace their requirements.
+
+| Scenario | Evidence to trace |
+|---|---|
+| Refusal or race before dispatch | [Transaction authorization](#transaction-authorization-boundary), OUT-01's committed hold, and [provider operation identity](provider.md#operation-lifecycle). |
+| Unknown result after dispatch | [Provider inquiry](provider.md#operation-lifecycle) uses the original provider and reference. OUT-02 keeps payout funds and usage reserved. See the [operator procedure](../runbooks/recovery.md#recover-an-unknown-provider-outcome). |
+| Provider success with missing local posting | PAY-02 keeps the payment processing and uses the original posting keys on a recoverable error. Payout step 5 pairs paid status with hold settlement. The [reconciliation contract](reconciliation-and-events.md#reconciliation) covers missing or mismatched records. |
+| Lost acknowledgement after Ledger commit | [Ledger replay and restore checks](ledger.md#recovery-tests) use the same key and verify a single journal and outbox effect. |
+| Incomplete currency conversion | [FX execution and recovery](fx.md#execution-and-recovery) defines the current sequential-leg checks and links the proposed atomic alternative. |
+| Duplicate or late provider evidence | [Provider inbound messages](provider.md#inbound-messages) retain conflict evidence. PAY-03 and OUT-03 handle duplicates and late results under their owning workflow. See [reconciliation](reconciliation-and-events.md#reconciliation) for tracked differences. |
 
 ## Transaction authorization boundary
 

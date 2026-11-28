@@ -6,12 +6,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler"
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler/verifyemailpage"
 	"github.com/herdifirdausss/mamony-go/internal/platform/httpedge"
 )
 
 func TestIdentityVerificationPageRemainsUnmounted(t *testing.T) {
-	page, err := handler.NewEmailVerificationPage("https://app.example.test")
+	page, err := verifyemailpage.New("https://app.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}

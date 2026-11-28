@@ -71,7 +71,7 @@ func (s *DeliveryStore) Claim(ctx context.Context, leaseID string) (usecase.Proo
 // Finalize uses the claim fencing token and lease deadline; a restarted
 // worker cannot acknowledge a lease owned by a newer worker. Temporary
 // failures retry after 1,2,4,8 minutes; fifth attempt is terminal.
-func (s *DeliveryStore) Finalize(ctx context.Context, challengeID, leaseID string, outcome usecase.ProofDeliveryOutcome) error {
+func (s *DeliveryStore) Finalize(ctx context.Context, challengeID, leaseID string, outcome usecase.DeliveryOutcome) error {
 	if s == nil || s.db == nil || len(challengeID) != 26 || len(leaseID) != 26 ||
 		(outcome != usecase.DeliveryAccepted && outcome != usecase.DeliveryTemporary && outcome != usecase.DeliveryPermanent) {
 		return ErrStorageUnavailable

@@ -23,7 +23,7 @@ type RecoveryDeliveryJob struct {
 
 type RecoveryDeliveryStore interface {
 	Claim(context.Context, string) (RecoveryDeliveryJob, bool, error)
-	Finalize(context.Context, string, string, ProofDeliveryOutcome) error
+	Finalize(context.Context, string, string, DeliveryOutcome) error
 }
 
 type RecoveryEnvelopeOpener interface {

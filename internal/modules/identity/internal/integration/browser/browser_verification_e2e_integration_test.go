@@ -20,6 +20,7 @@ import (
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler"
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler/verifyemailpage"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/integration/internal/fixture"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/mailcrypto"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/mailgun"
@@ -70,7 +71,7 @@ func TestIdentityZBrowserVerificationE2E(t *testing.T) {
 	regPool := open(regDSN, "mamony_identity_runtime")
 	proofPool := open(verifyDSN, "mamony_identity_verifier_runtime")
 	deliveryPool := open(deliveryDSN, "mamony_identity_delivery_runtime")
-	regStore, err := identitypg.NewStore(regPool)
+	regStore, err := identitypg.NewRegistrationStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +139,7 @@ func TestIdentityZBrowserVerificationE2E(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := handler.NewEmailVerificationPage("https://app.example.test")
+	page, err := verifyemailpage.New("https://app.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}

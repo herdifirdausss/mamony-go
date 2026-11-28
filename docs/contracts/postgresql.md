@@ -1,6 +1,17 @@
 # PostgreSQL contract
 
-**Implementation status:** DEC-01 is accepted and the platform migration runner (PR #17) passed disposable PostgreSQL CI. The HTTP application still has no database connection or payment/ledger runtime. A bounded runtime [pgxpool primitive](../../internal/platform/postgres/pool.go) is being verified with the existing synthetic RLS fixture; it is **not** tenant authorization, an owned business repository, or a production deployment. Restore and ledger behavior remain NOT RUN.
+**Effective design:** [DEC-01](../open-decisions.md#foundation-and-access) uses `golang-migrate/v4` with the pgx v5 driver and committed migration fingerprints. The default HTTP process serves health endpoints. Its readiness check covers the HTTP process. See the [migration runbook](../runbooks/platform-migrations.md) for the separate administrative command.
+
+## Implementation and evidence scope
+
+| Scope | Merged disposable evidence | Remaining acceptance |
+|---|---|---|
+| Migration runner | [PR #17](https://github.com/herdifirdausss/mamony-go/pull/17) covers platform apply, upgrade within the fixture, runtime-role denial, fingerprint checks, and dirty-state refusal. | Deployment grants, secrets, and supported upgrade and recovery evidence for the deployed target. |
+| Runtime pool and tenant isolation | The bounded [runtime pool](../../internal/platform/postgres/pool.go) and [PostgreSQL fixtures](../../tools/postgrestest/postgres_integration_test.go) exercise actual role and RLS checks, pooled connection reuse, rollback, and cancellation. | Tenant and resource authorization through the owning capability, deployment grant parity, and database-aware readiness. |
+| Platform and Identity restore | [RH-01 and RH-02](../proposals/platform-native-pitr-lab.md) cover the bounded physical restore lab. [RH-03](../current-state.md#evidence-at-the-inspected-main-commit) covers selected Identity state reconciliation. | RH-03 remains PARTIAL. Integrated RF-01–08 evidence is NOT RUN, and E2 remains BLOCKED. Full authority coverage and production recovery objectives remain open. |
+| Ledger storage and restore | [K2a](../proposals/ledger-k2a-isolated-persistence.md) covers the initial schema, scoped grants, and restore of a sealed fixture into a separate disposable database. | Full account lifecycle, authorized posting, outbox, and whole-Ledger recovery under the [Ledger acceptance checks](ledger.md#ledger-gate-evidence). |
+
+See the [testing strategy](../testing.md#postgresql-integration-stages) for the integration suite and the [recovery runbook](../runbooks/recovery.md#restore-a-database) for full restore acceptance. Review the [proposed native migration contract](#proposed-native-migration-contract-not-effective) when assessing a future change to DEC-01.
 
 ## Schemas and roles
 

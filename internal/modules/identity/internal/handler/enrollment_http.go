@@ -2,9 +2,7 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -103,7 +101,7 @@ func (h *EnrollmentHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxEnrollmentBody)
 	defer func() { _ = r.Body.Close() }()
-	email, password, err := decodeEnrollmentJSON(r.Body, action == usecase.AnonymousRegister)
+	email, password, err := decodeEmailPasswordRequestJSON(r.Body, action == usecase.AnonymousRegister)
 	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
@@ -140,54 +138,6 @@ func (h *EnrollmentHTTP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = err
 	}
 	WriteOpaqueAdmissionReceipt(w)
-}
-
-// decodeEnrollmentJSON rejects duplicate keys, unknown keys, wrong value
-// types, nested JSON and multiple top-level documents.
-func decodeEnrollmentJSON(body io.Reader, registration bool) (string, string, error) {
-	dec := json.NewDecoder(body)
-	first, err := dec.Token()
-	if err != nil || first != json.Delim('{') {
-		return "", "", ErrEnrollmentHandlerConfig
-	}
-	seen := make(map[string]bool, 2)
-	var email, password string
-	for dec.More() {
-		tok, err := dec.Token()
-		if err != nil {
-			return "", "", ErrEnrollmentHandlerConfig
-		}
-		name, ok := tok.(string)
-		if !ok || seen[name] || (name != "email" && (!registration || name != "password")) {
-			return "", "", ErrEnrollmentHandlerConfig
-		}
-		seen[name] = true
-		var value string
-		if err := dec.Decode(&value); err != nil {
-			return "", "", ErrEnrollmentHandlerConfig
-		}
-		switch name {
-		case "email":
-			if len(value) == 0 || len(value) > 254 {
-				return "", "", ErrEnrollmentHandlerConfig
-			}
-			email = value
-		case "password":
-			if len(value) == 0 || len(value) > 512 {
-				return "", "", ErrEnrollmentHandlerConfig
-			}
-			password = value
-		}
-	}
-	end, err := dec.Token()
-	if err != nil || end != json.Delim('}') || !seen["email"] ||
-		(registration && !seen["password"]) {
-		return "", "", ErrEnrollmentHandlerConfig
-	}
-	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return "", "", ErrEnrollmentHandlerConfig
-	}
-	return email, password, nil
 }
 
 func writeEnrollmentProblem(w http.ResponseWriter, status int, code string) {

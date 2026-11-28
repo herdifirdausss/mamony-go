@@ -57,7 +57,7 @@ func TestIdentityPasswordAuthentication(t *testing.T) {
 	regPool := open(regDSN, "mamony_identity_runtime")
 	verifyPool := open(verifyDSN, "mamony_identity_verifier_runtime")
 	authPool := open(authDSN, "mamony_identity_authenticator_runtime")
-	reg, err := identitypg.NewStore(regPool)
+	reg, err := identitypg.NewRegistrationStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}

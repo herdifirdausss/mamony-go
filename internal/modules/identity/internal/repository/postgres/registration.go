@@ -1,40 +1,31 @@
-// Package postgres persists Identity registration state through one limited
-// PostgreSQL transaction; it never authenticates or authorizes HTTP requests.
 package postgres
 
 import (
 	"context"
 	"errors"
 
-	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/domain"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-var ErrStorageUnavailable = errors.New("identity registration storage unavailable")
-
-// Transactor is deliberately consumer-side and accepts only operations
-// implemented by a credential-limited runtime connection pool.
-type Transactor interface {
-	WithTx(context.Context, func(pgx.Tx) error) error
-}
-
-type Store struct {
+// RegistrationStore persists pending Identity registration data through PostgreSQL.
+type RegistrationStore struct {
 	db Transactor
 }
 
-func NewStore(db Transactor) (*Store, error) {
+// NewRegistrationStore creates a registration store backed by the supplied transaction boundary.
+func NewRegistrationStore(db Transactor) (*RegistrationStore, error) {
 	if db == nil {
 		return nil, ErrStorageUnavailable
 	}
-	return &Store{db: db}, nil
+	return &RegistrationStore{db: db}, nil
 }
 
 // CreatePendingWithObligation inserts subject, alias, KDF verifier and a
 // durable identifier-only event in ONE transaction. No session or email
 // verification challenge is issued. Every failed insert rolls everything back.
-func (s *Store) CreatePendingWithObligation(ctx context.Context, r usecase.PendingRegistration) error {
+func (s *RegistrationStore) CreatePendingWithObligation(ctx context.Context, r usecase.PendingRegistration) error {
 	if s == nil || s.db == nil || r.Status != "UNVERIFIED" || r.CreatedAt.IsZero() ||
 		r.SubjectID == "" || r.EventID == "" || r.CanonicalEmail == "" ||
 		!isCanonicalEmail(r.CanonicalEmail) || !validVerifier(r.PasswordVerifier) {
@@ -78,14 +69,4 @@ func (s *Store) CreatePendingWithObligation(ctx context.Context, r usecase.Pendi
 		return ErrStorageUnavailable
 	}
 	return nil
-}
-
-func validVerifier(v domain.PasswordVerifier) bool {
-	return v.Version == 1 && v.MemoryKiB == 65536 && v.Iterations == 3 &&
-		v.Parallelism == 1 && len(v.Salt) == 16 && len(v.Digest) == 32
-}
-
-func isCanonicalEmail(email string) bool {
-	canonical, err := domain.CanonicalEmail(email)
-	return err == nil && canonical == email
 }
