@@ -7,7 +7,7 @@ See [current state](current-state.md) for the merged implementation and verifica
 | Capability | Start here |
 |---|---|
 | Platform and migrations | [Effective DEC-01 and Foundation choices](#foundation-and-access), [proposed DEC-01 amendment](#proposed-dec-01-amendment--foundation-105), [PostgreSQL contract](contracts/postgresql.md) |
-| Identity and public access | [Enrollment release decisions](#identity-enrollment-release-decisions), [login and session release decisions](#identity-login-and-session-release-decisions), [owning Identity contract](contracts/identity.md), [security architecture decisions](#security-architecture-decisions), [bounded passkey possession decision](#atomic-passkey-possession-verification-v36-critical-issue-78) |
+| Identity and public access | [Enrollment release decisions](#identity-enrollment-release-decisions), [login and session release decisions](#identity-login-and-session-release-decisions), [password-change release decisions](#identity-password-change-release-decisions), [owning Identity contract](contracts/identity.md), [security architecture decisions](#security-architecture-decisions), [bounded passkey possession decision](#atomic-passkey-possession-verification-v36-critical-issue-78) |
 | Platform recovery and Identity recovery sessions | [Platform recovery issue #14](https://github.com/herdifirdausss/mamony-go/issues/14), [recovery-fence evidence and E2 status](proposals/identity-recovery-fence.md#current-rf--experiment-disposition-supersedes-earlier-dependency-labels), [separate recovery-session prerequisites](proposals/identity-recovery-session-capability.md#changed-blocker-disposition) |
 | Ledger, money flows, and the pilot | [Money and recovery choices](#money-and-recovery), [Ledger implementation sequence](roadmap.md#ledger-implementation-sequence), [Ledger ownership decision](adr/0002-ledger-and-data-ownership.md) |
 | Governance and system design | [Branch protection and review issue #13](https://github.com/herdifirdausss/mamony-go/issues/13), [architecture decision index](adr/README.md) |
@@ -189,53 +189,52 @@ The original anchors below lead to the decisions at their original implementatio
 
 [Read the original slice record](history/identity-login-and-sessions.md#draft-49--credentialcontact-epoch-invalidation-and-stale-kdf-grant-fence).
 
-## Draft #50 — authenticated internal password change, purpose-bound grant
+## Identity password-change release decisions
 
-Proposed v15 introduces a separate **PASSWORD_CHANGE** one-use authentication grant and **mamony_identity_password_change_runtime** SQL role. The trusted Go usecase requires an active opaque session, pre-KDF admission and real old-password Argon2id comparison for that same subject, then mandatory new-password policy/blocklist, fresh salt/hash and a short-lived epoch-bound change grant. Its single SQL transaction checks current session, purpose/epoch and status after locks, rotates the verifier, increments epoch through v14 trigger and inserts one identifier-only `PASSWORD_CHANGED` outbox event. The old bearer and any prior grants are invalid immediately after commit. See [ADR-0013](adr/0013-authenticated-password-change.md).
+Read the [Identity contract](contracts/identity.md#authenticated-password-change-and-security-notices) for the merged synthetic flow and [issue #20](https://github.com/herdifirdausss/mamony-go/issues/20) for active work. The following decisions remain open before public activation or live notification.
 
-**Open:** owner approval of allowed password-change proof factors and old-session UI handling; real production compromised-password blocklist; MFA/recovery/step-up and password history; CSRF/Origin/TLS for a future unmounted route; outbox delivery and user notification; lock/contention measurements; secret/role workload isolation; and financial authorization. None are fulfilled by passing CI. No merge or route activation.
+| Decision still open | Evidence and scope |
+|---|---|
+| Reauthentication and runtime isolation | Review the password blocklist and capacity, MFA or step-up, CSRF key rotation, TLS and trusted proxy configuration, and deployment role isolation. Apply the relevant financial and resource authorization separately. [Authenticated password-change design](adr/0013-authenticated-password-change.md) · [HTTP candidate](adr/0018-first-party-password-change-http-candidate.md) |
+| Customer guidance and recovery handoff | Approve consent, localization, accessibility, uncertain-outcome guidance, and the trusted sign-in, recovery, and support path. The [one-shot page design](adr/0020-unmounted-password-change-recovery-page.md) and [browser evidence](runbooks/identity-browser-e2e.md#password-change-browser-evidence) describe the candidate scope. |
+| Live notice delivery and privacy | Approve the sending domain and provider account, egress, separate credentials and rotation, retention across operational data and backups, and bounce or complaint policy. Review callback ingress, missing-event reconciliation, and ambiguous provider responses. [Sender design](adr/0015-mailgun-password-change-notice-worker.md) · [Callback design](adr/0016-mailgun-security-notice-webhook-reconciliation.md) |
+| Operator monitoring and incident response | Set thresholds and monitoring cadence, assign ownership for unresolved or failed notices, and review alerting and recovery procedures. The [health probe design](adr/0017-read-only-notice-health-probe.md) defines the count-only scope. |
 
-## Draft #51 — durable password-change notification queue (no live send)
+### Password-change decision history links
 
-Proposed v16 atomically enqueues an email **obligation** from trusted `PASSWORD_CHANGED` events in a separate queue, with original DB session-user provenance to block verifier-role event forgery. A restricted worker credential can only claim/finalize leased notices, with five bounded attempts, recipient-alias recheck, 24h eligibility, and seven-day PII erasure. The identifier-only audit row survives. Existing mail verification delivery is not reused for password notices, preventing token-bearing challenge/ACTIVE-account mixups. See [ADR-0014](adr/0014-password-change-security-notices.md).
+The original anchors below lead to the decisions at their original implementation slices.
 
-**Still open:** actual provider transport (the new SecurityNoticeSender is mock-only), opt-in standalone process/bootstrap, sending-domain policy, bounces/complaints and provider retry-after, delivery monitoring and escalation for stale contact/dead letters, backup/WAL erasure, suppression policy, PKI/secret/workload isolation, and owner approval. Passing SQL and Go CI does not mean any email is sent. No merge/public activation.
+#### Draft #50 — authenticated internal password change, purpose-bound grant
 
-## Draft #52 — token-free Mailgun notice sender and explicit worker
+[Read the original slice record](history/identity-password-change.md#draft-50--authenticated-internal-password-change-purpose-bound-grant).
 
-ADR-0015 adds a region-pinned Mailgun sender for `PASSWORD_CHANGED` notices, separate from encrypted verification tokens, and a standalone opt-in worker with owner-only credential files and `mamony_identity_security_notice_runtime` SQL role. A real PostgreSQL + local HTTP mock test proves retry from 429 to 200 and correct event audit retention. Green CI does **not** claim a user received an email: the binary has not been deployed, enabled or given Mailgun credentials.
+#### Draft #51 — durable password-change notification queue (no live send)
 
-**Open:** verified Mailgun sending domain and regional DPA, SPF/DKIM/DMARC, dedicated domain sending key and rotation, operational worker deployment, provider bounce/complaint/receipt webhook authenticity, monitored DEAD or suppressed notice escalation, provider quotas, production PostgreSQL TLS/load, network egress and secret isolation, no-link warning UX wording review, owner release approval, MFA/recovery and protected user-facing password-change route. See [ADR-0015](adr/0015-mailgun-password-change-notice-worker.md). Keep Draft; no public endpoint activation.
+[Read the original slice record](history/identity-password-change.md#draft-51--durable-password-change-notification-queue-no-live-send).
 
-## Draft #53 — provider response correlation, signed webhook receipt and operator health
+#### Draft #52 — token-free Mailgun notice sender and explicit worker
 
-Proposed Identity v17 saves **only SHA-256 digests** of normalized Mailgun message IDs, signing tokens and event identities. The unmounted receiver validates Mailgun webhook HMAC with its **distinct** signing key, validates origin domain and 9h replay window, deduplicates receipts, and reconciles callback-before-sender-ack races. A separate webhook SQL role has one EXECUTE-only receipt function, and maintenance can read PII-free counts for due/dead/not-confirmed/SMTP-delivered/provider-failed/unmatched notices. No sender HTTP route or production webhook route was activated.
+[Read the original slice record](history/identity-password-change.md#draft-52--token-free-mailgun-notice-sender-and-explicit-worker).
 
-**Open:** production HTTPS webhook ingress and trusted network path, signing key loading and rotation, Mailgun account/subaccount domain verification, anti-abuse and monitoring, bounce/complaint suppression, provider API reconciliation when webhooks are missed, SLA alert thresholds/on-call ownership, exactly-once limitations, legacy ACCEPTED records without message-id, ambiguous send responses, provider security/privacy review and production permission approvals. See [ADR-0016](adr/0016-mailgun-security-notice-webhook-reconciliation.md). Do not merge, launch external services or enable public routes.
+#### Draft #53 — provider response correlation, signed webhook receipt and operator health
 
-## Draft #54 — count-only monitoring with a dedicated read-only credential
+[Read the original slice record](history/identity-password-change.md#draft-53--provider-response-correlation-signed-webhook-receipt-and-operator-health).
 
-Identity v18 adds a separate `mamony_identity_notice_monitor_runtime` role (schema USAGE + EXECUTE aggregate only; no purge, notice delivery, webhook writes or direct PII queries) and an explicit one-shot `mamony-identity-notice-health` CLI. Mandatory per-metric thresholds produce a redacted JSON `OK`/exit 0, `ALERT`/exit 2 or `ERROR`/exit 1. CI exercises real role-separated PostgreSQL and deterministic synthetic threshold tests. This does **not** activate monitoring, cron, paging, inbound/outbound Mailgun, recovery or public Identity HTTP.
+#### Draft #54 — count-only monitoring with a dedicated read-only credential
 
-**Open:** operator-approved thresholds and initial baseline, false-positive policy for due notices, scheduler/orchestration, monitoring sink, on-call ownership/escalation and incident response, secret rotation/least-privilege deployment, reconciliation of missed Mailgun events, and public ingress release approval. See [ADR-0017](adr/0017-read-only-notice-health-probe.md).
+[Read the original slice record](history/identity-password-change.md#draft-54--count-only-monitoring-with-a-dedicated-read-only-credential).
 
-## Draft #55 — first-party browser password-change candidate (unmounted)
+#### Draft #55 — first-party browser password-change candidate (unmounted)
 
-An isolated handler now exercises the existing `AuthenticatedPasswordChange` operation behind exact same-origin HTTPS browser requirements, session-bound HMAC CSRF, a strict 4096-byte JSON body and canonical alias. The form cannot choose a subject: the active cookie's owner must match the old-password's authenticated subject/epoch. Certain commits clear the browser cookie and require a separate login; denied password/policy/quota outcomes use the same generic HTTP response, and ambiguous SQL commits cannot claim success. No public/private router registration, migration or deployed listener was changed. See [ADR-0018](adr/0018-first-party-password-change-http-candidate.md).
+[Read the original slice record](history/identity-password-change.md#draft-55--first-party-browser-password-change-candidate-unmounted).
 
-**Unresolved before enabling:** real Chromium + disposable PostgreSQL end-to-end change-password test (including lost response), owner UX/consent and lockout guidance, account-specific password policy feedback without enumeration, approved breached-password blocklist, independent client/edge abuse controls, MFA/step-up/recovery, browser/CSRF secret rotation, production ingress TLS/proxy and workload isolation, notification deliverability and operational escalation, and financial action authorization. Keep the PR Draft/unmerged.
+#### Draft #56 — real browser/password-change atomicity and lost response
 
-## Draft #56 — real browser/password-change atomicity and lost response
+[Read the original slice record](history/identity-password-change.md#draft-56--real-browserpassword-change-atomicity-and-lost-response).
 
-A disposable `httptest.NewTLSServer` + Playwright Chromium + restricted PostgreSQL role fixture now covers the **unmounted** password-change HTTP candidate end-to-end. Both successful and dropped-after-commit responses are exercised; a lost response cannot restore an epoch-stale cookie or make an old password valid. SQL evidence checks precisely one `PASSWORD_CHANGED` event and event-linked pending notice per synthetic subject. The required real-browser workflow now includes the new test alongside existing email verification and session E2E. See [ADR-0019](adr/0019-browser-password-change-postgres-e2e.md).
+#### Draft #57 — one-shot browser password-change UX (unmounted)
 
-**Still open:** real production ingress/proxy/TLS validation; a production frontend with clear uncertain-outcome and session-logout messaging; safe lockout/recovery UX, breached-password policy, MFA/step-up, deployment role and key isolation, live Mailgun sender/webhook/alerting, monitoring/SLA, financial resource authorization and owner approval. Browser regression and disposable PostgreSQL tests are not permission to mount the endpoint or merge the draft stack.
-
-## Draft #57 — one-shot browser password-change UX (unmounted)
-
-A first-party, strict-CSP HTML/JavaScript candidate now renders a single-use change-password form only after verifying a live session and obtaining a session-bound CSRF. It clears DOM password inputs and locks the form after one mutation. HTTP 204 indicates a confirmed change; generic 401 indicates a denied change; response loss/503/other results never trigger an automatic retry and instead show an explicit **unknown result**. Browser/SQL E2E must prove denial and lost-after-commit behavior. See [ADR-0020](adr/0020-unmounted-password-change-recovery-page.md).
-
-**Still unresolved:** officially owned login/recovery/support routes, user-facing security copy/localization/accessibility approval, MFA and step-up, production password blocklist, full operational identity role/ingress/CSRF key isolation, real notice deliverability, and release orchestration. None of the page or password-change routes is installed in the default public/private listeners. Keep every stacked PR draft and unmerged.
+[Read the original slice record](history/identity-password-change.md#draft-57--one-shot-browser-password-change-ux-unmounted).
 
 ## Draft #58 — forgot-password recovery proof and threat model (no reset capability)
 
