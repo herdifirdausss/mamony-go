@@ -18,36 +18,36 @@ import (
 
 // Migration targets are fixed by code, never constructed from HTTP or an
 // untrusted database value. Roles must not own one another's schemas.
-type target struct {
+type migrationTarget struct {
 	schema string
 	role   string
 	lockID int64
 }
 
 var (
-	platformTarget = target{schema: "mamony_platform", role: "mamony_platform_migrator", lockID: 731198465908223}
-	identityTarget = target{schema: "mamony_identity", role: "mamony_identity_migrator", lockID: 731198465908224}
-	ledgerTarget   = target{schema: "mamony_ledger", role: "mamony_ledger_migrator", lockID: 731198465908225}
+	platformTarget = migrationTarget{schema: "mamony_platform", role: "mamony_platform_migrator", lockID: 731198465908223}
+	identityTarget = migrationTarget{schema: "mamony_identity", role: "mamony_identity_migrator", lockID: 731198465908224}
+	ledgerTarget   = migrationTarget{schema: "mamony_ledger", role: "mamony_ledger_migrator", lockID: 731198465908225}
 )
 
 // A session lock serializes manifest preflight and postflight for each target.
 // golang-migrate also owns its own independent lock.
 func Run(ctx context.Context, dsn, dir string) error {
-	return runTarget(ctx, dsn, dir, platformTarget)
+	return runMigrationTarget(ctx, dsn, dir, platformTarget)
 }
 
 // RunIdentity uses a different owned schema, role and advisory lock.
 func RunIdentity(ctx context.Context, dsn, dir string) error {
-	return runTarget(ctx, dsn, dir, identityTarget)
+	return runMigrationTarget(ctx, dsn, dir, identityTarget)
 }
 
 // RunLedger is the fixed Ledger migration target. K2a calls it only from
 // its disposable integration lab; no application or command wiring exists.
 func RunLedger(ctx context.Context, dsn, dir string) error {
-	return runTarget(ctx, dsn, dir, ledgerTarget)
+	return runMigrationTarget(ctx, dsn, dir, ledgerTarget)
 }
 
-func runTarget(ctx context.Context, dsn, dir string, target target) error {
+func runMigrationTarget(ctx context.Context, dsn, dir string, target migrationTarget) error {
 	if dsn == "" {
 		return errors.New("migration credentials not provided")
 	}
@@ -60,7 +60,7 @@ func runTarget(ctx context.Context, dsn, dir string, target target) error {
 		return fmt.Errorf("connect as migration role: %w", err)
 	}
 	defer func() { _ = conn.Close(context.Background()) }()
-	if err := checkRoleFor(ctx, conn, target); err != nil {
+	if err := checkMigrationTarget(ctx, conn, target); err != nil {
 		return err
 	}
 
@@ -123,19 +123,7 @@ func runTarget(ctx context.Context, dsn, dir string, target target) error {
 	return nil
 }
 
-func sameFiles(a, b []File) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func checkRoleFor(ctx context.Context, conn *pgx.Conn, target target) error {
+func checkMigrationTarget(ctx context.Context, conn *pgx.Conn, target migrationTarget) error {
 	var name string
 	var safe bool
 	err := conn.QueryRow(ctx, `SELECT rolname,
@@ -150,7 +138,7 @@ func checkRoleFor(ctx context.Context, conn *pgx.Conn, target target) error {
 	var schemaOwner string
 	err = conn.QueryRow(ctx, "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = $1", target.schema).Scan(&schemaOwner)
 	if err != nil {
-		return fmt.Errorf("platform schema not provisioned by admin: %w", err)
+		return fmt.Errorf("migration schema %q not provisioned by admin: %w", target.schema, err)
 	}
 	if strings.TrimSpace(schemaOwner) != target.role {
 		return errors.New("schema owner is not the authorized migration role")
@@ -158,106 +146,3 @@ func checkRoleFor(ctx context.Context, conn *pgx.Conn, target target) error {
 	return nil
 }
 
-// Verify checks database-committed digests against the current SQL directory.
-// Missing or inconsistent history fails closed, including after an interrupted
-// migration. It does not repair dirty versions or detect superuser tampering.
-func Verify(ctx context.Context, conn *pgx.Conn, files []File) error {
-	return verifyFor(ctx, conn, files, platformTarget.schema)
-}
-
-// VerifyIdentity checks identity migration fingerprints with the same rules.
-func VerifyIdentity(ctx context.Context, conn *pgx.Conn, files []File) error {
-	return verifyFor(ctx, conn, files, identityTarget.schema)
-}
-
-// VerifyLedger verifies Ledger migration history using its own manifest.
-func VerifyLedger(ctx context.Context, conn *pgx.Conn, files []File) error {
-	return verifyFor(ctx, conn, files, ledgerTarget.schema)
-}
-
-func verifyFor(ctx context.Context, conn *pgx.Conn, files []File, schema string) error {
-	var hasVersion, hasHistory bool
-	err := conn.QueryRow(ctx, `SELECT to_regclass($1) IS NOT NULL, to_regclass($2) IS NOT NULL`,
-		schema+".schema_migrations", schema+".migration_fingerprints").Scan(&hasVersion, &hasHistory)
-	if err != nil {
-		return fmt.Errorf("read migration catalogs: %w", err)
-	}
-	if !hasVersion {
-		if hasHistory {
-			return errors.New("fingerprint history exists without a schema version table")
-		}
-		return nil // Fresh schema; only provisioning exists.
-	}
-	rows, err := conn.Query(ctx, fmt.Sprintf("SELECT version, dirty FROM %s.schema_migrations", schema))
-	if err != nil {
-		return fmt.Errorf("read schema version: %w", err)
-	}
-	var version int64
-	count := 0
-	dirty := false
-	for rows.Next() {
-		if err := rows.Scan(&version, &dirty); err != nil {
-			rows.Close()
-			return fmt.Errorf("scan version: %w", err)
-		}
-		count++
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if count > 1 {
-		return errors.New("multiple schema version records")
-	}
-	if dirty {
-		return errors.New("migration version is dirty; manual recovery required")
-	}
-	if count == 0 || version < 0 {
-		if hasHistory {
-			return errors.New("fingerprint history exists without a committed schema version")
-		}
-		return nil // golang-migrate created an empty version table.
-	}
-	if !hasHistory {
-		return errors.New("committed version exists without fingerprint history")
-	}
-	expected := make(map[int64]string)
-	foundCurrent := false
-	for _, file := range files {
-		if file.Version <= version {
-			expected[file.Version] = file.Digest
-		}
-		if file.Version == version {
-			foundCurrent = true
-		}
-	}
-	if !foundCurrent {
-		return fmt.Errorf("applied schema version %d missing from local migration files", version)
-	}
-	recordRows, err := conn.Query(ctx, fmt.Sprintf("SELECT version, sha256 FROM %s.migration_fingerprints", schema))
-	if err != nil {
-		return fmt.Errorf("query fingerprint history: %w", err)
-	}
-	for recordRows.Next() {
-		var v int64
-		var got string
-		if err := recordRows.Scan(&v, &got); err != nil {
-			recordRows.Close()
-			return fmt.Errorf("read migration fingerprint: %w", err)
-		}
-		want, ok := expected[v]
-		if !ok || want != got {
-			recordRows.Close()
-			return fmt.Errorf("fingerprint mismatch for applied migration %d", v)
-		}
-		delete(expected, v)
-	}
-	recordRows.Close()
-	if err := recordRows.Err(); err != nil {
-		return err
-	}
-	if len(expected) != 0 {
-		return fmt.Errorf("%d applied migrations have no verified fingerprint", len(expected))
-	}
-	return nil
-}
