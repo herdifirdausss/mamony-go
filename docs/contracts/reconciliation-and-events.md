@@ -4,6 +4,8 @@ The reconciliation module explains differences. The back office owns operator wo
 
 ## Reconciliation
 
+Use the [pilot evidence scenarios](payments-and-payouts.md#pilot-evidence) to connect an operation to its original provider result, workflow state, committed journal references, and usage records. Retrieve facts through their owning interfaces and apply the matching rules below.
+
 | ID | Requirement | Acceptance check |
 |---|---|---|
 | REC-01 | Ingest a provider report as a batch with source, period, file fingerprint, counts, and totals. Store each provider item and reject inconsistent totals before matching. | Ingest the same file twice. Test an invalid total and a duplicate external reference. |
