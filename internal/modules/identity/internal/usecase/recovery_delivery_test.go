@@ -13,7 +13,7 @@ type recoveryDeliveryStoreMock struct {
 	found     bool
 	claimed   int
 	finalized int
-	outcome   ProofDeliveryOutcome
+	outcome   DeliveryOutcome
 	claimErr  error
 	finalErr  error
 }
@@ -25,7 +25,7 @@ func (m *recoveryDeliveryStoreMock) Claim(_ context.Context, lease string) (Reco
 	return job, m.found, m.claimErr
 }
 
-func (m *recoveryDeliveryStoreMock) Finalize(_ context.Context, _, _ string, outcome ProofDeliveryOutcome) error {
+func (m *recoveryDeliveryStoreMock) Finalize(_ context.Context, _, _ string, outcome DeliveryOutcome) error {
 	m.finalized++
 	m.outcome = outcome
 	return m.finalErr
@@ -81,7 +81,7 @@ func TestRecoveryDeliveryWorkerOutcomeIsolation(t *testing.T) {
 		name  string
 		send  error
 		open  error
-		want  ProofDeliveryOutcome
+		want  DeliveryOutcome
 		calls int
 	}{
 		{"success", nil, nil, DeliveryAccepted, 1},

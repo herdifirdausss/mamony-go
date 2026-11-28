@@ -13,7 +13,7 @@ type fakeRecoveryCodeNoticeStore struct {
 	claimErr   error
 	finalErr   error
 	calls      int
-	outcome    ProofDeliveryOutcome
+	outcome    DeliveryOutcome
 	providerID string
 }
 
@@ -24,7 +24,7 @@ func (s *fakeRecoveryCodeNoticeStore) Claim(_ context.Context, lease string) (Re
 	s.job.LeaseID = lease
 	return s.job, true, nil
 }
-func (s *fakeRecoveryCodeNoticeStore) Finalize(_ context.Context, _, _ string, o ProofDeliveryOutcome, id string) error {
+func (s *fakeRecoveryCodeNoticeStore) Finalize(_ context.Context, _, _ string, o DeliveryOutcome, id string) error {
 	s.calls++
 	s.outcome = o
 	s.providerID = id
@@ -75,7 +75,7 @@ func TestRecoveryCodeSecurityNoticeWorkerFailureAndFencing(t *testing.T) {
 		name       string
 		sendErr    error
 		providerID string
-		outcome    ProofDeliveryOutcome
+		outcome    DeliveryOutcome
 	}{
 		{name: "transport temporary", sendErr: ErrDeliveryUnavailable, outcome: DeliveryTemporary},
 		{name: "provider permanent", sendErr: ErrPermanentDelivery, outcome: DeliveryPermanent},
