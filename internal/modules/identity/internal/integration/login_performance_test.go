@@ -117,7 +117,7 @@ func TestIdentityLoginPerformance(t *testing.T) {
 
 	kdf, err := credential.NewPasswordHasher(1)
 	requireLoginPerf(t, err)
-	registration, err := identitypg.NewStore(regPool)
+	registration, err := identitypg.NewRegistrationStore(regPool)
 	requireLoginPerf(t, err)
 	proofs, err := identitypg.NewProofStore(verifyPool)
 	requireLoginPerf(t, err)

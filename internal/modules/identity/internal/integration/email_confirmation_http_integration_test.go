@@ -64,7 +64,7 @@ func TestIdentityZEmailConfirmationHTTPDB(t *testing.T) {
 		return p
 	}
 	regPool := open(regDSN, "mamony_identity_runtime")
-	reg, err := identitypg.NewStore(regPool)
+	reg, err := identitypg.NewRegistrationStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}
