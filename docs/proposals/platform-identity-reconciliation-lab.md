@@ -1,6 +1,8 @@
 # Synthetic Identity reconciliation lab — RH-03
 
-**Status:** owner-approved bounded Draft implementation; independent technical acceptance DEFERRED; G6 merge NOT AUTHORIZED; production readiness NOT ACCEPTED.
+**Current disposition:** [PR #95](https://github.com/herdifirdausss/mamony-go/pull/95) merged the bounded synthetic lab. RH-03 remains PARTIAL. The renewed exact-pair owner authorization record remains unresolved. Production readiness is NOT ACCEPTED. See [current state](../current-state.md#evidence-at-the-inspected-main-commit) for the merged evidence and its limits.
+
+**Historical candidate status:** Owner-approved bounded Draft implementation. Independent technical acceptance DEFERRED. G6 merge NOT AUTHORIZED at that checkpoint. The following sections preserve candidate reviews and their scope at the time.
 **Owner:** Platform [#14](https://github.com/herdifirdausss/mamony-go/issues/14), Identity [#78](https://github.com/herdifirdausss/mamony-go/issues/78).
 **Scope decision:** [owner approval](https://github.com/herdifirdausss/mamony-go/issues/14#issuecomment-7149877826).
 **Base inspected:** 3f402ff668d582d774b2fb3494a4703a602b0eb8.

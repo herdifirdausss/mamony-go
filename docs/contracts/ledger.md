@@ -2,7 +2,16 @@
 
 The ledger is the sole writer of balances. See the [ledger and data ownership decision](../adr/0002-ledger-and-data-ownership.md).
 
-[K1 — Monetary domain](../roadmap.md#ledger-implementation-sequence), [FND-02a–d reference slices](platform.md#configuration-data-and-operations) and [K2a — Isolated persistence foundation](../proposals/ledger-k2a-isolated-persistence.md) are merged for bounded synthetic use. Durable journal posting and runtime integration remain planned. See [current state](../current-state.md).
+## Implementation and evidence scope
+
+| Scope | Read here | Evidence boundary |
+|---|---|---|
+| Monetary domain (K1) | [K1 contract](#k1-isolated-monetary-domain-synthetic-experiment), [domain package](../../internal/modules/ledger/internal/domain/), and [PR #91](https://github.com/herdifirdausss/mamony-go/pull/91) | Merged pure-Go journal and balance arithmetic, with an independent model test. |
+| Currency reference admission (FND-02a–d) | [Platform reference scope](platform.md#configuration-data-and-operations) and [Ledger admission](#fnd-02b-isolated-currency-admission-synthetic-experiment) | Merged synthetic reference slices. The unmounted Ledger facade admits the curated USD definition. Full FND-02 lifecycle acceptance remains open. |
+| Isolated persistence (K2a) | [Accepted scope and fixture results](../proposals/ledger-k2a-isolated-persistence.md) | Merged isolated schema, grants, storage and restore for the frozen USD fixture. Full account lifecycle and runtime integration remain planned. |
+| Durable posting through restore (K3–K6) | [Ledger sequence](../roadmap.md#ledger-implementation-sequence) and [gate evidence](#ledger-gate-evidence) | Authorized posting, durable replay, reversal, outbox delivery and whole-Ledger recovery remain planned. |
+
+Use [current state](../current-state.md) for the merged baseline and [Issue #86](https://github.com/herdifirdausss/mamony-go/issues/86) to track the remaining design and sequencing work.
 
 ## K1 isolated monetary domain (synthetic experiment)
 
@@ -54,7 +63,7 @@ Before implementation, record which fields are part of replay identity. Include 
 
 Use the [PostgreSQL contract](postgresql.md) for schema ownership and runtime roles. Apply its tenant-isolation tests to tenant-owned tables. Check the ledger through its database grants and its calling capability's authorization.
 
-Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). All Ledger database checks above remain **NOT RUN**; isolated domain/reference test evidence does not satisfy them.
+Record the commit, PostgreSQL version, migration version, test commands, and observed results in the [PR evidence](../../.github/pull_request_template.md). K1 has pure-domain and independent model evidence. [K2a](../proposals/ledger-k2a-isolated-persistence.md) has separate disposable database evidence for fixture storage, grants, and restore. The full Ledger gate remains open. Durable posting, replay, reversal, event delivery, and whole-Ledger restore with the verifier remain **NOT RUN**.
 
 ## Account lifecycle and reads
 
@@ -95,6 +104,8 @@ Test `Read Committed` with explicit locks as a candidate. A Go design must prove
 | A backup restores. | Journal and entry totals, account sequences, permissions, and outbox records agree. The verifier detects any drift. |
 
 ## Data and package plan
+
+This table describes the target runtime model. Refer to the [K2a scope](../proposals/ledger-k2a-isolated-persistence.md) for the isolated schema and storage that have merged.
 
 | Record | Key or constraint | Owner |
 |---|---|---|
