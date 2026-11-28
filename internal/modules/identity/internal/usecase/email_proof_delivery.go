@@ -26,17 +26,9 @@ type ProofDeliveryJob struct {
 	ExpiresAt   time.Time
 }
 
-type ProofDeliveryOutcome string
-
-const (
-	DeliveryAccepted  ProofDeliveryOutcome = "ACCEPTED"
-	DeliveryTemporary ProofDeliveryOutcome = "TEMPORARY"
-	DeliveryPermanent ProofDeliveryOutcome = "PERMANENT"
-)
-
 type ProofDeliveryStore interface {
 	Claim(context.Context, string) (ProofDeliveryJob, bool, error)
-	Finalize(context.Context, string, string, ProofDeliveryOutcome) error
+	Finalize(context.Context, string, string, DeliveryOutcome) error
 }
 
 type ProofEnvelopeOpener interface {

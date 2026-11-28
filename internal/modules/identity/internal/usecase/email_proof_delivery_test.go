@@ -13,7 +13,7 @@ type fakeDeliveryStore struct {
 	has     bool
 	claimed int
 	final   int
-	outcome ProofDeliveryOutcome
+	outcome DeliveryOutcome
 	fail    bool
 }
 
@@ -30,7 +30,7 @@ func (f *fakeDeliveryStore) Claim(_ context.Context, lease string) (ProofDeliver
 	return j, true, nil
 }
 
-func (f *fakeDeliveryStore) Finalize(_ context.Context, challenge, lease string, outcome ProofDeliveryOutcome) error {
+func (f *fakeDeliveryStore) Finalize(_ context.Context, challenge, lease string, outcome DeliveryOutcome) error {
 	f.final++
 	if f.fail {
 		return errors.New("secret from DB")
@@ -93,7 +93,7 @@ func TestDeliveryWorkerRetriesWithoutLoggingOrLeakingSecrets(t *testing.T) {
 		sendErr    error
 		decryptErr bool
 		ttl        time.Duration
-		outcome    ProofDeliveryOutcome
+		outcome    DeliveryOutcome
 		calls      int
 	}{
 		{"transient", errors.New("API credential raw secret"), false, 10 * time.Minute, DeliveryTemporary, 1},
