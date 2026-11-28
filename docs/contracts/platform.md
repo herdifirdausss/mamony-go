@@ -9,7 +9,7 @@ The current binary reads listener addresses at startup and shuts down on cancell
 | FND-01 | Load typed configuration at startup. Validate required values and bounds. Read test credentials from the configured secret source. | Invalid configuration stops startup. Logs and errors omit secrets. |
 | FND-02 | Keep one reference list for country codes and currency exponents. Represent each amount as currency plus integer minor units. Each capability can enable a subset of currencies. | Reject undefined exponents and unsupported currencies. Test zero-, two-, and three-decimal currencies. |
 | FND-03 | Version migrations by schema. Protect applied migration files from edits. Separate owner and runtime grants. | Run bootstrap and migrations on an empty database. Upgrade a supported fixture. Check owners and grants in the catalog. |
-| FND-04 | Use structured logs with a correlation ID. Record the actor, action, target, outcome, time, and capability for controlled changes. | Follow one request across a job and a consumer. Check redaction and trace continuity. |
+| FND-04 | Use structured logs with a correlation ID. Record the actor, action, target, outcome, time, and capability for controlled changes. | Follow one request across a job and a consumer. Check redaction and trace continuity. See the [observability proposal](../proposals/observability-foundation.md) for a candidate only; it does not amend FND-04. |
 | FND-05 | Provide one local startup command once PostgreSQL joins the application. Give the process bounded startup and shutdown. | Start from a clean clone with synthetic fixtures. Cancel the process during a job. Check that work can resume. |
 
 ### FND-02a — curated reference experiment
