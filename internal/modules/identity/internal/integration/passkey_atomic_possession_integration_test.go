@@ -1298,4 +1298,3 @@ func TestIdentityZPasskeyAtomicPossession(t *testing.T) {
 		})
 	}
 }
-
