@@ -8,7 +8,7 @@ The default HTTP run starts only `cmd/mamony`. Each other command requires a sep
 
 | Command | Delegates to | PostgreSQL role | Observable effect | Evidence |
 |---|---|---|---|---|
-| [`mamony`](../cmd/mamony/main.go) | `app.Run` | None | Starts the public and private health listeners. Handles process signals. | [Listener startup, shutdown, and isolation](../internal/app/app_test.go) |
+| [`mamony`](../cmd/mamony/main.go) | `app.Run` | None | Starts the public and private health listeners. Handles process signals. | [Listener startup, shutdown, and isolation](../internal/app/http_server_test.go) |
 | [`mamony-identity-mail-worker`](../cmd/mamony-identity-mail-worker/main.go) | `identity.RunDelivery` | `mamony_identity_delivery_runtime` | Polls the email proof outbox and submits eligible messages to Mailgun after explicit opt-in. | [Worker startup and secret handling](../cmd/mamony-identity-mail-worker/main_test.go) |
 | [`mamony-identity-maintain`](../cmd/mamony-identity-maintain/main.go) | `identity.PurgeRetention` | `mamony_identity_maintenance_runtime` | Runs one bounded retention purge batch after explicit opt-in. | [Maintenance opt-in and secret validation](../cmd/mamony-identity-maintain/main_test.go) |
 | [`mamony-identity-reconcile`](../cmd/mamony-identity-reconcile/main.go) | `identity.InspectEnrollmentBacklog` and `identity.ReconcileEnrollmentOnce` | `mamony_identity_verifier_runtime` | Reads the enrollment backlog. Approved repair issues missing first proofs in one bounded pass and reads the backlog again. | [Reconciliation CLI behavior](../cmd/mamony-identity-reconcile/main_test.go) · [Operator runbook](runbooks/identity-reconciliation.md) |
