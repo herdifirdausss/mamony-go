@@ -1,6 +1,6 @@
 # Identity enrollment: first implementation slice
 
-**Status:** DRAFT / stacked PRs #22–#31; SQL Identity storage, internal proof verification, and encrypted delivery queue/worker ports are implemented. **No public HTTP Identity route, deployed worker or provider credentials, real email send, session or login.** Tracking: [Identity issue #20](https://github.com/herdifirdausss/mamony-go/issues/20).
+**Status:** Historical implementation record for merged synthetic PRs #22–#31. Public enablement is NOT ACCEPTED. See the [Identity contract](../contracts/identity.md#enrollment-and-contact-verification) for current scope and the [enrollment history](../history/identity-enrollment.md) for later proof confirmation and browser verification. The sections below describe the original slices.
 
 The initial PR implements a pure Identity domain policy, credential adapter, and an atomic enrollment port. The stacked storage PR adds a least-privileged Identity PostgreSQL repository, schema, migrator and real transaction tests. Neither PR exposes registration or login as public HTTP routes. Real provider delivery, running worker and public HTTP activation are still disabled.
 

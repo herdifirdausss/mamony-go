@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler/internal/browserpage"
 )
 
 //go:embed password_change_page.js password_change_page.css
@@ -33,7 +35,7 @@ func NewPasswordChangePage(browser *BrowserSessionHTTP) (*PasswordChangePage, er
 
 func (h *PasswordChangePage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// No cache, referrer, frames, third-party fetch or persisted state.
-	setVerificationPageHeaders(w)
+	browserpage.SetSecurityHeaders(w)
 	if h == nil || h.browser == nil || r == nil || r.URL == nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return

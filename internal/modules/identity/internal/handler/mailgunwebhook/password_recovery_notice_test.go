@@ -1,4 +1,4 @@
-package handler
+package mailgunwebhook
 
 import (
 	"net/http"
@@ -14,7 +14,7 @@ func TestMailgunRecoveryNoticeWebhookSignatureAndRotation(t *testing.T) {
 	active := []byte("active-recovery-webhook-signing-fixture-key")
 	retained := []byte("retained-recovery-webhook-signing-fixture-key")
 	recorder := &fakeNoticeWebhookRecorder{}
-	webhook, err := NewMailgunRecoveryNoticeWebhook(
+	webhook, err := NewPasswordRecoveryNotice(
 		[][]byte{active, retained}, "mg.example.test", recorder)
 	if err != nil {
 		t.Fatal(err)
@@ -55,10 +55,10 @@ func TestMailgunRecoveryNoticeWebhookSignatureAndRotation(t *testing.T) {
 	if recorder.calls != 2 {
 		t.Fatal("unverified callback reached recovery receipt recorder")
 	}
-	if _, err := NewMailgunRecoveryNoticeWebhook(nil, "mg.example.test", recorder); err == nil {
+	if _, err := NewPasswordRecoveryNotice(nil, "mg.example.test", recorder); err == nil {
 		t.Fatal("recovery handler accepted missing signature verification keys")
 	}
-	if _, err := NewMailgunRecoveryNoticeWebhook([][]byte{active}, "mg.example.test", nil); err == nil {
+	if _, err := NewPasswordRecoveryNotice([][]byte{active}, "mg.example.test", nil); err == nil {
 		t.Fatal("recovery handler accepted missing restricted recorder")
 	}
 	if strings.Contains(recorder.seen.DeliveryState, "sensitive") {

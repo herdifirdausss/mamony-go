@@ -52,7 +52,7 @@ go test -tags=integration,browser_e2e \
   -count=1 -timeout=4m ./internal/modules/identity/internal/integration/browser
 ```
 
-The test bridge is **not** a production DNS, TLS ingress or proxy test. A browser E2E passing does not resolve the `mamony_identity_session_runtime` direct-mint privilege, production CSRF key management, MFA, financial authorization or release gates. Keep #43 and #44 Draft and all candidate routes unmounted.
+The test bridge is **not** a production DNS, TLS ingress or proxy test. These observations describe the v10 fixture. See [the v11 fixture](#draft-46--grant-bound-session-e2e-candidate) for subsequent evidence on the direct-mint boundary. Production CSRF key management, MFA, financial authorization, and release approval remain open. PRs [#43](https://github.com/herdifirdausss/mamony-go/pull/43) and [#44](https://github.com/herdifirdausss/mamony-go/pull/44) merged the unmounted candidate and its synthetic browser tests.
 
 ## Draft #46 — grant-bound session E2E candidate
 
@@ -69,6 +69,16 @@ Mandatory disposable-PostgreSQL `TestIdentityZMaxActiveSessions` exercises five 
 ## Draft #49 — credential mutation race regression
 
 Required PostgreSQL `TestIdentityZAuthMaterialEpochFence` uses disposable role-separated SQL to verify that password and current contact changes transactionally invalidate previous opaque sessions and grants, including a deterministic grant-stage SQL wait behind a concurrent password rotation. Snapshot epoch is read with verifier before real Argon2id in existing browser E2E; one-use grant stage now requires the same epoch, so it cannot re-issue with a newly changed account epoch. No reset/password-change HTTP route is introduced or browser-tested. See [ADR-0012](../adr/0012-auth-material-epoch-grant-fence.md).
+
+## Password-change browser evidence
+
+The [password-change E2E test](../../internal/modules/identity/internal/integration/browser/browser_password_change_e2e_integration_test.go) and its [Chromium driver](../../tools/browsercheck/real_browser_password_change_e2e.cjs) run the unmounted mutation and one-shot page against disposable PostgreSQL in the existing [browser workflow](../../.github/workflows/identity-real-browser-e2e.yml). [PR #56](https://github.com/herdifirdausss/mamony-go/pull/56) added the mutation scenarios. [PR #57](https://github.com/herdifirdausss/mamony-go/pull/57) added the page scenarios.
+
+- Confirmed password changes invalidate the previous sessions. The database checks the epoch, the audit event, and its linked pending security notice.
+- After a lost response following commit, the page reports uncertainty and keeps the form locked. The browser test checks that the client sends only one mutation and that the stale session is denied.
+- The fixture uses a local TLS bridge and synthetic credentials. Production ingress, live notification, and account-recovery acceptance have separate evidence requirements.
+
+The following notes describe earlier dependencies at their original slices.
 
 ## Draft #50 — internal password-change integration evidence
 
