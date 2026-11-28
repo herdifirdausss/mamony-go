@@ -1,6 +1,6 @@
 # Platform migrations: operations and recovery
 
-**Decision:** DEC-01 accepted 2026-11-21. See [platform proposal](../proposals/postgresql-foundation.md), [PostgreSQL contract](../contracts/postgresql.md) and [testing strategy](../testing.md).
+**Effective decision:** [DEC-01](../open-decisions.md#foundation-and-access), accepted 2026-11-21. Use the [PostgreSQL evidence scope](../contracts/postgresql.md#implementation-and-evidence-scope) and [testing strategy](../testing.md#postgresql-integration-stages) to select the applicable checks. [ADR-0042](../adr/0042-context-aware-migration-executor.md) records the proposed native executor amendment.
 
 ## Scope
 
@@ -44,13 +44,13 @@ Before adding a new migration, use the [migration file validation tests](../../i
 | Fault | Expected behavior |
 |---|---|
 | Invalid or missing migration credentials | Command refuses to start; no SQL applied |
-| Runtime/owner/superuser credentials instead of migrator | Command refuses to start |
+| Wrong database role, elevated role attributes, or unexpected schema owner | Command refuses to start. The required schema owner is the dedicated migrator. |
 | Edited file or trailer | Preflight refuses before SQL migration |
 | SQL fails after one DDL statement | PostgreSQL rolls back that batch, `golang-migrate` retains a dirty version; no automatic retry |
 | Process crashes after body/digest commit but before version becomes clean | `schema_migrations` may remain dirty; next call refuses. An operator inspects the committed schema/digest before any explicit recovery |
 | Digest row missing or changed while version is clean | Next call refuses; **do not** self-heal, rehash old SQL or force version |
 | Two migration commands race | The second command cannot enter fingerprint verification while the first holds the session lock |
-| Restore a stale database | An application restore drill must separately verify schema version, fingerprint table, role grants and domain data; **NOT RUN** in this slice |
+| Restore a stale database | Use the [database restore procedure](recovery.md#restore-a-database). Verify schema version, fingerprints, role grants, and domain data before deciding whether the target may resume service. |
 
 **Manual incident handling:** stop new application writes, capture DB backup and current schema catalog, compare applied SQL fingerprints and schema versions with the audited release, determine whether the DDL committed, and document a forward-fix or explicit version repair separately. `golang-migrate force` is intentionally not wired into `make` because it bypasses dirty-state checks. A repair requires explicit operator approval, an audited SQL change and re-run of integration/restore verification. Do not claim the separate version table is atomic with the migration SQL.
 
@@ -58,6 +58,7 @@ Before adding a new migration, use the [migration file validation tests](../../i
 
 - **Migration-file validation:** regular Go unit tests, `make migrations-check`.
 - **Real migration integration:** disposable PostgreSQL `TestPostgresPlatformMigration` covers fresh apply, replay, runtime privilege denial, altered/re-signed SQL rejection, missing history, successful upgrade, rollback on failed SQL and sticky dirty state.
-- **NOT RUN in this slice:** a production secret provider, deployment image digest, app `pgxpool` runtime adapter, real tenant authorization, ledger/idempotency/locking, outbox, backup-and-restore drills, and long-running migration performance.
+- **Related disposable checks:** the [PostgreSQL evidence scope](../contracts/postgresql.md#implementation-and-evidence-scope) links runtime pool and RLS, Platform and Identity restore, and Ledger K2a storage and restore.
+- **Release evidence pending:** production secret provisioning, deployment image and grants, capability-level tenant authorization, long-running migration performance, and full recovery for the deployed scopes.
 
 Record `PASS`, `FAIL` or `NOT RUN` separately. A green SQL fixture CI job is **not** evidence that live traffic can safely perform financial transactions.
