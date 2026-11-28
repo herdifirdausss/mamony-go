@@ -1,10 +1,12 @@
 # ADR 0009 — Authentication-to-session issuance trust boundary (Proposed; Draft PR #45)
 
-Status: **PROPOSED design; Draft PR #46 implements a synthetic v11 code candidate for adversarial validation. Owner/security acceptance and production workload proof remain outstanding.**
+Status: **PROPOSED design.** [PR #46](https://github.com/herdifirdausss/mamony-go/pull/46) merged the synthetic v11 grant-bound candidate. Owner and security acceptance and production workload proof remain outstanding.
 Parent stack: Draft #45 → #44 → #43 → #42 → #41 → #40. Profile **A**, synthetic first-party browser only.
 No new public routes, migration, DB roles or trusted production workload boundaries are introduced by this ADR.
 
 ## The concrete bypass (reproduced)
+
+This section records the v10 finding. The v11 candidate removed the subject-only issuer, and the existing integration test now checks denial. See the [merged synthetic scope](../contracts/identity.md#password-login-and-browser-sessions) for the current implementation path.
 
 Identity v10 has `mamony_identity.issue_opaque_session(subject,digest,event)`, a `SECURITY DEFINER` function. It checks that the subject is ACTIVE, has a verified contact, and has a current session epoch; it does **not** check that the caller verified a password. Its dedicated `mamony_identity_session_runtime` SQL role has direct EXECUTE. An attacker who obtains **only that DB role credential** and learns an eligible `sub_...` ID can choose their own 256-bit bearer, submit its SHA-256 digest, and receive a valid session. The subsequent cookie's HttpOnly, CSRF, pre-KDF admission and Argon2id in Go cannot defend this direct SQL path.
 

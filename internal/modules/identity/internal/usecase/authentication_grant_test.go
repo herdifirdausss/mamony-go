@@ -12,6 +12,37 @@ import (
 	"testing"
 )
 
+type fakeAuthenticationGrantStore struct {
+	allow   bool
+	err     error
+	stages  int
+	subject string
+	epoch   int64
+	digest  []byte
+}
+
+func (f *fakeAuthenticationGrantStore) Stage(_ context.Context, subject string, epoch int64, digest []byte) (bool, error) {
+	f.stages++
+	f.subject = subject
+	f.epoch = epoch
+	f.digest = append([]byte(nil), digest...)
+	return f.allow, f.err
+}
+
+func (f *fakeAuthenticationGrantStore) StageChange(ctx context.Context, subject string, epoch int64, digest []byte) (bool, error) {
+	return f.Stage(ctx, subject, epoch, digest)
+}
+
+func testAuthenticationGrantAuthority(t *testing.T) (*AuthenticationGrantAuthority, *fakeAuthenticationGrantStore) {
+	t.Helper()
+	store := &fakeAuthenticationGrantStore{allow: true}
+	a, err := NewAuthenticationGrantAuthority(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a, store
+}
+
 func TestAuthenticationGrantSecretAndAmbiguousStageFailClosed(t *testing.T) {
 	grant, store := testAuthenticationGrantAuthority(t)
 	subject := "sub_AAAAAAAAAAAAAAAAAAAAAA"

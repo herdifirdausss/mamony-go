@@ -10,6 +10,8 @@ Use [the ledger](ledger.md) for balances. Use [onboarding](screening-and-onboard
 | FEE-02 | Bind the quote to the tenant and command. Record its rule version, fee, legs, and expiry. Consume it once in the posting transaction through a ledger participant. | Reject expiry and changed input. Race two uses. Check that a rolled-back posting leaves the quote available. A replay returns the original posting. |
 | FEE-03 | Apply a rule change only after an independent approval of its exact content. Keep the version that priced each quote. | Change a rule while an existing quote is active. Check that its recorded amount and version remain stable. |
 
+**Open design decision.** FEE-02 calls for consumption in the posting transaction. [ADR-0002](../adr/0002-ledger-and-data-ownership.md#ledger-ownership) limits the transaction to Ledger-owned effects by default. The [candidate amendments](../proposals/ledger-cross-border-payments.md#i2--exact-candidate-requirement-amendments-core-and-quotes) record the conflict and explain the change an independent fee-owner claim would make to quote availability after rollback. Resolve that choice before implementing FEE-02 and [payment posting](payments-and-payouts.md#payments).
+
 ## policy and usage
 
 | ID | Requirement | Acceptance check |
