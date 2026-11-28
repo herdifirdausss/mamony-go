@@ -183,6 +183,12 @@ A future cookie-based HTTP login/session/logout contract is **documented but not
 
 Unexported runtime wiring remains **deliberately absent**. The Identity handler package offers `NewBrowserSessionHTTP` requiring concrete `SessionLogin`, opaque session authority, exact HTTPS Origin, direct peer resolver **without proxy trust** and a separate 32-byte CSRF HMAC key; it supports four **unmounted** HTTP candidate paths. Both default public/private listeners must continue returning 404 for every candidate route (`TestListenerRouteIsolation`). `httptest` covers strict origin/host/direct TLS/forwarded-header, admission-before-KDF, max-2048 JSON duplicate-key protection, 12h host-only HttpOnly Secure SameSite=Strict cookie, signed per-session CSRF token (15min), cookie-only session check, and revoke-before-cookie-clear logout. All errors are generic, no-store and fail closed. No production secret or route exists; never reuse synthetic test HMAC keys in deployment. See `docs/adr/0008-unmounted-browser-session-http-candidate.md` for all release blockers, particularly the **high-risk session database role's direct token minting privilege**.
 
+## Password-change notice scope
+
+PRs [#51](https://github.com/herdifirdausss/mamony-go/pull/51) through [#54](https://github.com/herdifirdausss/mamony-go/pull/54) merged the internal queue, opt-in sender, unmounted callback, and read-only health probe. The provider tests use a local mock. A queued obligation, provider acceptance, reported SMTP delivery, and inbox receipt are distinct outcomes. Each probe result reports aggregate counts against the configured thresholds.
+
+Use the [release decision register](../open-decisions.md#identity-password-change-release-decisions) for live delivery and monitoring prerequisites. The following notes preserve the individual implementation slices.
+
 ## Draft #51 — password-change security notices (separate from verification tokens)
 
 Identity v16 adds `password_change_notices` for the `PASSWORD_CHANGED` event. Unlike `email_proof_deliveries`, these jobs contain no encrypted bearer or verification URL and belong to ACTIVE account credentials. A trigger accepts the event only from the **original authenticated password-change SQL runtime** and snapshots the verified email into a separate PII-limited table atomically with v15 password rotation. Compromised verifier SQL permissions cannot forge notices.
