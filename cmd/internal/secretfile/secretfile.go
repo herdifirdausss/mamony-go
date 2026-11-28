@@ -43,7 +43,6 @@ func OpenPrivate(path string) (*os.File, error) {
 	return file, nil
 }
 
-
 // ReadPrivateLimited reads a non-empty private regular file with a strict byte limit.
 // It rejects size changes observed during the read and returns a generic error
 // that does not reveal the path or underlying filesystem error.
