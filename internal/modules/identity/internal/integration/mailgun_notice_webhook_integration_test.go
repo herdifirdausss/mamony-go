@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity"
-	identityhandler "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler"
+	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/handler/mailgunwebhook"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/integration/internal/fixture"
 	identitypg "github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/repository/postgres"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
@@ -95,7 +95,7 @@ func TestIdentityMailgunMockWebhookReconciliation(t *testing.T) {
 		t.Fatal(err)
 	}
 	secret := []byte("synthetic-webhook-signing-key-not-sending-api-key")
-	webhook, err := identityhandler.NewMailgunSecurityNoticeWebhook(
+	webhook, err := mailgunwebhook.NewSecurityNotice(
 		[][]byte{secret}, "mg.example.test", recorder)
 	if err != nil {
 		t.Fatal(err)

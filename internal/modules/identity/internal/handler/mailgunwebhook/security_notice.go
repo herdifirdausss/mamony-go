@@ -1,4 +1,4 @@
-package handler
+package mailgunwebhook
 
 import (
 	"crypto/hmac"
@@ -16,17 +16,17 @@ import (
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity/internal/usecase"
 )
 
-// MailgunSecurityNoticeWebhook is an UNMOUNTED handler candidate. Only a
+// SecurityNotice is an UNMOUNTED handler candidate. Only a
 // separately reviewed, TLS-terminated, rate-limited webhook ingress may mount
 // it. Never share the Mailgun Sending API key as the webhook signing key.
-type MailgunSecurityNoticeWebhook struct {
+type SecurityNotice struct {
 	keys     [][]byte
 	domain   string
 	recorder usecase.SecurityNoticeWebhookRecorder
 	clock    func() time.Time
 }
 
-func NewMailgunSecurityNoticeWebhook(keys [][]byte, domain string, recorder usecase.SecurityNoticeWebhookRecorder) (*MailgunSecurityNoticeWebhook, error) {
+func NewSecurityNotice(keys [][]byte, domain string, recorder usecase.SecurityNoticeWebhookRecorder) (*SecurityNotice, error) {
 	if recorder == nil || len(keys) == 0 || len(keys) > 2 ||
 		domain == "" || domain != strings.ToLower(domain) ||
 		len(domain) > 253 || strings.ContainsAny(domain, " /\\\r\n") {
@@ -39,7 +39,7 @@ func NewMailgunSecurityNoticeWebhook(keys [][]byte, domain string, recorder usec
 		}
 		copied = append(copied, append([]byte(nil), key...))
 	}
-	return &MailgunSecurityNoticeWebhook{
+	return &SecurityNotice{
 		keys: copied, domain: domain, recorder: recorder, clock: time.Now,
 	}, nil
 }
@@ -79,7 +79,7 @@ func validWebhookHex(raw string, length int) bool {
 	return true
 }
 
-func (h *MailgunSecurityNoticeWebhook) validSignature(sig mailgunNoticeEnvelope) bool {
+func (h *SecurityNotice) validSignature(sig mailgunNoticeEnvelope) bool {
 	ts := sig.Signature.Timestamp
 	token := sig.Signature.Token
 	raw := sig.Signature.Signature
@@ -135,7 +135,7 @@ func classifyMailgunNoticeEvent(event, severity string) (string, bool) {
 // ServeHTTP is never mounted by the Identity API router. Bad requests receive
 // a generic 406 (Mailgun does not retry); only transient DB failures return
 // 503 so Mailgun can retry. No provider PII/body is copied into logs or errors.
-func (h *MailgunSecurityNoticeWebhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *SecurityNotice) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h == nil || h.recorder == nil || h.clock == nil || r == nil {
 		http.Error(w, "unavailable", http.StatusServiceUnavailable)
 		return
@@ -202,4 +202,4 @@ func (h *MailgunSecurityNoticeWebhook) ServeHTTP(w http.ResponseWriter, r *http.
 }
 
 // Implement the net/http handler contract without activating a route.
-var _ http.Handler = (*MailgunSecurityNoticeWebhook)(nil)
+var _ http.Handler = (*SecurityNotice)(nil)

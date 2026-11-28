@@ -1,6 +1,6 @@
 # Identity Phase 1 — Secure enrollment, login and authorization
 
-**Tracking issue:** [#20](https://github.com/herdifirdausss/mamony-go/issues/20). **Status:** The narrow first-party Profile A implementation direction and email-verification-before-activation were approved by the owner on 2026-11-21. PRs #22–#24 remain draft and public enablement is NOT accepted; detailed operational delivery, KDF budget and admission controls remain pending. Original G2 candidate text below is a historical design proposal, not proof of implementation. **Scope:** Mamony Go, one-process modular monolith; first-party browser customer flow with synthetic users. **Review date:** 2026-11-21.
+**Tracking issue:** [#20](https://github.com/herdifirdausss/mamony-go/issues/20). **Status:** The narrow first-party Profile A implementation direction and email-verification-before-activation were approved by the owner on 2026-11-21. PRs #22–#24 merged for internal synthetic use. Public enablement is NOT ACCEPTED. See the [Identity contract](../contracts/identity.md#enrollment-and-contact-verification) for the accepted requirements and the [release decisions](../open-decisions.md#identity-enrollment-release-decisions) for the outstanding operational scope. The proposal below preserves the original design review, including its candidate requirements. **Scope:** Mamony Go, one-process modular monolith; first-party browser customer flow with synthetic users. **Review date:** 2026-11-21.
 
 ## G0 — Problem, actors and goal
 
