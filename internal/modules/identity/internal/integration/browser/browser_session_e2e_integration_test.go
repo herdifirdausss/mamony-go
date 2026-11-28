@@ -71,7 +71,7 @@ func TestIdentityZBrowserSessionE2E(t *testing.T) {
 	grantPool := open(grantDSN, "mamony_identity_auth_grant_runtime")
 	sessionPool := open(sessionDSN, "mamony_identity_session_runtime")
 
-	reg, err := identitypg.NewStore(regPool)
+	reg, err := identitypg.NewRegistrationStore(regPool)
 	if err != nil {
 		t.Fatal(err)
 	}

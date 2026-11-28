@@ -53,7 +53,7 @@ func TestIdentityMailgunMockPipeline(t *testing.T) {
 		t.Cleanup(pool.Close)
 		return pool
 	}
-	reg, err := identitypg.NewStore(open(regDSN, "mamony_identity_runtime"))
+	reg, err := identitypg.NewRegistrationStore(open(regDSN, "mamony_identity_runtime"))
 	if err != nil {
 		t.Fatal(err)
 	}

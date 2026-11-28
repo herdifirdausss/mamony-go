@@ -48,7 +48,7 @@ func TestIdentityRegistrationPersistence(t *testing.T) {
 		t.Fatalf("open limited Identity runtime: %v", err)
 	}
 	defer pool.Close()
-	store, err := NewStore(pool)
+	store, err := NewRegistrationStore(pool)
 	if err != nil {
 		t.Fatal(err)
 	}
