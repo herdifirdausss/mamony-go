@@ -4,6 +4,8 @@ Run these procedures in the synthetic test environment before claiming a gate. R
 
 ## Restore a database
 
+Use this procedure to assess full restore acceptance for the affected capability. The PostgreSQL [evidence scope](../contracts/postgresql.md#implementation-and-evidence-scope) links the bounded PITR, Identity reconciliation, and Ledger K2a drills. Apply each result to its documented fixture scope. Full Ledger restore still requires the [Ledger verifier and gate evidence](../contracts/ledger.md#ledger-gate-evidence). Keep the recovery gate open when a required check or implementation is missing.
+
 1. Select a backup and record its recovery point.
 2. Restore onto a fresh server with the documented roles and migrations.
 3. Compare journal counts, balances, sequences, outbox state, and grants.
