@@ -7,11 +7,10 @@ import (
 	"errors"
 	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/herdifirdausss/mamony-go/cmd/internal/secretfile"
 	"github.com/herdifirdausss/mamony-go/internal/modules/identity"
 )
 
@@ -96,30 +95,14 @@ func readRuntimeConfig(getenv func(string) string, args []string) (identity.Deli
 }
 
 func readPrivateFile(path string, limit int64) ([]byte, error) {
-	if path == "" || !filepath.IsAbs(path) || limit < 1 {
+	if limit < 1 {
 		return nil, errStartup
 	}
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() ||
-		before.Mode().Perm()&0077 != 0 || before.Mode().Perm()&0400 == 0 {
-		return nil, errStartup
-	}
-	// os.Root confines file opens to the selected directory. Combined with
-	// Lstat + SameFile this refuses symlinks and unexpected path replacement.
-	root, err := os.OpenRoot(filepath.Dir(path))
-	if err != nil {
-		return nil, errStartup
-	}
-	defer func() { _ = root.Close() }()
-	f, err := root.Open(filepath.Base(path))
+	f, err := secretfile.OpenPrivate(path)
 	if err != nil {
 		return nil, errStartup
 	}
 	defer func() { _ = f.Close() }()
-	after, err := f.Stat()
-	if err != nil || !os.SameFile(before, after) {
-		return nil, errStartup
-	}
 	raw, err := io.ReadAll(io.LimitReader(f, limit+1))
 	if err != nil || len(raw) == 0 || int64(len(raw)) > limit {
 		return nil, errStartup
