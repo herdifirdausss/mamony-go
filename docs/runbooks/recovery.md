@@ -38,6 +38,8 @@ Use this procedure to assess full restore acceptance for the affected capability
 
 ## Recover compromised identity or approval state
 
+This procedure covers operator recovery after authority compromise or restore. See the [account-recovery contract](../contracts/identity.md#account-recovery-and-saved-codes) for customer recovery and the [recovery-session proposal](../proposals/identity-recovery-session-capability.md) for post-restore session policy.
+
 1. Declare the attacker scope: application runtime, tenant/business tables, authoritative identity data, session store, keys, approval state, migration/deploy administration and backups. Record which independent authorities, if any, are still trusted.
 2. Restrict affected authentication and financial actions using the owning authority. Do not report a freeze complete until the required deny state and propagation barrier are acknowledged.
 3. Revoke compromised credentials and sessions, pause risky recovery and key actions, and preserve audit evidence outside the suspect writer's permissions where possible.
